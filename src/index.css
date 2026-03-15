@@ -1,0 +1,43 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  font-family: "Noto Serif KR", "Noto Sans KR", serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: #e8e8e8;
+  background-color: #0f1729;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #0f1729;
+  min-height: 100dvh;
+}
+
+#root {
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100dvh;
+}
+
+h1, h2, h3, p { margin: 0; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+select {
+  font-family: inherit;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}

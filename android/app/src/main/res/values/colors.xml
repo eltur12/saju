@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_score_gold">#FFD700</color>
+    <color name="widget_score_green">#4CAF50</color>
+    <color name="widget_score_gray">#B0B0B0</color>
+    <color name="widget_score_red">#F44336</color>
+</resources>

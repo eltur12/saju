@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">사주 운세</string>
+    <string name="title_activity_main">사주 운세</string>
+    <string name="package_name">com.saju.fortune</string>
+    <string name="custom_url_scheme">com.saju.fortune</string>
+    <string name="widget_description">오늘의 사주 운세를 홈 화면에서 바로 확인하세요</string>
+</resources>

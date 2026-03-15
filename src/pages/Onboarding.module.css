@@ -1,0 +1,130 @@
+.container {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  background: #0f1729;
+}
+
+.logo {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.title {
+  font-size: 1.6rem;
+  color: #c9a84c;
+  text-align: center;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.05em;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: #8899aa;
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  width: 100%;
+  max-width: 360px;
+}
+
+.section {
+  margin-bottom: 1.5rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.8rem;
+  color: #c9a84c;
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.03em;
+}
+
+.selectRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.select {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(136, 153, 170, 0.3);
+  border-radius: 8px;
+  color: #e8e8e8;
+  padding: 0.6rem 0.4rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  appearance: none;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.select:focus {
+  outline: none;
+  border-color: #c9a84c;
+}
+
+.select option {
+  background: #1a2540;
+}
+
+.btn {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(135deg, #c9a84c, #a8883c);
+  border: none;
+  border-radius: 12px;
+  color: #0f1729;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  margin-top: 0.5rem;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn:hover { opacity: 0.9; }
+.btn:active { transform: scale(0.98); }
+
+.genderRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.genderBtn {
+  flex: 1;
+  padding: 0.65rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(136, 153, 170, 0.3);
+  border-radius: 8px;
+  color: #8899aa;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.genderBtnActive {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: #c9a84c;
+  color: #c9a84c;
+  font-weight: 600;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: #5a6a7a;
+  text-align: center;
+  margin-top: 1rem;
+}
