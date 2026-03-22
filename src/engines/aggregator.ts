@@ -3,8 +3,8 @@
  */
 import type { ScoreMap } from "./sajuEngine";
 import { buildSajuEngineFromProfile, type SajuEngineProfile } from "./sajuEngine";
-import { buildZiweiEngineFromProfile, SAMPLE_ZIWEI_PROFILE, type ZiweiProfile } from "./ziweiEngine";
-import { buildAstroEngineFromProfile, SAMPLE_ASTRO_PROFILE, type AstroProfile } from "./astroEngine";
+import { buildZiweiEngineFromProfile, type ZiweiProfile } from "./ziweiEngine";
+import { buildAstroEngineFromProfile, type AstroProfile } from "./astroEngine";
 import { getLunarDate } from "../utils/lunarConverter";
 import { generateTodos, generateSummary } from "./todoGenerator";
 
@@ -45,8 +45,8 @@ export class FortuneAggregator {
 
   constructor(
     sajuProfile: SajuEngineProfile,
-    ziweiProfile: ZiweiProfile = SAMPLE_ZIWEI_PROFILE,
-    astroProfile: AstroProfile = SAMPLE_ASTRO_PROFILE,
+    ziweiProfile: ZiweiProfile,
+    astroProfile: AstroProfile,
     engineWeights = ENGINE_WEIGHTS,
     birthDate = new Date(1998, 0, 22),
   ) {
@@ -79,7 +79,7 @@ export class FortuneAggregator {
     const badge   = scoreToBadge(merged.overall);
     const lunar   = getLunarDate(targetDate);
     const summary = generateSummary(merged, sajuResult.factors, ziweiResult.factors);
-    const todos   = generateTodos(merged, sajuResult.factors, badge);
+    const todos   = generateTodos(merged, sajuResult.factors, badge, targetDate);
 
     return {
       date:       `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`,

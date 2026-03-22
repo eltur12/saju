@@ -202,12 +202,45 @@ export class SajuEngine {
     return scores;
   }
 
+  /** 절기(節氣) 기준 월주(月柱) 계산 */
+  private dateToMonthPillar(date: Date): [string, string] {
+    // 절기 시작 근사값: [달력월(1-12), 일, 지지인덱스]
+    const JIEQI: [number, number, number][] = [
+      [1,  6,  1],  // 소한 → 丑月
+      [2,  4,  2],  // 입춘 → 寅月
+      [3,  6,  3],  // 경칩 → 卯月
+      [4,  5,  4],  // 청명 → 辰月
+      [5,  6,  5],  // 입하 → 巳月
+      [6,  6,  6],  // 망종 → 午月
+      [7,  7,  7],  // 소서 → 未月
+      [8,  7,  8],  // 입추 → 申月
+      [9,  8,  9],  // 백로 → 酉月
+      [10, 8, 10],  // 한로 → 戌月
+      [11, 7, 11],  // 입동 → 亥月
+      [12, 7,  0],  // 대설 → 子月
+    ];
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    // 기본값: 子月 (대설 전 12월 초 또는 1월 소한 전)
+    let branchIdx = 0;
+    for (let i = JIEQI.length - 1; i >= 0; i--) {
+      const [jm, jd, bIdx] = JIEQI[i];
+      if (m > jm || (m === jm && d >= jd)) { branchIdx = bIdx; break; }
+    }
+    // 사주 년도는 입춘(2/4) 기준으로 바뀜
+    const year = date.getFullYear();
+    const sajuYear = (m === 1 || (m === 2 && d < 4)) ? year - 1 : year;
+    const yearStemIdx = ((sajuYear - 1900) % 10 + 10) % 10;
+    // 寅月(branchIdx=2) 시작 천간: 甲己→丙(2), 乙庚→戊(4), 丙辛→庚(6), 丁壬→壬(8), 戊癸→甲(0)
+    const yinStartStem = ((yearStemIdx % 5) * 2 + 2) % 10;
+    const stemIdx = (yinStartStem + ((branchIdx - 2 + 12) % 12)) % 10;
+    return [HEAVENLY_STEMS[stemIdx], EARTHLY_BRANCHES[branchIdx]];
+  }
+
   calculate(targetDate: Date): { scores: ScoreMap; factors: Record<string, unknown> } {
     const [targetStem, targetBranch] = this.dateToStemBranch(targetDate);
-    // 현재 월(月)의 간지 — 해당 월 1일 기준으로 계산해 월별 변화를 반영
-    const [monthStem, monthBranch] = this.dateToStemBranch(
-      new Date(targetDate.getFullYear(), targetDate.getMonth(), 1),
-    );
+    // 현재 월주 — 절기(節氣) 기준으로 계산
+    const [monthStem, monthBranch] = this.dateToMonthPillar(targetDate);
     let scores = this.baseScores();
     scores = this.applyTenGod(scores, this.month_stem, 0.8); // 출생 월주
     scores = this.applyTenGod(scores, monthStem, 0.7);       // 현재 월주 (월별 변화 핵심)

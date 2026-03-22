@@ -48,6 +48,10 @@ export interface ZiweiProfile {
   sihua: Record<string, { palace: string; star: string }>;
   current_dahan: string;
   dahan_stars: string[];
+  /** 유월(流月): 월별 활성 궁 이름 [0=1월 .. 11=12월] */
+  monthly_palaces: string[];
+  /** 유년 사화(流年四化): 化祿·化權·化科·化忌 → 궁 이름 */
+  year_sihua_palaces: Record<string, string>;
 }
 
 export class ZiweiEngine {
@@ -55,12 +59,16 @@ export class ZiweiEngine {
   private sihua: Record<string, { palace: string; star: string }>;
   private current_dahan: string;
   private dahan_stars: string[];
+  private monthly_palaces: string[];
+  private year_sihua_palaces: Record<string, string>;
 
   constructor(p: ZiweiProfile) {
     this.palaces = p.palaces;
     this.sihua = p.sihua;
     this.current_dahan = p.current_dahan;
     this.dahan_stars = p.dahan_stars;
+    this.monthly_palaces = p.monthly_palaces;
+    this.year_sihua_palaces = p.year_sihua_palaces;
   }
 
   private palaceScore(palaceName: string): ScoreMap {
@@ -104,6 +112,22 @@ export class ZiweiEngine {
     return scores;
   }
 
+  /** 유년 사화(流年四化) 적용 — natal 사화의 0.5배 강도 */
+  private applyYearSihua(scores: ScoreMap): ScoreMap {
+    const sihuaTypes = ["化祿", "化權", "化科", "化忌"] as const;
+    for (const sihuaType of sihuaTypes) {
+      const palace = this.year_sihua_palaces[sihuaType];
+      if (palace) {
+        const weight = PALACE_WEIGHT[palace] ?? { overall: 0.5, wealth: 0.5, love: 0.5, health: 0.5, career: 0.5 };
+        const effect = SIHUA_EFFECTS[sihuaType];
+        (Object.keys(scores) as (keyof ScoreMap)[]).forEach(k => {
+          scores[k] += Math.trunc(effect[k] * weight[k] * 0.5);
+        });
+      }
+    }
+    return scores;
+  }
+
   private applyDahan(scores: ScoreMap): ScoreMap {
     const dahanScores = this.palaceScore(this.current_dahan);
     (Object.keys(scores) as (keyof ScoreMap)[]).forEach(k => {
@@ -127,10 +151,11 @@ export class ZiweiEngine {
     });
 
     this.applySihua(scores);
+    this.applyYearSihua(scores);
     this.applyDahan(scores);
 
-    const PALACE_ORDER = ["命宮","兄弟","夫妻","子女","財帛","疾厄","遷移","交友","官祿","田宅","福德","父母"];
-    const monthlyPalace = PALACE_ORDER[targetDate.getMonth()];
+    // 유월(流月): liunian 기반 월별 활성 궁 (달력 월 0-11)
+    const monthlyPalace = this.monthly_palaces[targetDate.getMonth()] ?? "命宮";
     const monthlyScores = this.palaceScore(monthlyPalace);
     (Object.keys(scores) as (keyof ScoreMap)[]).forEach(k => {
       scores[k] += Math.trunc((monthlyScores[k] ?? 0) * 0.4);
@@ -171,6 +196,8 @@ export const SAMPLE_ZIWEI_PROFILE: ZiweiProfile = {
   },
   current_dahan: "夫妻",
   dahan_stars: ["廉貞","貪狼"],
+  monthly_palaces: ["命宮","兄弟","夫妻","子女","財帛","疾厄","遷移","交友","官祿","田宅","福德","父母"],
+  year_sihua_palaces: { "化祿": "官祿", "化權": "財帛", "化科": "遷移", "化忌": "疾厄" },
 };
 
 export function buildZiweiEngineFromProfile(profile: ZiweiProfile): ZiweiEngine {

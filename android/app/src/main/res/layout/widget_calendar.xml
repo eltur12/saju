@@ -6,86 +6,90 @@
     android:orientation="vertical"
     android:padding="12dp">
 
-    <!-- 헤더: 이전달 | 년월 | 다음달 | 오늘 -->
+    <!-- 헤더: 년월 | 오늘 | ‹ › -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="32dp"
+        android:layout_height="42dp"
         android:orientation="horizontal"
         android:gravity="center_vertical">
-
-        <TextView
-            android:id="@+id/btn_prev"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:text="‹"
-            android:textSize="22sp"
-            android:textColor="#FFFFFF"
-            android:gravity="center"
-            android:background="@android:color/transparent" />
 
         <TextView
             android:id="@+id/tv_month_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:gravity="center"
-            android:textSize="15sp"
+            android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
             android:text="" />
 
         <TextView
-            android:id="@+id/btn_next"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:text="›"
-            android:textSize="22sp"
-            android:textColor="#FFFFFF"
-            android:gravity="center"
-            android:background="@android:color/transparent" />
-
-        <TextView
             android:id="@+id/btn_today"
             android:layout_width="wrap_content"
             android:layout_height="24dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
             android:text="오늘"
-            android:textSize="11sp"
-            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:textColor="#1BC4A8"
             android:gravity="center"
             android:background="@drawable/widget_badge_bg"
             android:paddingStart="8dp"
             android:paddingEnd="8dp" />
+
+        <TextView
+            android:id="@+id/btn_prev"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:text="&#8249;"
+            android:textSize="26sp"
+            android:textColor="#55FFFFFF"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/btn_next"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:text="&#8250;"
+            android:textSize="26sp"
+            android:textColor="#55FFFFFF"
+            android:gravity="center" />
     </LinearLayout>
+
+    <!-- 틸 강조선 -->
+    <TextView
+        android:layout_width="28dp"
+        android:layout_height="2dp"
+        android:layout_marginTop="3dp"
+        android:layout_marginBottom="5dp"
+        android:background="#1BC4A8" />
 
     <!-- 요일 헤더 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="4dp">
+        android:orientation="horizontal">
 
         <TextView android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:gravity="center"
-            android:text="일" android:textSize="11sp" android:textColor="#FF9999" />
+            android:text="일" android:textSize="12sp" android:textColor="#7DFF6666" />
         <TextView android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:gravity="center"
-            android:text="월" android:textSize="11sp" android:textColor="#CCFFFFFF" />
+            android:text="월" android:textSize="12sp" android:textColor="#50FFFFFF" />
         <TextView android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:gravity="center"
-            android:text="화" android:textSize="11sp" android:textColor="#CCFFFFFF" />
+            android:text="화" android:textSize="12sp" android:textColor="#50FFFFFF" />
         <TextView android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:gravity="center"
-            android:text="수" android:textSize="11sp" android:textColor="#CCFFFFFF" />
+            android:text="수" android:textSize="12sp" android:textColor="#50FFFFFF" />
         <TextView android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:gravity="center"
-            android:text="목" android:textSize="11sp" android:textColor="#CCFFFFFF" />
+            android:text="목" android:textSize="12sp" android:textColor="#50FFFFFF" />
         <TextView android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:gravity="center"
-            android:text="금" android:textSize="11sp" android:textColor="#CCFFFFFF" />
+            android:text="금" android:textSize="12sp" android:textColor="#50FFFFFF" />
         <TextView android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:gravity="center"
-            android:text="토" android:textSize="11sp" android:textColor="#AAAAFF" />
+            android:text="토" android:textSize="12sp" android:textColor="#7D9999FF" />
     </LinearLayout>
 
     <!-- 달력 그리드 -->
@@ -95,10 +99,155 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:numColumns="7"
-        android:verticalSpacing="1dp"
-        android:horizontalSpacing="1dp"
-        android:rowHeight="42dp"
+        android:verticalSpacing="0dp"
+        android:horizontalSpacing="0dp"
         android:layout_marginTop="2dp"
         android:stretchMode="columnWidth" />
+
+    <!-- 구분선 + 상세 (클릭 시 앱 상세 탭으로 이동) -->
+    <LinearLayout
+        android:id="@+id/detail_area"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="8dp"
+        android:background="#1AFFFFFF" />
+
+    <!-- 선택 날짜 + 종합 점수 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/tv_detail_date"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:text="--월 --일" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="종합  "
+            android:textSize="10sp"
+            android:textColor="#60FFFFFF" />
+
+        <TextView
+            android:id="@+id/tv_detail_overall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="#1BC4A8"
+            android:text="--" />
+    </LinearLayout>
+
+    <!-- 재물 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="6dp">
+        <TextView android:layout_width="26dp" android:layout_height="wrap_content"
+            android:text="재물" android:textSize="10sp" android:textColor="#60FFFFFF" />
+        <ProgressBar
+            android:id="@+id/pb_wealth"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:indeterminate="false"
+            android:progressDrawable="@drawable/widget_progress_bg"
+            android:layout_width="0dp" android:layout_height="6dp"
+            android:layout_weight="1" android:max="100" android:progress="0"
+            android:layout_marginStart="4dp" android:layout_marginEnd="6dp" />
+        <TextView
+            android:id="@+id/tv_wealth_score"
+            android:layout_width="22dp" android:layout_height="wrap_content"
+            android:textSize="10sp" android:textStyle="bold"
+            android:textColor="#FFD700" android:gravity="end" android:text="--" />
+    </LinearLayout>
+
+    <!-- 애정 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="6dp">
+        <TextView android:layout_width="26dp" android:layout_height="wrap_content"
+            android:text="애정" android:textSize="10sp" android:textColor="#60FFFFFF" />
+        <ProgressBar
+            android:id="@+id/pb_love"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:indeterminate="false"
+            android:progressDrawable="@drawable/widget_progress_bg"
+            android:layout_width="0dp" android:layout_height="6dp"
+            android:layout_weight="1" android:max="100" android:progress="0"
+            android:layout_marginStart="4dp" android:layout_marginEnd="6dp" />
+        <TextView
+            android:id="@+id/tv_love_score"
+            android:layout_width="22dp" android:layout_height="wrap_content"
+            android:textSize="10sp" android:textStyle="bold"
+            android:textColor="#7EE87E" android:gravity="end" android:text="--" />
+    </LinearLayout>
+
+    <!-- 건강 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="6dp">
+        <TextView android:layout_width="26dp" android:layout_height="wrap_content"
+            android:text="건강" android:textSize="10sp" android:textColor="#60FFFFFF" />
+        <ProgressBar
+            android:id="@+id/pb_health"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:indeterminate="false"
+            android:progressDrawable="@drawable/widget_progress_bg"
+            android:layout_width="0dp" android:layout_height="6dp"
+            android:layout_weight="1" android:max="100" android:progress="0"
+            android:layout_marginStart="4dp" android:layout_marginEnd="6dp" />
+        <TextView
+            android:id="@+id/tv_health_score"
+            android:layout_width="22dp" android:layout_height="wrap_content"
+            android:textSize="10sp" android:textStyle="bold"
+            android:textColor="#7EE87E" android:gravity="end" android:text="--" />
+    </LinearLayout>
+
+    <!-- 직업 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView android:layout_width="26dp" android:layout_height="wrap_content"
+            android:text="직업" android:textSize="10sp" android:textColor="#60FFFFFF" />
+        <ProgressBar
+            android:id="@+id/pb_career"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:indeterminate="false"
+            android:progressDrawable="@drawable/widget_progress_bg"
+            android:layout_width="0dp" android:layout_height="6dp"
+            android:layout_weight="1" android:max="100" android:progress="0"
+            android:layout_marginStart="4dp" android:layout_marginEnd="6dp" />
+        <TextView
+            android:id="@+id/tv_career_score"
+            android:layout_width="22dp" android:layout_height="wrap_content"
+            android:textSize="10sp" android:textStyle="bold"
+            android:textColor="#7EE87E" android:gravity="end" android:text="--" />
+    </LinearLayout>
+
+    </LinearLayout><!-- /detail_area -->
 
 </LinearLayout>

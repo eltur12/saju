@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getMonthlyFortune, getUser, clearUser, saveWidgetData } from "../api/fortuneApi";
+import { App } from "@capacitor/app";
 import type { MonthlyFortuneResult, DailyFortune } from "../engines/aggregator";
 import type { SajuUser } from "../api/fortuneApi";
 import styles from "./Main.module.css";
@@ -42,8 +43,50 @@ export default function Main({ onBack }: Props) {
   const [user, setUser]                   = useState<SajuUser | null>(null);
   const [autoSelectToday, setAutoSelectToday] = useState(true);
   const [tab, setTab]                     = useState<TabId>("calendar");
+  const [pendingDay, setPendingDay]       = useState<{ year: number; month: number; day: number } | null>(null);
 
   useEffect(() => { setUser(getUser()); }, []);
+
+  // 위젯 상세 클릭 → 딥링크로 해당 날짜 상세 탭 열기
+  const handleDeepLink = useCallback((url: string) => {
+    try {
+      const u = new URL(url);
+      if (u.host === "fortune" && u.pathname === "/detail") {
+        const y = parseInt(u.searchParams.get("year") ?? "0");
+        const m = parseInt(u.searchParams.get("month") ?? "0");
+        const d = parseInt(u.searchParams.get("day") ?? "0");
+        if (y && m && d) setPendingDay({ year: y, month: m, day: d });
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    // cold start: 딥링크로 앱이 처음 실행된 경우
+    App.getLaunchUrl().then(result => { if (result?.url) handleDeepLink(result.url); });
+    // warm start: 앱이 이미 실행 중일 때 딥링크 수신
+    const listenerPromise = App.addListener("appUrlOpen", ({ url }) => handleDeepLink(url));
+    return () => { listenerPromise.then(h => h.remove()); };
+  }, [handleDeepLink]);
+
+  // pendingDay 가 설정되면 해당 월 로드 후 날짜 선택
+  useEffect(() => {
+    if (!pendingDay) return;
+    const u = getUser();
+    if (!u) return;
+    setYear(pendingDay.year);
+    setMonth(pendingDay.month);
+    setAutoSelectToday(false);
+    // 월 데이터 로드 완료 후 처리는 아래 effect 에서
+  }, [pendingDay]);
+
+  useEffect(() => {
+    if (!pendingDay || loading || !data) return;
+    if (data.year === pendingDay.year && data.month === pendingDay.month) {
+      const f = data.daily_fortunes[pendingDay.day - 1];
+      if (f) { setSelected(f); setTab("detail"); }
+      setPendingDay(null);
+    }
+  }, [pendingDay, loading, data]);
 
   const load = useCallback(async (y: number, m: number, u: SajuUser) => {
     setLoading(true);

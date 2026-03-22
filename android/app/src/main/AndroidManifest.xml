@@ -22,6 +22,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="saju" android:host="fortune" />
+            </intent-filter>
+
         </activity>
 
         <provider
@@ -46,6 +53,7 @@
                 <action android:name="com.saju.fortune.PREV_MONTH" />
                 <action android:name="com.saju.fortune.NEXT_MONTH" />
                 <action android:name="com.saju.fortune.TODAY" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
@@ -55,8 +63,12 @@
         <!-- 달력 위젯 GridView 어댑터 서비스 -->
         <service
             android:name=".FortuneWidgetService"
-            android:exported="false"
-            android:permission="android.permission.BIND_REMOTEVIEWS" />
+            android:exported="true"
+            android:permission="android.permission.BIND_REMOTEVIEWS">
+            <intent-filter>
+                <action android:name="android.widget.RemoteViewsService" />
+            </intent-filter>
+        </service>
 
     </application>
 

@@ -5,6 +5,7 @@ import { FortuneAggregator, type MonthlyFortuneResult, type DailyFortune } from 
 import { calculateSajuProfile } from "../utils/sajuCalculator";
 import { buildZiweiProfile } from "../utils/ziweiCalculator";
 import { buildAstroProfile } from "../utils/astroCalculator";
+import { refreshWidget } from "../plugins/widgetPlugin";
 
 /** Capacitor Preferences — 네이티브 환경에서만 동작, 웹에서는 no-op */
 async function setPreference(key: string, value: string): Promise<void> {
@@ -51,7 +52,7 @@ export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promi
 }
 
 /** 캐시 스키마 버전 — 필드 변경 시 올리면 캐시 무효화 */
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v6";
 
 export interface SajuUser {
   birth_year: number;
@@ -95,9 +96,9 @@ export async function getMonthlyFortune(
   const hour = user.birth_hour ?? 12;
   const isMale = user.gender === "M";
 
-  // 사주 (동기)
+  // 사주 (동기) — 성별 반영 (대운 순역방향)
   const sajuProfile = calculateSajuProfile(
-    user.birth_year, user.birth_month, user.birth_day, hour,
+    user.birth_year, user.birth_month, user.birth_day, hour, user.gender,
   );
 
   // 자미두수 (동기) — 성별 반영
@@ -117,7 +118,8 @@ export async function getMonthlyFortune(
 
   const result = aggregator.getMonthlyFortune(year, month);
   saveCache(key, result);
-  saveWidgetMonthlyData(result); // 달력 위젯용 월간 데이터 저장
+  await saveWidgetMonthlyData(result); // 달력 위젯용 월간 데이터 저장
+  refreshWidget(); // 사주 변경 시 위젯 즉시 갱신
   return result;
 }
 

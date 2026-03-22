@@ -86,7 +86,7 @@ function sample<T>(arr: T[], n: number, rng: () => number): T[] {
   return result;
 }
 
-export function generateTodos(scores: ScoreMap, sajuFactors: Record<string, unknown>, _badge: string): { do_list: string[]; dont_list: string[] } {
+export function generateTodos(scores: ScoreMap, sajuFactors: Record<string, unknown>, _badge: string, date?: Date): { do_list: string[]; dont_list: string[] } {
   const w = scores.wealth ?? 65;
   const l = scores.love ?? 65;
   const h = scores.health ?? 65;
@@ -119,7 +119,10 @@ export function generateTodos(scores: ScoreMap, sajuFactors: Record<string, unkn
   doPool   = [...new Map(doPool.map(x => [x, x])).values()];
   dontPool = [...new Map(dontPool.map(x => [x, x])).values()];
 
-  const seedVal = Math.abs(Object.values(scores).reduce((a, b) => a + b, 0)) % 1000;
+  const dateNum = date
+    ? date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()
+    : 0;
+  const seedVal = Math.abs(Object.values(scores).reduce((a, b) => a + b, 0) + dateNum) % 233280;
   const rng = seededRandom(seedVal);
 
   return {

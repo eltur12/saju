@@ -25,6 +25,7 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
         int day;   // 0 = 빈 셀
         int score;
         boolean isToday;
+        boolean isSelected;
         int dow;   // 0=일, 6=토
     }
 
@@ -68,6 +69,8 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
         int todayYear    = now.get(Calendar.YEAR);
         int todayMonth   = now.get(Calendar.MONTH) + 1;
         int todayDay     = now.get(Calendar.DAY_OF_MONTH);
+        int defaultDay   = (year == todayYear && month == todayMonth) ? todayDay : 1;
+        int selectedDay  = widgetPrefs.getInt("selected_day", defaultDay);
 
         // 첫날 이전 빈 셀
         for (int i = 0; i < firstDow; i++) {
@@ -78,10 +81,11 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
         // 날짜 셀
         for (int day = 1; day <= daysInMonth; day++) {
             CellData c  = new CellData();
-            c.day       = day;
-            c.score     = scores[day];
-            c.isToday   = (year == todayYear && month == todayMonth && day == todayDay);
-            c.dow       = (firstDow + day - 1) % 7;
+            c.day        = day;
+            c.score      = scores[day];
+            c.isToday    = (year == todayYear && month == todayMonth && day == todayDay);
+            c.isSelected = (day == selectedDay);
+            c.dow        = (firstDow + day - 1) % 7;
             cells.add(c);
         }
         // 7의 배수로 패딩
@@ -107,12 +111,22 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
             rv.setTextViewText(R.id.cell_day,   String.valueOf(cell.day));
             rv.setTextViewText(R.id.cell_score, cell.score > 0 ? String.valueOf(cell.score) : "");
 
-            // 날짜 색상
+            // 날짜 색상 + 오늘 배경
             int dayColor;
-            if      (cell.isToday)  dayColor = Color.parseColor("#FFD700");
-            else if (cell.dow == 0) dayColor = Color.parseColor("#FF8888");
-            else if (cell.dow == 6) dayColor = Color.parseColor("#AAAAFF");
-            else                    dayColor = Color.WHITE;
+            if (cell.isToday) {
+                rv.setInt(R.id.cell_root, "setBackgroundResource", R.drawable.cell_today_bg);
+                dayColor = Color.parseColor("#1BC4A8");
+            } else if (cell.isSelected) {
+                rv.setInt(R.id.cell_root, "setBackgroundColor", Color.parseColor("#25FFFFFF"));
+                if      (cell.dow == 0) dayColor = Color.parseColor("#CC884444");
+                else if (cell.dow == 6) dayColor = Color.parseColor("#CC7777CC");
+                else                    dayColor = Color.parseColor("#CCF0F0F0");
+            } else {
+                rv.setInt(R.id.cell_root, "setBackgroundColor", Color.TRANSPARENT);
+                if      (cell.dow == 0) dayColor = Color.parseColor("#CC884444");
+                else if (cell.dow == 6) dayColor = Color.parseColor("#CC7777CC");
+                else                    dayColor = Color.parseColor("#CCF0F0F0");
+            }
             rv.setTextColor(R.id.cell_day, dayColor);
 
             // 점수 색상
@@ -135,7 +149,12 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
         return rv;
     }
 
-    @Override public RemoteViews getLoadingView()  { return null; }
+    @Override public RemoteViews getLoadingView() {
+        RemoteViews rv = new RemoteViews(context.getPackageName(), R.layout.widget_cell);
+        rv.setTextViewText(R.id.cell_day, "");
+        rv.setTextViewText(R.id.cell_score, "");
+        return rv;
+    }
     @Override public int         getViewTypeCount() { return 1; }
     @Override public long        getItemId(int pos) { return pos; }
     @Override public boolean     hasStableIds()     { return false; }

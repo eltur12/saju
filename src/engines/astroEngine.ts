@@ -64,7 +64,7 @@ const HOUSE_WEIGHT: Record<number, ScoreMap> = {
   9:{"overall":0.7,"wealth":0.5,"love":0.3,"health":0.3,"career":0.7},
   10:{"overall":0.7,"wealth":0.8,"love":0.3,"health":0.3,"career":1.5},
   11:{"overall":0.7,"wealth":0.5,"love":0.8,"health":0.3,"career":0.8},
-  12:{"overall":-0.3,"wealth":-0.3,"love":-0.3,"health":-0.5,"career":-0.5},
+  12:{"overall":0.2,"wealth":-0.2,"love":-0.2,"health":0.3,"career":-0.3},
 };
 
 export interface NatalPlanet { lon: number; house: number }

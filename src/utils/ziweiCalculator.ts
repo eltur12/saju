@@ -48,7 +48,13 @@ export function ziweiChartToProfile(chart: ZiweiChart, currentYear: number): Ziw
     ? dahanPalace.stars.filter(s => MAIN_STAR_NAMES.has(s.name)).map(s => s.name)
     : [];
 
-  return { palaces, sihua, current_dahan, dahan_stars };
+  // 유월(流月): 각 달의 활성 궁 이름 [0=1월 .. 11=12월]
+  const monthly_palaces = liunian.liuyue.map(ly => ly.natalPalaceName);
+
+  // 유년 사화(流年四化): 化祿·化權·化科·化忌 → 궁 이름
+  const year_sihua_palaces = liunian.siHuaPalaces ?? {};
+
+  return { palaces, sihua, current_dahan, dahan_stars, monthly_palaces, year_sihua_palaces };
 }
 
 export function buildZiweiProfile(
