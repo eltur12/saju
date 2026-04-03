@@ -42,6 +42,7 @@ export function calculateSajuProfile(
   birthDay:   number,
   birthHour?: number,
   gender: 'M' | 'F' = 'M',
+  injongRules?: Record<string, "jeoljong" | "byeongjong">,
 ): SajuEngineProfile {
   const hour   = birthHour ?? 12;
   const result = orreryCalcSaju({
@@ -66,5 +67,6 @@ export function calculateSajuProfile(
     special_stars: mapSpecialSals(result.specialSals, result.pillars.map(p => p.sinsal)),
     dayun_stem:    dayunStem,
     dayun_branch:  dayunBranch,
+    injong_rules:  injongRules,
   };
 }

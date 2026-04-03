@@ -8,7 +8,21 @@ import { buildAstroEngineFromProfile, type AstroProfile } from "./astroEngine";
 import { getLunarDate } from "../utils/lunarConverter";
 import { generateTodos, generateSummary } from "./todoGenerator";
 
-const ENGINE_WEIGHTS = { saju: 0.45, ziwei: 0.35, astro: 0.20 };
+/**
+ * 도메인별 엔진 가중치 (규칙서 기준)
+ * 종합(overall)은 6개 영역 평균으로 산출
+ */
+const DOMAIN_WEIGHTS: Record<keyof ScoreMap, { saju: number; ziwei: number; astro: number }> = {
+  overall:  { saju: 0.45, ziwei: 0.35, astro: 0.20 },
+  wealth:   { saju: 0.50, ziwei: 0.35, astro: 0.15 },
+  love:     { saju: 0.40, ziwei: 0.35, astro: 0.25 },
+  health:   { saju: 0.55, ziwei: 0.25, astro: 0.20 },
+  career:   { saju: 0.50, ziwei: 0.30, astro: 0.20 },
+  relations:{ saju: 0.45, ziwei: 0.30, astro: 0.25 },
+  study:    { saju: 0.45, ziwei: 0.25, astro: 0.30 },
+};
+
+const BASE = 60; // 기본 베이스 점수
 
 export function scoreToBadge(score: number): string {
   if (score >= 80) return "대길";
@@ -37,18 +51,18 @@ export interface MonthlyFortuneResult {
 }
 
 export class FortuneAggregator {
-  private sajuEngine: ReturnType<typeof buildSajuEngineFromProfile>;
+  private sajuEngine:  ReturnType<typeof buildSajuEngineFromProfile>;
   private ziweiEngine: ReturnType<typeof buildZiweiEngineFromProfile>;
   private astroEngine: ReturnType<typeof buildAstroEngineFromProfile>;
-  private weights: typeof ENGINE_WEIGHTS;
-  private birthDate: Date;
+  private weights:     typeof DOMAIN_WEIGHTS;
+  private birthDate:   Date;
 
   constructor(
-    sajuProfile: SajuEngineProfile,
+    sajuProfile:  SajuEngineProfile,
     ziweiProfile: ZiweiProfile,
     astroProfile: AstroProfile,
-    engineWeights = ENGINE_WEIGHTS,
-    birthDate = new Date(1998, 0, 22),
+    engineWeights = DOMAIN_WEIGHTS,
+    birthDate     = new Date(1998, 0, 22),
   ) {
     this.sajuEngine  = buildSajuEngineFromProfile(sajuProfile);
     this.ziweiEngine = buildZiweiEngineFromProfile(ziweiProfile);
@@ -58,15 +72,28 @@ export class FortuneAggregator {
   }
 
   private mergeScores(sajuScores: ScoreMap, ziweiScores: ScoreMap, astroScores: ScoreMap): ScoreMap {
-    const cats: (keyof ScoreMap)[] = ["overall","wealth","love","health","career"];
+    const cats = Object.keys(sajuScores) as (keyof ScoreMap)[];
     const merged = {} as ScoreMap;
+
     for (const cat of cats) {
-      const s = sajuScores[cat] ?? 50;
+      if (cat === "overall") {
+        // overall은 나머지 6개 영역 평균으로 후처리
+        continue;
+      }
+      const w = this.weights[cat] ?? this.weights.overall;
+      const s = sajuScores[cat]  ?? BASE;
       const z = ziweiScores[cat] ?? 0;
       const a = astroScores[cat] ?? 0;
-      const combined = s * this.weights.saju + (50 + z) * this.weights.ziwei + (50 + a) * this.weights.astro;
-      merged[cat] = Math.max(20, Math.min(100, Math.round(combined)));
+      const combined = s * w.saju + (BASE + z) * w.ziwei + (BASE + a) * w.astro;
+      merged[cat] = Math.max(0, Math.min(100, Math.round(combined)));
     }
+
+    // overall = 6개 영역 단순 평균
+    merged.overall = Math.round(
+      (merged.wealth + merged.love + merged.health + merged.career + merged.relations + merged.study) / 6
+    );
+    merged.overall = Math.max(0, Math.min(100, merged.overall));
+
     return merged;
   }
 
@@ -75,7 +102,7 @@ export class FortuneAggregator {
     const ziweiResult = this.ziweiEngine.calculate(targetDate);
     const astroResult = this.astroEngine.calculate(targetDate, this.birthDate);
 
-    const merged = this.mergeScores(sajuResult.scores, ziweiResult.scores, astroResult.scores);
+    const merged  = this.mergeScores(sajuResult.scores, ziweiResult.scores, astroResult.scores);
     const badge   = scoreToBadge(merged.overall);
     const lunar   = getLunarDate(targetDate);
     const summary = generateSummary(merged, sajuResult.factors, ziweiResult.factors);

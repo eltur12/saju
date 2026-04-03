@@ -9,16 +9,20 @@ function seededRandom(seed: number): () => number {
 }
 
 const TODO_POOL: Record<string, string[]> = {
-  wealth_high: ["투자 검토 및 분석","재무 계획 수립","수입원 다각화 검토","중요 금융 계약 검토","절약 계획 점검","재물 관련 미팅 배치"],
-  wealth_low:  ["충동구매 자제","큰 금액 결정 보류","재정 지출 점검","투자 결정 연기","빌리거나 빌려주는 행위 자제"],
-  love_high:   ["소중한 이와 시간 보내기","감사 표현·선물","새 인연 만남 시도","관계 심화 대화","이성 모임 참석"],
-  love_low:    ["감정적 대화 자제","연애 관련 중요 결정 보류","오해 살 행동 조심","SNS 감정 표출 자제"],
-  health_high: ["유산소·근력 운동","균형 잡힌 식단 유지","규칙적 수면","건강검진 예약","스트레칭·요가"],
-  health_low:  ["과음·과식 자제","무리한 운동 금지","충분한 수면 확보","신체 피로 방치 금지","야간 과로 자제"],
-  career_high: ["중요 미팅·발표 배치","도전적 과제 착수","리더십 발휘","창의적 기획·브레인스토밍","인맥 확장 모임 참석"],
-  career_low:  ["새 사업·프로젝트 착수 보류","권위자와 충돌 자제","중요 계약 서명 연기","성급한 발언 주의"],
-  overall_high:["이달의 목표 점검","감사 일기 쓰기","긍정적 자기 확언","새로운 도전 시도","소중한 사람에게 연락"],
-  overall_low: ["내면 성찰·명상","혼자 집중하는 작업","현상 유지 전략","무리한 약속 자제","충분한 휴식"],
+  wealth_high:   ["투자 검토 및 분석","재무 계획 수립","수입원 다각화 검토","중요 금융 계약 검토","절약 계획 점검","재물 관련 미팅 배치"],
+  wealth_low:    ["충동구매 자제","큰 금액 결정 보류","재정 지출 점검","투자 결정 연기","빌리거나 빌려주는 행위 자제"],
+  love_high:     ["소중한 이와 시간 보내기","감사 표현·선물","새 인연 만남 시도","관계 심화 대화","이성 모임 참석"],
+  love_low:      ["감정적 대화 자제","연애 관련 중요 결정 보류","오해 살 행동 조심","SNS 감정 표출 자제"],
+  health_high:   ["유산소·근력 운동","균형 잡힌 식단 유지","규칙적 수면","건강검진 예약","스트레칭·요가"],
+  health_low:    ["과음·과식 자제","무리한 운동 금지","충분한 수면 확보","신체 피로 방치 금지","야간 과로 자제"],
+  career_high:   ["중요 미팅·발표 배치","도전적 과제 착수","리더십 발휘","창의적 기획·브레인스토밍","인맥 확장 모임 참석"],
+  career_low:    ["새 사업·프로젝트 착수 보류","권위자와 충돌 자제","중요 계약 서명 연기","성급한 발언 주의"],
+  relations_high:["네트워킹 모임 참석","동료·친구에게 먼저 연락","팀 프로젝트 적극 참여","감사 인사 전하기","사교적 약속 잡기"],
+  relations_low: ["불필요한 갈등 자제","험담·비교 발언 주의","단체 활동 무리하게 참여 자제","SNS 논쟁 피하기"],
+  study_high:    ["새 분야 학습 시작","자격증·시험 준비","독서·강의 수강","아이디어 정리 및 기록","멘토에게 조언 구하기"],
+  study_low:     ["중요한 발표·시험 일정 재조정 검토","집중력 요하는 작업 무리하게 시도 자제","복잡한 계획 수립 보류"],
+  overall_high:  ["이달의 목표 점검","감사 일기 쓰기","긍정적 자기 확언","새로운 도전 시도","소중한 사람에게 연락"],
+  overall_low:   ["내면 성찰·명상","혼자 집중하는 작업","현상 유지 전략","무리한 약속 자제","충분한 휴식"],
 };
 
 const TEN_GOD_TODOS: Record<string, { do: string; dont: string }> = {
@@ -87,27 +91,31 @@ function sample<T>(arr: T[], n: number, rng: () => number): T[] {
 }
 
 export function generateTodos(scores: ScoreMap, sajuFactors: Record<string, unknown>, _badge: string, date?: Date): { do_list: string[]; dont_list: string[] } {
-  const w = scores.wealth ?? 65;
-  const l = scores.love ?? 65;
-  const h = scores.health ?? 65;
-  const c = scores.career ?? 65;
-  const o = scores.overall ?? 65;
+  const w = scores.wealth    ?? 65;
+  const l = scores.love      ?? 65;
+  const h = scores.health    ?? 65;
+  const c = scores.career    ?? 65;
+  const r = scores.relations ?? 65;
+  const s = scores.study     ?? 65;
+  const o = scores.overall   ?? 65;
 
   let doPool: string[] = [];
   let dontPool: string[] = [];
 
-  doPool   = doPool.concat(TODO_POOL[w >= 65 ? "wealth_high" : "wealth_low"]);
-  doPool   = doPool.concat(TODO_POOL[l >= 65 ? "love_high"   : "love_low"]);
-  doPool   = doPool.concat(TODO_POOL[h >= 65 ? "health_high" : "health_low"]);
-  doPool   = doPool.concat(TODO_POOL[c >= 65 ? "career_high" : "career_low"]);
-  doPool   = doPool.concat(TODO_POOL[o >= 65 ? "overall_high": "overall_low"]);
+  doPool = doPool.concat(TODO_POOL[w >= 65 ? "wealth_high"    : "wealth_low"]);
+  doPool = doPool.concat(TODO_POOL[l >= 65 ? "love_high"      : "love_low"]);
+  doPool = doPool.concat(TODO_POOL[h >= 65 ? "health_high"    : "health_low"]);
+  doPool = doPool.concat(TODO_POOL[c >= 65 ? "career_high"    : "career_low"]);
+  doPool = doPool.concat(TODO_POOL[r >= 65 ? "relations_high" : "relations_low"]);
+  doPool = doPool.concat(TODO_POOL[s >= 65 ? "study_high"     : "study_low"]);
+  doPool = doPool.concat(TODO_POOL[o >= 65 ? "overall_high"   : "overall_low"]);
 
-  // dontPool uses OPPOSITE direction: when score is LOW → avoid the high-risk actions;
-  // when score is HIGH → include cautionary reminders to not squander the good luck
-  dontPool = dontPool.concat(TODO_POOL[w >= 65 ? "wealth_low"  : "wealth_high"]);
-  dontPool = dontPool.concat(TODO_POOL[l >= 65 ? "love_low"    : "love_high"]);
-  dontPool = dontPool.concat(TODO_POOL[h >= 65 ? "health_low"  : "health_high"]);
-  dontPool = dontPool.concat(TODO_POOL[c >= 65 ? "career_low"  : "career_high"]);
+  dontPool = dontPool.concat(TODO_POOL[w >= 65 ? "wealth_low"    : "wealth_high"]);
+  dontPool = dontPool.concat(TODO_POOL[l >= 65 ? "love_low"      : "love_high"]);
+  dontPool = dontPool.concat(TODO_POOL[h >= 65 ? "health_low"    : "health_high"]);
+  dontPool = dontPool.concat(TODO_POOL[c >= 65 ? "career_low"    : "career_high"]);
+  dontPool = dontPool.concat(TODO_POOL[r >= 65 ? "relations_low" : "relations_high"]);
+  dontPool = dontPool.concat(TODO_POOL[s >= 65 ? "study_low"     : "study_high"]);
 
   // ten_god_of_day 우선 (날짜마다 달라짐)
   const tenGod = (sajuFactors.ten_god_of_day as string) || (sajuFactors.ten_god_of_month as string);

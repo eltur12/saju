@@ -20,14 +20,16 @@ async function setPreference(key: string, value: string): Promise<void> {
 /** 위젯에서 읽을 오늘의 운세를 SharedPreferences에 저장 */
 export async function saveWidgetData(fortune: DailyFortune): Promise<void> {
   await setPreference("widget_data", JSON.stringify({
-    score:   fortune.scores.overall,
-    badge:   fortune.badge,
-    summary: fortune.summary,
-    date:    fortune.date,
-    wealth:  fortune.scores.wealth,
-    love:    fortune.scores.love,
-    health:  fortune.scores.health,
-    career:  fortune.scores.career,
+    score:     fortune.scores.overall,
+    badge:     fortune.badge,
+    summary:   fortune.summary,
+    date:      fortune.date,
+    wealth:    fortune.scores.wealth,
+    love:      fortune.scores.love,
+    health:    fortune.scores.health,
+    career:    fortune.scores.career,
+    relations: fortune.scores.relations,
+    study:     fortune.scores.study,
   }));
 }
 
@@ -46,20 +48,25 @@ export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promi
       love:       f.scores.love,
       health:     f.scores.health,
       career:     f.scores.career,
+      relations:  f.scores.relations,
+      study:      f.scores.study,
     })),
   };
   await setPreference(key, JSON.stringify(payload));
 }
 
 /** 캐시 스키마 버전 — 필드 변경 시 올리면 캐시 무효화 */
-const CACHE_VERSION = "v6";
+const CACHE_VERSION = "v7";
 
 export interface SajuUser {
   birth_year: number;
   birth_month: number;
   birth_day: number;
   birth_hour?: number;
+  birth_minute?: number;
   gender: "M" | "F";
+  /** 인종법(引從法): 십성별 절종/병종 규칙 — 차트 분석 후 설정 */
+  injong_rules?: Record<string, "jeoljong" | "byeongjong">;
 }
 
 function getCacheKey(year: number, month: number): string {
@@ -99,6 +106,7 @@ export async function getMonthlyFortune(
   // 사주 (동기) — 성별 반영 (대운 순역방향)
   const sajuProfile = calculateSajuProfile(
     user.birth_year, user.birth_month, user.birth_day, hour, user.gender,
+    user.injong_rules,
   );
 
   // 자미두수 (동기) — 성별 반영
@@ -109,6 +117,7 @@ export async function getMonthlyFortune(
   // 서양 점성술 (비동기 — Moshier 에페메리스)
   const astroProfile = await buildAstroProfile(
     user.birth_year, user.birth_month, user.birth_day, user.birth_hour,
+    undefined, undefined, user.birth_minute,
   );
 
   const birthDate = new Date(user.birth_year, user.birth_month - 1, user.birth_day);

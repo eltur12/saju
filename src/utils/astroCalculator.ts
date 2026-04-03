@@ -17,10 +17,12 @@ export function natalChartToAstroProfile(chart: NatalChart): AstroProfile {
   const natal_planets: AstroProfile['natal_planets'] = {};
   const planet_houses: AstroProfile['planet_houses'] = {};
 
+  let venus_retrograde = false;
   for (const planet of chart.planets) {
     if (planet.id === 'SouthNode') continue;
     natal_planets[planet.id] = { lon: planet.longitude, house: planet.house ?? 1 };
     planet_houses[planet.id] = planet.house ?? 1;
+    if (planet.id === 'Venus') venus_retrograde = planet.isRetrograde ?? false;
   }
 
   const natal_aspects: AstroProfile['natal_aspects'] = chart.aspects
@@ -32,19 +34,20 @@ export function natalChartToAstroProfile(chart: NatalChart): AstroProfile {
       orb:    asp.orb,
     }));
 
-  return { natal_planets, natal_aspects, planet_houses };
+  return { natal_planets, natal_aspects, planet_houses, venus_retrograde };
 }
 
 export async function buildAstroProfile(
   birthYear: number, birthMonth: number, birthDay: number,
   birthHour?: number, latitude?: number, longitude?: number,
+  birthMinute?: number,
 ): Promise<AstroProfile> {
   const chart = await calculateNatal({
     year:        birthYear,
     month:       birthMonth,
     day:         birthDay,
     hour:        birthHour ?? 12,
-    minute:      0,
+    minute:      birthMinute ?? 0,
     gender:      'M',
     unknownTime: birthHour === undefined,
     latitude,

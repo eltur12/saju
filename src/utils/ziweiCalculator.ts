@@ -35,7 +35,13 @@ export function ziweiChartToProfile(chart: ZiweiChart, currentYear: number): Ziw
       }
     }
 
-    palaces[palaceName] = { main_stars, lucky_stars, unlucky_stars };
+    const branch = palace.zhi ?? "";
+    const star_strengths: Record<string, string> = {};
+    for (const star of palace.stars) {
+      if (star.brightness) star_strengths[star.name] = star.brightness;
+    }
+
+    palaces[palaceName] = { main_stars, lucky_stars, unlucky_stars, branch, star_strengths };
   }
 
   // 현재 대한 궁 이름
