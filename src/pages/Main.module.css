@@ -441,3 +441,116 @@
 }
 
 .dontItem::before { color: var(--danger); }
+
+/* 시간대별 흐름 */
+.segmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.segmentRow {
+  display: grid;
+  grid-template-columns: 7.5rem 2rem 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--item-bg);
+  border-radius: 7px;
+}
+
+.segmentTime {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.segmentScore {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.segmentTags {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* 알림 힌트 */
+.hintRow {
+  display: grid;
+  grid-template-columns: 2.5rem 7rem 1fr 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--item-bg);
+  border-radius: 7px;
+}
+
+.hintHour {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.hintType {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.hintLabel {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+}
+
+.hintScheduled {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* 알림 허용 시간대 설정 */
+.notiSettingsRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.notiLabel {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.notiSelect {
+  background: var(--bg-card);
+  border: 1px solid var(--divider-plain);
+  color: var(--text);
+  font-size: 0.75rem;
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+}
+
+.notiSaveBtn {
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.7rem;
+  border-radius: 6px;
+}
+
+.notiSaveBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.notiSavedMsg {
+  font-size: 0.68rem;
+  color: var(--accent2);
+}

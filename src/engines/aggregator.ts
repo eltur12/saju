@@ -8,6 +8,8 @@ import { buildZiweiEngineFromProfile, type ZiweiProfile } from "./ziweiEngine";
 import { buildAstroEngineFromProfile, type AstroProfile } from "./astroEngine";
 import { getLunarDate } from "../utils/lunarConverter";
 import { generateTodos, generateSummary } from "./todoGenerator";
+import { generateTimeSegments } from "./timeSegmentLayer";
+import { generateNotificationHints } from "./notificationHintLayer";
 
 /**
  * 도메인별 엔진 가중치 (규칙서 기준)
@@ -50,6 +52,18 @@ export interface DailyFortune {
   badge: string;
   summary: string;
   todos: { do_list: string[]; dont_list: string[] };
+  timeSegments?: Array<{
+    startHour: number;
+    endHour: number;
+    score: number;
+    tags: string[];
+  }>;
+  notificationHints?: Array<{
+    type: "best_window" | "caution_window" | "next_rise";
+    hour: number;
+    score: number;
+    label: string;
+  }>;
 }
 
 export interface MonthlyFortuneResult {
@@ -155,7 +169,7 @@ export class FortuneAggregator {
     const summary = generateSummary(merged, sajuResult.factors, ziweiResult.factors);
     const todos   = generateTodos(merged, sajuResult.factors, badge, targetDate);
 
-    return {
+    const fortune: DailyFortune & { balance_debug?: SajuBalanceDebug } = {
       date:          `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`,
       lunar_date:    lunar,
       scores:        merged,
@@ -164,6 +178,9 @@ export class FortuneAggregator {
       todos,
       balance_debug: balanceDebug,
     };
+    fortune.timeSegments = generateTimeSegments(fortune);
+    fortune.notificationHints = generateNotificationHints(fortune);
+    return fortune;
   }
 
   getMonthlyFortune(year: number, month: number): MonthlyFortuneResult {

@@ -16,6 +16,7 @@
     "@capacitor/app": "^5.0.8",
     "@capacitor/cli": "^5.7.8",
     "@capacitor/core": "^5.7.8",
+    "@capacitor/local-notifications": "^5.0.8",
     "@capacitor/preferences": "^5.0.8",
     "korean-lunar-calendar": "^0.3.6",
     "lunar-javascript": "^1.7.7",
