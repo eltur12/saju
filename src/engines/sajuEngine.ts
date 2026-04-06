@@ -20,10 +20,10 @@ function baseScore(): ScoreMap {
   return { overall: 60, wealth: 60, love: 60, health: 60, career: 60, relations: 60, study: 60 };
 }
 
-function addScore(a: ScoreMap, b: ScoreMap, weight = 1.0): ScoreMap {
+function addScore(a: ScoreMap, b: Partial<ScoreMap>, weight = 1.0): ScoreMap {
   const keys = Object.keys(a) as (keyof ScoreMap)[];
   const result = { ...a };
-  keys.forEach(k => { result[k] += Math.trunc(b[k] * weight); });
+  keys.forEach(k => { result[k] += Math.trunc((b[k] ?? 0) * weight); });
   return result;
 }
 
@@ -50,18 +50,21 @@ const TEN_GOD_MAP: Record<string, string> = {
   "水_水_true":"比肩","水_水_false":"劫財","水_木_true":"食神","水_木_false":"傷官","水_火_true":"偏財","水_火_false":"正財","水_土_true":"偏官","水_土_false":"正官","水_金_true":"偏印","水_金_false":"正印",
 };
 
+// FIX 1: overall 제거 — 병합 시 사용되지 않는 dead field
+type DomainInfluence = Omit<ScoreMap, 'overall'>;
+
 // 십성별 영역 차등 보정값 (규칙서 STEP 6 기반)
-const TEN_GOD_INFLUENCE: Record<string, ScoreMap> = {
-  "比肩": { overall:0,  wealth:0,   love:0,   health:0,  career:0,   relations:0,  study:0  },
-  "劫財": { overall:-4, wealth:-8,  love:-4,  health:-2, career:-3,  relations:-5, study:-2 },
-  "食神": { overall:7,  wealth:10,  love:5,   health:8,  career:6,   relations:6,  study:8  },
-  "傷官": { overall:0,  wealth:-3,  love:-4,  health:-2, career:3,   relations:-6, study:6  },
-  "偏財": { overall:4,  wealth:8,   love:3,   health:2,  career:6,   relations:5,  study:3  },
-  "正財": { overall:6,  wealth:12,  love:3,   health:4,  career:8,   relations:5,  study:3  },
-  "偏官": { overall:-5, wealth:-5,  love:-5,  health:-8, career:-5,  relations:-7, study:-3 },
-  "正官": { overall:5,  wealth:5,   love:2,   health:4,  career:10,  relations:6,  study:3  },
-  "偏印": { overall:4,  wealth:0,   love:6,   health:3,  career:5,   relations:4,  study:10 },
-  "正印": { overall:6,  wealth:5,   love:3,   health:5,  career:8,   relations:5,  study:12 },
+const TEN_GOD_INFLUENCE: Record<string, DomainInfluence> = {
+  "比肩": { wealth:0,   love:0,   health:0,  career:0,   relations:0,  study:0  },
+  "劫財": { wealth:-8,  love:-4,  health:-2, career:-3,  relations:-5, study:-2 },
+  "食神": { wealth:10,  love:5,   health:8,  career:6,   relations:6,  study:8  },
+  "傷官": { wealth:-3,  love:-4,  health:-2, career:3,   relations:-6, study:6  },
+  "偏財": { wealth:8,   love:3,   health:2,  career:6,   relations:5,  study:3  },
+  "正財": { wealth:12,  love:3,   health:4,  career:8,   relations:5,  study:3  },
+  "偏官": { wealth:-5,  love:-5,  health:-8, career:-5,  relations:-7, study:-3 },
+  "正官": { wealth:5,   love:2,   health:4,  career:10,  relations:6,  study:3  },
+  "偏印": { wealth:0,   love:6,   health:3,  career:5,   relations:4,  study:10 },
+  "正印": { wealth:5,   love:3,   health:5,  career:8,   relations:5,  study:12 },
 };
 
 const SPECIAL_STARS: Record<string, ScoreMap> = {
@@ -357,12 +360,12 @@ export class SajuEngine {
     const injongType = this.injong_rules[tenGod];
     if (injongType === "jeoljong") {
       // 절종: 보정값 반전 + 금전 추가 -5
-      const keys = Object.keys(inf) as (keyof ScoreMap)[];
+      const keys = Object.keys(inf) as (keyof DomainInfluence)[];
       keys.forEach(k => { inf[k] = -inf[k]; });
       inf.wealth -= 5;
     } else if (injongType === "byeongjong") {
       // 병종: 50% 감쇄
-      const keys = Object.keys(inf) as (keyof ScoreMap)[];
+      const keys = Object.keys(inf) as (keyof DomainInfluence)[];
       keys.forEach(k => { inf[k] = Math.trunc(inf[k] * 0.5); });
     }
 
@@ -442,6 +445,55 @@ export class SajuEngine {
     return result;
   }
 
+  /** FIX 3: 도메인별 전체 충(沖) 패널티 합산 (스칼라) */
+  private computeClashPenalty(
+    targetStem: string, targetBranch: string,
+    monthStem: string, monthBranch: string,
+    chartBranches: string[],
+  ): number {
+    let penalty = 0;
+    const chartStems = [this.day_stem, this.month_stem, this.year_stem];
+
+    // 일진 지지 충
+    for (const rel of getBranchRelations(targetBranch, chartBranches)) {
+      if (rel.type === "충") {
+        penalty += rel.value;
+      }
+    }
+    // 월 지지 충
+    for (const rel of getBranchRelations(monthBranch, chartBranches)) {
+      if (rel.type === "충") {
+        penalty += rel.value;
+      }
+    }
+    // 일진 천간 충
+    for (const [s1, s2] of STEM_CLASH_PAIRS) {
+      if ((targetStem === s1 && chartStems.includes(s2)) ||
+          (targetStem === s2 && chartStems.includes(s1))) {
+        penalty -= 8;
+      }
+    }
+    // 월 천간 충
+    for (const [s1, s2] of STEM_CLASH_PAIRS) {
+      if ((monthStem === s1 && chartStems.includes(s2)) ||
+          (monthStem === s2 && chartStems.includes(s1))) {
+        penalty -= 8;
+      }
+    }
+    // 대운-일진 천간 충
+    if (STEM_CLASH_PAIRS.some(([s1, s2]) =>
+        (this.dayun_stem === s1 && targetStem === s2) ||
+        (this.dayun_stem === s2 && targetStem === s1))) {
+      penalty -= 10;
+    }
+    // 대운-일진 지지 충
+    if (isPair(this.dayun_branch, targetBranch, CHONG_PAIRS)) {
+      penalty -= 10;
+    }
+
+    return penalty;
+  }
+
   /** 절기(節氣) 기준 월주(月柱) 계산 */
   private dateToMonthPillar(date: Date): [string, string] {
     const JIEQI: [number, number, number][] = [
@@ -500,6 +552,15 @@ export class SajuEngine {
     scores = this.applyStemClash(scores, monthStem);
     // 대운-일진 상호작용
     scores = this.applyDayunInteraction(scores, targetStem, targetBranch);
+    // FIX 3: 전체 충 패널티 상한 -20 적용
+    {
+      const totalClash = this.computeClashPenalty(targetStem, targetBranch, monthStem, monthBranch, chartBranches);
+      const clashAdj = Math.max(totalClash, -20) - totalClash;
+      if (clashAdj !== 0) {
+        const ck = Object.keys(scores) as (keyof ScoreMap)[];
+        ck.forEach(k => { scores[k] += clashAdj; });
+      }
+    }
     // 일진 천간 십성 (0.5)
     scores = this.applyTenGod(scores, targetStem, 0.5);
 

@@ -10,10 +10,10 @@ import { generateTodos, generateSummary } from "./todoGenerator";
 
 /**
  * 도메인별 엔진 가중치 (규칙서 기준)
- * 종합(overall)은 6개 영역 평균으로 산출
+ * FIX 1: overall은 dead field이므로 제거 — 6개 영역 평균으로 후처리
  */
-const DOMAIN_WEIGHTS: Record<keyof ScoreMap, { saju: number; ziwei: number; astro: number }> = {
-  overall:  { saju: 0.45, ziwei: 0.35, astro: 0.20 },
+type DomainWeight = { saju: number; ziwei: number; astro: number };
+const DOMAIN_WEIGHTS: Partial<Record<keyof ScoreMap, DomainWeight>> = {
   wealth:   { saju: 0.50, ziwei: 0.35, astro: 0.15 },
   love:     { saju: 0.40, ziwei: 0.35, astro: 0.25 },
   health:   { saju: 0.55, ziwei: 0.25, astro: 0.20 },
@@ -21,6 +21,17 @@ const DOMAIN_WEIGHTS: Record<keyof ScoreMap, { saju: number; ziwei: number; astr
   relations:{ saju: 0.45, ziwei: 0.30, astro: 0.25 },
   study:    { saju: 0.45, ziwei: 0.25, astro: 0.30 },
 };
+
+/** FIX 5: 극단 구간 소프트 압축 */
+function softScale(score: number): number {
+  if (score > 85) {
+    return 85 + (score - 85) * 0.5;
+  }
+  if (score < 15) {
+    return 15 - (15 - score) * 0.5;
+  }
+  return score;
+}
 
 const BASE = 60; // 기본 베이스 점수
 
@@ -80,15 +91,35 @@ export class FortuneAggregator {
         // overall은 나머지 6개 영역 평균으로 후처리
         continue;
       }
-      const w = this.weights[cat] ?? this.weights.overall;
+      const w = this.weights[cat]!;
       const s = sajuScores[cat]  ?? BASE;
       const z = ziweiScores[cat] ?? 0;
       const a = astroScores[cat] ?? 0;
-      const combined = s * w.saju + (BASE + z) * w.ziwei + (BASE + a) * w.astro;
+
+      // FIX 2: 자미·점성 델타 상한 적용
+      const zCapped = Math.max(-30, Math.min(30, z));
+      const aCapped = Math.max(-25, Math.min(25, a));
+      const zScore  = BASE + zCapped;
+      const aScore  = BASE + aCapped;
+
+      // FIX 4: 병합 전 하드 클램프
+      const sClamped = Math.max(0, Math.min(100, s));
+      const zClamped = Math.max(0, Math.min(100, zScore));
+      const aClamped = Math.max(0, Math.min(100, aScore));
+
+      // FIX 5: 소프트 스케일
+      const sSoft = softScale(sClamped);
+      const zSoft = softScale(zClamped);
+      const aSoft = softScale(aClamped);
+
+      // FIX 6: 기존 가중치 그대로 병합
+      const combined = sSoft * w.saju + zSoft * w.ziwei + aSoft * w.astro;
+
+      // FIX 7: 최종 클램프
       merged[cat] = Math.max(0, Math.min(100, Math.round(combined)));
     }
 
-    // overall = 6개 영역 단순 평균
+    // FIX 7: overall = 6개 영역 단순 평균 후 클램프
     merged.overall = Math.round(
       (merged.wealth + merged.love + merged.health + merged.career + merged.relations + merged.study) / 6
     );
