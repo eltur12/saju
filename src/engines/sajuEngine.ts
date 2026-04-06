@@ -17,13 +17,13 @@ function zeroScore(): ScoreMap {
 }
 
 function baseScore(): ScoreMap {
-  return { overall: 60, wealth: 60, love: 60, health: 60, career: 60, relations: 60, study: 60 };
+  return { overall: 60, wealth: 60, love: 60, health: 60, career: 60, relations: 61, study: 60 };
 }
 
 function addScore(a: ScoreMap, b: Partial<ScoreMap>, weight = 1.0): ScoreMap {
   const keys = Object.keys(a) as (keyof ScoreMap)[];
   const result = { ...a };
-  keys.forEach(k => { result[k] += Math.trunc((b[k] ?? 0) * weight); });
+  keys.forEach(k => { result[k] += Math.round((b[k] ?? 0) * weight); });
   return result;
 }
 
@@ -383,13 +383,13 @@ export class SajuEngine {
   }
 
   private applyDayun(scores: ScoreMap): ScoreMap {
-    let result = this.applyTenGod(scores, this.dayun_stem, 0.6);
+    let result = this.applyTenGod(scores, this.dayun_stem, 0.40);
     const branchElem = BRANCH_ELEMENT[this.dayun_branch];
     if (branchElem) {
       const key = `${this.day_element}_${branchElem}_${this.is_yang}`;
       const tenGod = TEN_GOD_MAP[key];
       if (tenGod && TEN_GOD_INFLUENCE[tenGod]) {
-        result = addScore(result, TEN_GOD_INFLUENCE[tenGod], 0.4);
+        result = addScore(result, TEN_GOD_INFLUENCE[tenGod], 0.27);
       }
     }
     return result;
@@ -403,13 +403,13 @@ export class SajuEngine {
     if (this.dayun_stem === targetStem) {
       const tenGod = this.getTenGod(targetStem);
       if (tenGod && TEN_GOD_INFLUENCE[tenGod]) {
-        result = addScore(result, TEN_GOD_INFLUENCE[tenGod], 1.0); // 1.0 추가 = 기존 1배 + 추가 1배
+        result = addScore(result, TEN_GOD_INFLUENCE[tenGod], 0.5); // 0.5 추가 = 기존 대비 비례 보정
       }
     }
 
     // 대운 지지 = 일진 지지: 해당 지지 관계 효과 ×2
     if (this.dayun_branch === targetBranch) {
-      result = addScore(result, uniformScore(10)); // 복음(+10) 2배 → 추가 +10
+      result = addScore(result, uniformScore(7)); // 복음(+10) 2배 → 추가 +7 (TG 스케일 비례 보정)
     }
 
     // 대운 천간과 일진 천간이 충
@@ -535,10 +535,10 @@ export class SajuEngine {
     // 원국 내 고정 패널티 (매일 자동 적용)
     scores = addScore(scores, this.natal_fixed_penalty);
 
-    // 출생 월주 천간 (0.8)
-    scores = this.applyTenGod(scores, this.month_stem, 0.8);
-    // 현재 월주 천간 (0.7)
-    scores = this.applyTenGod(scores, monthStem, 0.7);
+    // 출생 월주 천간 (0.53)
+    scores = this.applyTenGod(scores, this.month_stem, 0.53);
+    // 현재 월주 천간 (0.47)
+    scores = this.applyTenGod(scores, monthStem, 0.47);
     // 특별성
     scores = this.applySpecialStars(scores);
     // 대운
@@ -561,8 +561,8 @@ export class SajuEngine {
         ck.forEach(k => { scores[k] += clashAdj; });
       }
     }
-    // 일진 천간 십성 (0.5)
-    scores = this.applyTenGod(scores, targetStem, 0.5);
+    // 일진 천간 십성 (0.33)
+    scores = this.applyTenGod(scores, targetStem, 0.33);
 
     // 일간 오행 극 건강 패널티
     const ELEMENT_克: Record<string, string> = {
