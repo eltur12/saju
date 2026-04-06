@@ -3,6 +3,7 @@
  */
 import type { ScoreMap } from "./sajuEngine";
 import { buildSajuEngineFromProfile, type SajuEngineProfile } from "./sajuEngine";
+import { applySajuBalanceAdjustment, type SajuBalanceDebug } from "./sajuBalanceLayer";
 import { buildZiweiEngineFromProfile, type ZiweiProfile } from "./ziweiEngine";
 import { buildAstroEngineFromProfile, type AstroProfile } from "./astroEngine";
 import { getLunarDate } from "../utils/lunarConverter";
@@ -62,24 +63,29 @@ export interface MonthlyFortuneResult {
 }
 
 export class FortuneAggregator {
-  private sajuEngine:  ReturnType<typeof buildSajuEngineFromProfile>;
-  private ziweiEngine: ReturnType<typeof buildZiweiEngineFromProfile>;
-  private astroEngine: ReturnType<typeof buildAstroEngineFromProfile>;
-  private weights:     typeof DOMAIN_WEIGHTS;
-  private birthDate:   Date;
+  private sajuEngine:      ReturnType<typeof buildSajuEngineFromProfile>;
+  private ziweiEngine:     ReturnType<typeof buildZiweiEngineFromProfile>;
+  private astroEngine:     ReturnType<typeof buildAstroEngineFromProfile>;
+  private weights:         typeof DOMAIN_WEIGHTS;
+  private birthDate:       Date;
+  private sajuProfile:     SajuEngineProfile;
+  private enableBalanceAdj: boolean;
 
   constructor(
-    sajuProfile:  SajuEngineProfile,
-    ziweiProfile: ZiweiProfile,
-    astroProfile: AstroProfile,
-    engineWeights = DOMAIN_WEIGHTS,
-    birthDate     = new Date(1998, 0, 22),
+    sajuProfile:              SajuEngineProfile,
+    ziweiProfile:             ZiweiProfile,
+    astroProfile:             AstroProfile,
+    engineWeights             = DOMAIN_WEIGHTS,
+    birthDate                 = new Date(1998, 0, 22),
+    enableSajuBalanceAdjustment = false,
   ) {
-    this.sajuEngine  = buildSajuEngineFromProfile(sajuProfile);
-    this.ziweiEngine = buildZiweiEngineFromProfile(ziweiProfile);
-    this.astroEngine = buildAstroEngineFromProfile(astroProfile);
-    this.weights     = engineWeights;
-    this.birthDate   = birthDate;
+    this.sajuEngine      = buildSajuEngineFromProfile(sajuProfile);
+    this.ziweiEngine     = buildZiweiEngineFromProfile(ziweiProfile);
+    this.astroEngine     = buildAstroEngineFromProfile(astroProfile);
+    this.weights         = engineWeights;
+    this.birthDate       = birthDate;
+    this.sajuProfile     = sajuProfile;
+    this.enableBalanceAdj = enableSajuBalanceAdjustment;
   }
 
   private mergeScores(sajuScores: ScoreMap, ziweiScores: ScoreMap, astroScores: ScoreMap): ScoreMap {
@@ -128,24 +134,35 @@ export class FortuneAggregator {
     return merged;
   }
 
-  getDailyFortune(targetDate: Date): DailyFortune {
+  getDailyFortune(targetDate: Date): DailyFortune & { balance_debug?: SajuBalanceDebug } {
     const sajuResult  = this.sajuEngine.calculate(targetDate);
     const ziweiResult = this.ziweiEngine.calculate(targetDate);
     const astroResult = this.astroEngine.calculate(targetDate, this.birthDate);
 
-    const merged  = this.mergeScores(sajuResult.scores, ziweiResult.scores, astroResult.scores);
+    let sajuScoresForMerge = sajuResult.scores;
+    let balanceDebug: SajuBalanceDebug | undefined;
+    if (this.enableBalanceAdj) {
+      const balanceResult = applySajuBalanceAdjustment(
+        sajuResult.scores, this.sajuProfile, sajuResult.factors,
+      );
+      sajuScoresForMerge = balanceResult.adjustedScores;
+      balanceDebug = balanceResult.debug;
+    }
+
+    const merged  = this.mergeScores(sajuScoresForMerge, ziweiResult.scores, astroResult.scores);
     const badge   = scoreToBadge(merged.overall);
     const lunar   = getLunarDate(targetDate);
     const summary = generateSummary(merged, sajuResult.factors, ziweiResult.factors);
     const todos   = generateTodos(merged, sajuResult.factors, badge, targetDate);
 
     return {
-      date:       `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`,
-      lunar_date: lunar,
-      scores:     merged,
+      date:          `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-${String(targetDate.getDate()).padStart(2, "0")}`,
+      lunar_date:    lunar,
+      scores:        merged,
       badge,
       summary,
       todos,
+      balance_debug: balanceDebug,
     };
   }
 

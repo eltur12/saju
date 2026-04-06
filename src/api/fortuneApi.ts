@@ -122,7 +122,7 @@ export async function getMonthlyFortune(
 
   const birthDate = new Date(user.birth_year, user.birth_month - 1, user.birth_day);
   const aggregator = new FortuneAggregator(
-    sajuProfile, ziweiProfile, astroProfile, undefined, birthDate,
+    sajuProfile, ziweiProfile, astroProfile, undefined, birthDate, true,
   );
 
   const result = aggregator.getMonthlyFortune(year, month);
