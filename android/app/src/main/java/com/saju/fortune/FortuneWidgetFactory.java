@@ -111,28 +111,55 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
             rv.setTextViewText(R.id.cell_day,   String.valueOf(cell.day));
             rv.setTextViewText(R.id.cell_score, cell.score > 0 ? String.valueOf(cell.score) : "");
 
-            // 날짜 색상 + 오늘 배경
+            // 날짜 색상 + 상태별 배경
             int dayColor;
-            if (cell.isToday) {
-                rv.setInt(R.id.cell_root, "setBackgroundResource", R.drawable.cell_today_bg);
+
+            if (cell.isSelected) {
+                rv.setInt(R.id.cell_root, "setBackgroundResource", R.drawable.cell_selected_bg);
+
+                if (cell.isToday) {
+                    dayColor = Color.parseColor("#1BC4A8");
+                } else if (cell.dow == 0) {
+                    dayColor = Color.parseColor("#FF8A8A");   // 일요일 선택
+                } else if (cell.dow == 6) {
+                    dayColor = Color.parseColor("#8AB4FF");   // 토요일 선택
+                } else {
+                    dayColor = Color.parseColor("#FFFFFF");   // 평일 선택
+                }
+            } else if (cell.isToday) {
+                // 오늘 날짜: 글자 색만 초록
+                rv.setInt(R.id.cell_root, "setBackgroundColor", Color.TRANSPARENT);
                 dayColor = Color.parseColor("#1BC4A8");
-            } else if (cell.isSelected) {
-                rv.setInt(R.id.cell_root, "setBackgroundColor", Color.parseColor("#25FFFFFF"));
-                if      (cell.dow == 0) dayColor = Color.parseColor("#CC884444");
-                else if (cell.dow == 6) dayColor = Color.parseColor("#CC7777CC");
-                else                    dayColor = Color.parseColor("#CCF0F0F0");
+
             } else {
                 rv.setInt(R.id.cell_root, "setBackgroundColor", Color.TRANSPARENT);
-                if      (cell.dow == 0) dayColor = Color.parseColor("#CC884444");
-                else if (cell.dow == 6) dayColor = Color.parseColor("#CC7777CC");
-                else                    dayColor = Color.parseColor("#CCF0F0F0");
+                if (cell.dow == 0) {
+                    dayColor = Color.parseColor("#CC884444");
+                } else if (cell.dow == 6) {
+                    dayColor = Color.parseColor("#CC7777CC");
+                } else {
+                    dayColor = Color.parseColor("#CCF0F0F0");
+                }
             }
+
             rv.setTextColor(R.id.cell_day, dayColor);
+
+            if (cell.isSelected) {
+                rv.setFloat(R.id.cell_day, "setTextSize", 15f);
+                rv.setFloat(R.id.cell_day, "setAlpha", 1.0f);
+                rv.setFloat(R.id.cell_score, "setAlpha", 1.0f);
+                rv.setFloat(R.id.cell_score, "setTextSize", 11f);
+            } else {
+                rv.setFloat(R.id.cell_day, "setTextSize", 14f);
+                rv.setFloat(R.id.cell_day, "setAlpha", 0.9f);
+                rv.setFloat(R.id.cell_score, "setAlpha", 0.88f);
+                rv.setFloat(R.id.cell_score, "setTextSize", 10f);
+            }
 
             // 점수 색상
             int scoreColor;
             if      (cell.score >= 75) scoreColor = Color.parseColor("#FFD700");
-            else if (cell.score >= 65) scoreColor = Color.parseColor("#88DD88");
+            else if (cell.score >= 65) scoreColor = Color.parseColor("#1BC4A8");
             else if (cell.score >= 55) scoreColor = Color.parseColor("#AAAAAA");
             else                       scoreColor = Color.parseColor("#FF6666");
             rv.setTextColor(R.id.cell_score, scoreColor);
