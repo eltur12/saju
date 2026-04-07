@@ -5,36 +5,38 @@
   align-items: center;
   justify-content: center;
   padding: 2rem 1.5rem;
-  background: #0f1729;
+  background: #f7f8fa;
 }
 
 .logo {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
+  font-size: 2.2rem;
+  margin-bottom: 0.6rem;
 }
 
 .title {
-  font-size: 1.6rem;
-  color: #c9a84c;
+  font-size: 1.45rem;
+  color: #111111;
   text-align: center;
-  margin-bottom: 0.4rem;
-  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .subtitle {
-  font-size: 0.85rem;
-  color: #8899aa;
+  font-size: 0.84rem;
+  color: #999999;
   text-align: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 2rem;
+  line-height: 1.55;
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(201, 168, 76, 0.2);
-  border-radius: 16px;
+  background: #ffffff;
+  border-radius: 20px;
   padding: 2rem 1.5rem;
   width: 100%;
   max-width: 360px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
 }
 
 .section {
@@ -43,88 +45,85 @@
 
 .label {
   display: block;
-  font-size: 0.8rem;
-  color: #c9a84c;
-  margin-bottom: 0.6rem;
-  letter-spacing: 0.03em;
+  font-size: 0.77rem;
+  color: #999999;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
 }
 
 .selectRow {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .select {
   flex: 1;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(136, 153, 170, 0.3);
-  border-radius: 8px;
-  color: #e8e8e8;
-  padding: 0.6rem 0.4rem;
-  font-size: 0.9rem;
+  background: #f7f8fa;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  color: #111111;
+  padding: 0.65rem 0.3rem;
+  font-size: 0.88rem;
   font-family: inherit;
   appearance: none;
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s;
 }
-
 .select:focus {
   outline: none;
-  border-color: #c9a84c;
+  border-color: #3aab8c;
 }
-
 .select option {
-  background: #1a2540;
+  background: #ffffff;
+  color: #111111;
 }
 
 .btn {
   width: 100%;
   padding: 1rem;
-  background: linear-gradient(135deg, #c9a84c, #a8883c);
+  background: #3aab8c;
   border: none;
   border-radius: 12px;
-  color: #0f1729;
+  color: #ffffff;
   font-size: 1rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   margin-top: 0.5rem;
   transition: opacity 0.2s, transform 0.1s;
 }
-
-.btn:hover { opacity: 0.9; }
+.btn:hover  { opacity: 0.9; }
 .btn:active { transform: scale(0.98); }
 
 .genderRow {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .genderBtn {
   flex: 1;
   padding: 0.65rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(136, 153, 170, 0.3);
-  border-radius: 8px;
-  color: #8899aa;
+  background: #f7f8fa;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  color: #999999;
   font-size: 0.95rem;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
-
 .genderBtnActive {
-  background: rgba(201, 168, 76, 0.15);
-  border-color: #c9a84c;
-  color: #c9a84c;
+  background: rgba(58, 171, 140, 0.08);
+  border-color: #3aab8c;
+  color: #3aab8c;
   font-weight: 600;
 }
 
 .hint {
-  font-size: 0.75rem;
-  color: #5a6a7a;
+  font-size: 0.72rem;
+  color: #cccccc;
   text-align: center;
   margin-top: 1rem;
 }

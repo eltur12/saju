@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getMonthlyFortune, getUser, clearUser, saveWidgetData } from "../api/fortuneApi";
 import { App } from "@capacitor/app";
 import { LocalNotifications } from "@capacitor/local-notifications";
@@ -23,8 +23,6 @@ const SCORE_CATS: { key: keyof DailyFortune["scores"]; label: string }[] = [
   { key: "career",  label: "직업" },
 ];
 
-type TabId = "calendar" | "detail";
-
 const HINT_TYPE_LABEL: Record<string, string> = {
   best_window:    "좋은 시간",
   caution_window: "주의 시간",
@@ -32,6 +30,12 @@ const HINT_TYPE_LABEL: Record<string, string> = {
 };
 
 type HintItem = NonNullable<DailyFortune["notificationHints"]>[number];
+type TabId = "calendar" | "detail";
+type SettingsView = "main" | "noti";
+
+function fmtHour(h: number) {
+  return String(h).padStart(2, "0") + ":00";
+}
 
 function resolveScheduledTime(
   hint: HintItem,
@@ -54,23 +58,16 @@ function computeHintLabels(
   allowedStart: number,
   allowedEnd: number,
 ): string[] {
-  // Step 1: resolve best_window candidate first for spacing check
   const bestHint = hints.find(h => h.type === "best_window");
-  const bestAt = bestHint
-    ? resolveScheduledTime(bestHint, dateStr, allowedStart, allowedEnd)
-    : null;
-
+  const bestAt   = bestHint ? resolveScheduledTime(bestHint, dateStr, allowedStart, allowedEnd) : null;
   return hints.map(hint => {
     if (hint.type === "next_rise") return "참고용";
-
     const at = resolveScheduledTime(hint, dateStr, allowedStart, allowedEnd);
     if (!at) return "알림 없음";
-
     if (hint.type === "caution_window") {
       if (hint.score >= 50) return "알림 없음";
       if (bestAt !== null && Math.abs(at.getHours() - bestAt.getHours()) < 2) return "알림 없음";
     }
-
     return `알림 ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")} 예정`;
   });
 }
@@ -81,6 +78,7 @@ function getScoreClass(score: number) {
   if (score >= 55) return styles["score-gray"];
   return styles["score-red"];
 }
+
 function getBadgeClass(badge: string) {
   return `${styles.badge} ${styles[`badge-${badge}`]}`;
 }
@@ -92,20 +90,23 @@ export default function Main({ onBack }: Props) {
   const todayYear  = today.getFullYear();
   const todayMonth = today.getMonth() + 1;
   const todayDate  = today.getDate();
+  const todayStr   = `${todayYear}-${String(todayMonth).padStart(2, "0")}-${String(todayDate).padStart(2, "0")}`;
 
   const [year,  setYear]  = useState(todayYear);
   const [month, setMonth] = useState(todayMonth);
   const [data,  setData]  = useState<MonthlyFortuneResult | null>(null);
-  const [loading, setLoading]             = useState(true);
-  const [selected, setSelected]           = useState<DailyFortune | null>(null);
-  const [user, setUser]                   = useState<SajuUser | null>(null);
+  const [loading, setLoading]               = useState(true);
+  const [selected, setSelected]             = useState<DailyFortune | null>(null);
+  const [user, setUser]                     = useState<SajuUser | null>(null);
   const [autoSelectToday, setAutoSelectToday] = useState(true);
-  const [tab, setTab]                     = useState<TabId>("calendar");
-  const [pendingDay, setPendingDay]       = useState<{ year: number; month: number; day: number } | null>(null);
-  const [notiStart, setNotiStart]         = useState(7);
-  const [notiEnd,   setNotiEnd]           = useState(22);
-  const [notiSaved, setNotiSaved]         = useState(false);
-  const hasScheduledTodayRef              = { current: false };
+  const [tab, setTab]                       = useState<TabId>("calendar");
+  const [pendingDay, setPendingDay]         = useState<{ year: number; month: number; day: number } | null>(null);
+  const [notiStart, setNotiStart]           = useState(7);
+  const [notiEnd,   setNotiEnd]             = useState(22);
+  const [notiSaved, setNotiSaved]           = useState(false);
+  const [settingsOpen, setSettingsOpen]     = useState(false);
+  const [settingsView, setSettingsView]     = useState<SettingsView>("main");
+  const hasScheduledTodayRef                = useRef(false);
 
   useEffect(() => {
     getNotificationAllowedStartHour().then(setNotiStart);
@@ -116,14 +117,9 @@ export default function Main({ onBack }: Props) {
     try {
       const TEST_NOTIFICATION_ID = 999001;
       const { display } = await LocalNotifications.requestPermissions();
-      console.log("[TEST_NOTI] permission:", display);
       if (display !== "granted") return;
-
       await LocalNotifications.cancel({ notifications: [{ id: TEST_NOTIFICATION_ID }] });
-
       const scheduleAt = new Date(Date.now() + 5000);
-      console.log("[TEST_NOTI] id:", TEST_NOTIFICATION_ID, "scheduledAt:", scheduleAt.toString());
-
       await LocalNotifications.schedule({
         notifications: [{
           id: TEST_NOTIFICATION_ID,
@@ -131,7 +127,7 @@ export default function Main({ onBack }: Props) {
           body: "알림이 정상적으로 동작합니다",
           schedule: { at: scheduleAt },
           smallIcon: "ic_stat_icon_config_sample",
-          iconColor: "#c9a84c",
+          iconColor: "#3aab8c",
         }],
       });
     } catch (e) { console.warn("[TEST_NOTI] failed", e); }
@@ -140,23 +136,19 @@ export default function Main({ onBack }: Props) {
   const handleNotiSave = async () => {
     if (notiStart > notiEnd) return;
     await setNotificationAllowedHours(notiStart, notiEnd);
-
     const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const todayFortune = data?.daily_fortunes[now.getDate() - 1];
     if (year === now.getFullYear() && month === now.getMonth() + 1 && todayFortune) {
-      console.log("[NOTI_SAVE] explicit re-schedule after settings save");
-      await clearDailyFortuneNotifications(todayStr);
-      await scheduleDailyFortuneNotifications(todayFortune, todayStr);
+      await clearDailyFortuneNotifications(dateStr);
+      await scheduleDailyFortuneNotifications(todayFortune, dateStr);
     }
-
     setNotiSaved(true);
     setTimeout(() => setNotiSaved(false), 2000);
   };
 
   useEffect(() => { setUser(getUser()); }, []);
 
-  // 위젯 상세 클릭 → 딥링크로 해당 날짜 상세 탭 열기
   const handleDeepLink = useCallback((url: string) => {
     try {
       const u = new URL(url);
@@ -170,14 +162,11 @@ export default function Main({ onBack }: Props) {
   }, []);
 
   useEffect(() => {
-    // cold start: 딥링크로 앱이 처음 실행된 경우
     App.getLaunchUrl().then(result => { if (result?.url) handleDeepLink(result.url); });
-    // warm start: 앱이 이미 실행 중일 때 딥링크 수신
     const listenerPromise = App.addListener("appUrlOpen", ({ url }) => handleDeepLink(url));
     return () => { listenerPromise.then(h => h.remove()); };
   }, [handleDeepLink]);
 
-  // pendingDay 가 설정되면 해당 월 로드 후 날짜 선택
   useEffect(() => {
     if (!pendingDay) return;
     const u = getUser();
@@ -185,7 +174,6 @@ export default function Main({ onBack }: Props) {
     setYear(pendingDay.year);
     setMonth(pendingDay.month);
     setAutoSelectToday(false);
-    // 월 데이터 로드 완료 후 처리는 아래 effect 에서
   }, [pendingDay]);
 
   useEffect(() => {
@@ -203,7 +191,6 @@ export default function Main({ onBack }: Props) {
     try {
       const result = await getMonthlyFortune(u, y, m);
       setData(result);
-      // 현재 달 로드 시 오늘 운세를 위젯용으로 저장
       const now = new Date();
       if (y === now.getFullYear() && m === now.getMonth() + 1) {
         const todayFortune = result.daily_fortunes[now.getDate() - 1];
@@ -211,12 +198,9 @@ export default function Main({ onBack }: Props) {
           saveWidgetData(todayFortune);
           const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
           if (!hasScheduledTodayRef.current) {
-            console.log("[NOTI_LOAD] scheduling today's notifications");
             hasScheduledTodayRef.current = true;
             await clearDailyFortuneNotifications(dateStr);
             scheduleDailyFortuneNotifications(todayFortune, dateStr);
-          } else {
-            console.log("[NOTI_LOAD] skipped: already scheduled this session");
           }
         }
       }
@@ -263,21 +247,44 @@ export default function Main({ onBack }: Props) {
     setTab("detail");
   };
 
+  const openSettings = () => {
+    setSettingsView("main");
+    setSettingsOpen(true);
+  };
+
+  // Calendar grid
   const firstDay    = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
   const cells = Array.from({ length: firstDay + daysInMonth }, (_, i) =>
     i < firstDay ? null : i - firstDay + 1
   );
   while (cells.length % 7 !== 0) cells.push(null);
-
   const isCurrentMonth = year === todayYear && month === todayMonth;
 
+  // Selected date display
   const selectedDate   = selected
     ? (() => { const [y, m, d] = selected.date.split("-").map(Number); return new Date(y, m - 1, d); })()
     : null;
   const selectedDayStr = selectedDate
     ? `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일 (${DOW_KO[selectedDate.getDay()]})`
     : "";
+
+  // Now / best segments
+  const isSelectedToday = selected?.date === todayStr;
+  const nowSegment = (() => {
+    if (!selected?.timeSegments?.length) return null;
+    if (isSelectedToday) {
+      const h = new Date().getHours();
+      return selected.timeSegments.find(s => h >= s.startHour && h < s.endHour)
+        ?? selected.timeSegments[0];
+    }
+    return selected.timeSegments.reduce((a, b) => b.score > a.score ? b : a);
+  })();
+  const bestSegment = selected?.timeSegments?.length
+    ? selected.timeSegments.reduce((a, b) => b.score > a.score ? b : a)
+    : null;
+  const showBestSeparately = bestSegment && nowSegment
+    && bestSegment.startHour !== nowSegment.startHour;
 
   return (
     <div className={styles.container}>
@@ -289,7 +296,7 @@ export default function Main({ onBack }: Props) {
           <span className={styles.headerTitle}>{year}년 {month}월</span>
           <button className={styles.navBtn} onClick={nextMonth}>›</button>
         </div>
-        <button className={styles.settingsBtn} onClick={() => { clearUser(); onBack(); }} title="설정">⚙</button>
+        <button className={styles.settingsBtn} onClick={openSettings} title="설정">⚙</button>
       </div>
 
       {/* ── Tab Bar ── */}
@@ -318,7 +325,7 @@ export default function Main({ onBack }: Props) {
             ))}
           </div>
           {loading ? (
-            <div className={styles.loading}>✨ 운세 계산 중...</div>
+            <div className={styles.loading}>운세 계산 중...</div>
           ) : (
             <div className={styles.calendarGrid}>
               {cells.map((day, idx) => {
@@ -353,6 +360,26 @@ export default function Main({ onBack }: Props) {
               })}
             </div>
           )}
+
+          {/* ── Selected date preview card ── */}
+          {selected && !loading && (
+            <div className={styles.previewCard}>
+              <div className={styles.previewLeft}>
+                <div className={styles.previewDate}>{selectedDayStr}</div>
+                <div className={styles.previewLunar}>음력 {selected.lunar_date}</div>
+                <div className={styles.previewSummary}>{selected.summary}</div>
+              </div>
+              <div className={styles.previewRight}>
+                <span className={`${styles.previewScore} ${getScoreClass(selected.scores.overall)}`}>
+                  {selected.scores.overall}
+                </span>
+                <span className={getBadgeClass(selected.badge)}>{selected.badge}</span>
+                <button className={styles.previewBtn} onClick={() => setTab("detail")}>
+                  자세히 보기
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -369,26 +396,46 @@ export default function Main({ onBack }: Props) {
             </div>
           ) : (
             <>
-              {/* 날짜 + 점수 + 뱃지 */}
-              <div className={styles.detailTopRow}>
-                <div>
-                  <div className={styles.detailDate}>{selectedDayStr}</div>
-                  <div className={styles.detailLunar}>음력 {selected.lunar_date}</div>
+              {/* ── Hero: date + score + badge ── */}
+              <div className={styles.heroCard}>
+                <div className={styles.heroMeta}>
+                  <span className={styles.heroDate}>{selectedDayStr}</span>
+                  <span className={styles.heroLunar}>음력 {selected.lunar_date}</span>
                 </div>
-                <div className={styles.detailScoreInline}>
-                  <span className={`${styles.detailScoreNum} ${getScoreClass(selected.scores.overall)}`}>
+                <div className={styles.heroScoreRow}>
+                  <span className={`${styles.heroScoreNum} ${getScoreClass(selected.scores.overall)}`}>
                     {selected.scores.overall}
                   </span>
                   <span className={getBadgeClass(selected.badge)}>{selected.badge}</span>
                 </div>
+                <p className={styles.heroSummary}>{selected.summary}</p>
               </div>
 
-              {/* 요약 */}
-              <div className={styles.detailSummaryBox}>{selected.summary}</div>
+              {/* ── 지금 추천 / 오늘 최고 ── */}
+              {(nowSegment || showBestSeparately) && (
+                <div className={styles.cardsRow}>
+                  {nowSegment && (
+                    <div className={styles.nowCard}>
+                      <div className={styles.cardLabel}>지금 추천</div>
+                      <div className={styles.cardTime}>{fmtHour(nowSegment.startHour)} – {fmtHour(nowSegment.endHour)}</div>
+                      <div className={styles.cardTags}>{nowSegment.tags.join(" · ")}</div>
+                      <div className={`${styles.cardScore} ${styles["cardScore-mint"]}`}>{nowSegment.score}</div>
+                    </div>
+                  )}
+                  {showBestSeparately && bestSegment && (
+                    <div className={styles.bestCard}>
+                      <div className={styles.cardLabel}>오늘 최고</div>
+                      <div className={styles.cardTime}>{fmtHour(bestSegment.startHour)} – {fmtHour(bestSegment.endHour)}</div>
+                      <div className={styles.cardTags}>{bestSegment.tags.join(" · ")}</div>
+                      <div className={`${styles.cardScore} ${styles["cardScore-gold"]}`}>{bestSegment.score}</div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {/* 카테고리 점수 */}
+              {/* ── 카테고리 점수 ── */}
               <div className={styles.detailSection}>
-                <div className={styles.sectionTitle}>카테고리별 점수</div>
+                <div className={styles.sectionTitle}>카테고리</div>
                 <div className={styles.scoreGrid}>
                   {SCORE_CATS.map(({ key, label }) => (
                     <div key={key} className={styles.scoreItem}>
@@ -402,11 +449,47 @@ export default function Main({ onBack }: Props) {
                 </div>
               </div>
 
-              {/* 할 일 / 피할 일 */}
+              {/* ── 시간대 흐름 ── */}
+              {selected.timeSegments && selected.timeSegments.length > 0 && (
+                <div className={styles.detailSection}>
+                  <div className={styles.sectionTitle}>시간대 흐름</div>
+                  <div className={styles.segmentList}>
+                    {selected.timeSegments.map((seg) => {
+                      const isNow  = nowSegment?.startHour === seg.startHour;
+                      const isBest = bestSegment?.startHour === seg.startHour && !isNow;
+                      const isCaution = seg.score < 45;
+                      const marker = isNow ? "now" : isBest ? "best" : isCaution ? "caution" : null;
+                      const markerLabel = isNow ? "지금" : isBest ? "최고" : "주의";
+                      return (
+                        <div
+                          key={seg.startHour}
+                          className={`${styles.segmentRow} ${isNow ? styles.segmentRowNow : ""} ${isBest ? styles.segmentRowBest : ""}`}
+                        >
+                          <span className={styles.segmentTime}>
+                            {fmtHour(seg.startHour)} – {fmtHour(seg.endHour)}
+                          </span>
+                          <span className={`${styles.segmentScore} ${getScoreClass(seg.score)}`}>
+                            {seg.score}
+                          </span>
+                          <span className={styles.segmentTags}>{seg.tags.join(" · ")}</span>
+                          {marker && (
+                            <span className={`${styles.segmentMarker} ${styles[`segmentMarker-${marker}`]}`}>
+                              {markerLabel}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── 오늘의 행동 ── */}
               <div className={styles.detailSection}>
+                <div className={styles.sectionTitle}>오늘의 행동</div>
                 <div className={styles.todoRow}>
                   <div className={styles.todoCol}>
-                    <div className={styles.todoTitle}>✅ 하면 좋은 것</div>
+                    <div className={styles.todoTitle}>하면 좋은 것</div>
                     <ul className={styles.todoList}>
                       {selected.todos.do_list.map((item, i) => (
                         <li key={i} className={styles.todoItem}>{item}</li>
@@ -414,7 +497,7 @@ export default function Main({ onBack }: Props) {
                     </ul>
                   </div>
                   <div className={styles.todoCol}>
-                    <div className={`${styles.todoTitle} ${styles.todoTitleDanger}`}>⚠️ 피해야 할 것</div>
+                    <div className={`${styles.todoTitle} ${styles.todoTitleDanger}`}>피해야 할 것</div>
                     <ul className={styles.todoList}>
                       {selected.todos.dont_list.map((item, i) => (
                         <li key={i} className={`${styles.todoItem} ${styles.dontItem}`}>{item}</li>
@@ -424,55 +507,34 @@ export default function Main({ onBack }: Props) {
                 </div>
               </div>
 
-              {/* 시간대별 흐름 */}
-              {selected.timeSegments && selected.timeSegments.length > 0 && (
-                <div className={styles.detailSection}>
-                  <div className={styles.sectionTitle}>시간대별 흐름</div>
-                  <div className={styles.segmentList}>
-                    {selected.timeSegments.map((seg) => (
-                      <div key={seg.startHour} className={styles.segmentRow}>
-                        <span className={styles.segmentTime}>
-                          {String(seg.startHour).padStart(2, "0")}:00 – {String(seg.endHour).padStart(2, "0")}:00
-                        </span>
-                        <span className={`${styles.segmentScore} ${getScoreClass(seg.score)}`}>
-                          {seg.score}
-                        </span>
-                        <span className={styles.segmentTags}>{seg.tags.join("  ")}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* ── 알림 예정 (scheduled hints only, clean) ── */}
+              {selected.notificationHints && selected.notificationHints.length > 0 && (() => {
+                const labels  = computeHintLabels(selected.notificationHints, selected.date, notiStart, notiEnd);
+                const bestHint = selected.notificationHints.find(h => h.type === "best_window");
+                const bestAt   = bestHint ? resolveScheduledTime(bestHint, selected.date, notiStart, notiEnd) : null;
 
-              {/* 알림 힌트 */}
-              {selected.notificationHints && selected.notificationHints.length > 0 && (
-                <div className={styles.detailSection}>
-                  <div className={styles.sectionTitle}>알림 힌트</div>
-                  <div className={styles.segmentList}>
-                    {(() => {
-                      const labels = computeHintLabels(selected.notificationHints, selected.date, notiStart, notiEnd);
-                      const bestHint = selected.notificationHints.find(h => h.type === "best_window");
-                      const bestAt   = bestHint ? resolveScheduledTime(bestHint, selected.date, notiStart, notiEnd) : null;
+                const enriched = selected.notificationHints.map((hint, i) => {
+                  const isInfoOnly = hint.type === "next_rise";
+                  const at         = isInfoOnly ? null : resolveScheduledTime(hint, selected.date, notiStart, notiEnd);
+                  const typeValid  = hint.type === "best_window" ||
+                    (hint.type === "caution_window" && hint.score < 50 &&
+                      !(bestAt !== null && at !== null && Math.abs(at.getHours() - bestAt.getHours()) < 2));
+                  const isScheduled = !isInfoOnly && at !== null && typeValid;
+                  return { hint, label: labels[i], isScheduled, isInfoOnly, at };
+                });
 
-                      const enriched = selected.notificationHints.map((hint, i) => {
-                        const isInfoOnly   = hint.type === "next_rise";
-                        const at           = isInfoOnly ? null : resolveScheduledTime(hint, selected.date, notiStart, notiEnd);
-                        const typeValid    =
-                          hint.type === "best_window" ||
-                          (hint.type === "caution_window" && hint.score < 50 &&
-                            !(bestAt !== null && at !== null && Math.abs(at.getHours() - bestAt.getHours()) < 2));
-                        const isScheduled  = !isInfoOnly && at !== null && typeValid;
-                        return { hint, label: labels[i], isScheduled, isInfoOnly, at };
-                      });
+                enriched.sort((a, b) => {
+                  if (a.hint.hour !== b.hint.hour) return a.hint.hour - b.hint.hour;
+                  const ga = a.isScheduled ? 0 : a.isInfoOnly ? 1 : 2;
+                  const gb = b.isScheduled ? 0 : b.isInfoOnly ? 1 : 2;
+                  return ga - gb;
+                });
 
-                      enriched.sort((a, b) => {
-                        if (a.hint.hour !== b.hint.hour) return a.hint.hour - b.hint.hour;
-                        const groupA = a.isScheduled ? 0 : a.isInfoOnly ? 1 : 2;
-                        const groupB = b.isScheduled ? 0 : b.isInfoOnly ? 1 : 2;
-                        return groupA - groupB;
-                      });
-
-                      return enriched.map(({ hint, label }) => (
+                return (
+                  <div className={styles.detailSection}>
+                    <div className={styles.sectionTitle}>알림 예정</div>
+                    <div className={styles.segmentList}>
+                      {enriched.map(({ hint, label }) => (
                         <div key={`${hint.type}-${hint.hour}`} className={styles.hintRow}>
                           <span className={styles.hintHour}>
                             {hint.hour}시
@@ -482,44 +544,78 @@ export default function Main({ onBack }: Props) {
                           <span className={styles.hintLabel}>{hint.label}</span>
                           <span className={`${styles.segmentScore} ${getScoreClass(hint.score)}`}>{hint.score}</span>
                         </div>
-                      ));
-                    })()}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* 알림 허용 시간대 설정 (디버그) */}
-              <div className={styles.detailSection}>
-                <div className={styles.sectionTitle}>알림 허용 시간대</div>
-                <div className={styles.notiSettingsRow}>
-                  <label className={styles.notiLabel}>시작</label>
-                  <select
-                    className={styles.notiSelect}
-                    value={notiStart}
-                    onChange={e => setNotiStart(Number(e.target.value))}
-                  >
-                    {[6,7,8,9,10,11,12].map(h => <option key={h} value={h}>{h}시</option>)}
-                  </select>
-                  <label className={styles.notiLabel}>종료</label>
-                  <select
-                    className={styles.notiSelect}
-                    value={notiEnd}
-                    onChange={e => setNotiEnd(Number(e.target.value))}
-                  >
-                    {[12,13,14,15,16,17,18,19,20,21,22,23].map(h => <option key={h} value={h}>{h}시</option>)}
-                  </select>
-                  <button
-                    className={styles.notiSaveBtn}
-                    onClick={handleNotiSave}
-                    disabled={notiStart > notiEnd}
-                  >저장</button>
-                  {notiSaved && <span className={styles.notiSavedMsg}>저장됨</span>}
-                  <button className={styles.notiSaveBtn} onClick={sendTestNotification}>알림 테스트</button>
-                </div>
-              </div>
+                );
+              })()}
             </>
           )}
         </div>
+      )}
+
+      {/* ── Settings Bottom Sheet ── */}
+      {settingsOpen && (
+        <>
+          <div className={styles.overlay} onClick={() => setSettingsOpen(false)} />
+          <div className={styles.bottomSheet}>
+            <div className={styles.sheetHandle} />
+
+            {settingsView === "main" ? (
+              <>
+                <div className={styles.sheetTitle}>설정</div>
+                <button className={styles.sheetOption} onClick={() => setSettingsView("noti")}>
+                  알림 설정
+                </button>
+                <button
+                  className={`${styles.sheetOption} ${styles.sheetOptionDanger}`}
+                  onClick={() => { clearUser(); onBack(); }}
+                >
+                  기본 정보 수정
+                </button>
+              </>
+            ) : (
+              <>
+                <button className={styles.sheetBack} onClick={() => setSettingsView("main")}>
+                  ← 알림 설정
+                </button>
+                <div className={styles.notiSheetSection}>
+                  <div className={styles.notiSheetRow}>
+                    <span className={styles.notiLabel}>시작</span>
+                    <select
+                      className={styles.notiSelect}
+                      value={notiStart}
+                      onChange={e => setNotiStart(Number(e.target.value))}
+                    >
+                      {[6,7,8,9,10,11,12].map(h => <option key={h} value={h}>{h}시</option>)}
+                    </select>
+                    <span className={styles.notiLabel}>종료</span>
+                    <select
+                      className={styles.notiSelect}
+                      value={notiEnd}
+                      onChange={e => setNotiEnd(Number(e.target.value))}
+                    >
+                      {[12,13,14,15,16,17,18,19,20,21,22,23].map(h => <option key={h} value={h}>{h}시</option>)}
+                    </select>
+                  </div>
+                  <div className={styles.notiSheetRow}>
+                    <button
+                      className={styles.notiSaveBtn}
+                      onClick={handleNotiSave}
+                      disabled={notiStart > notiEnd}
+                    >
+                      저장
+                    </button>
+                    {notiSaved && <span className={styles.notiSavedMsg}>저장됨</span>}
+                    <button className={styles.notiTestBtn} onClick={sendTestNotification}>
+                      알림 테스트
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
