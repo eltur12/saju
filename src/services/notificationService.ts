@@ -1,12 +1,24 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Preferences } from "@capacitor/preferences";
 import type { DailyFortune } from "../engines/aggregator";
+import {
+  planNotifications,
+  applyNotificationSettings,
+  generateNotificationMessage,
+  type NotificationSettings,
+} from "../engines/notificationPlanner";
 
-const PREF_KEY_PREFIX = "fortune_notification_";
+export type { NotificationSettings };
 
-const HINT_TITLES: Record<string, string> = {
-  best_window:    "좋은 흐름이 시작돼요",
-  caution_window: "조금 조심하면 좋은 시간이에요",
+const PREF_KEY_PREFIX    = "fortune_notification_";
+const PREF_KEY_SETTINGS  = "notification_settings_v2";
+
+const DEFAULT_SETTINGS: NotificationSettings = {
+  dailyEnabled: true,
+  flowEnabled:  true,
+  lowEnabled:   true,
+  allowNight:   false,
+  dailyTime:    "07:00",
 };
 
 /** 알림 권한 요청 — 앱 시작 시 1회 호출 */
@@ -17,6 +29,18 @@ export async function requestNotificationPermission(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function loadNotificationSettings(): Promise<NotificationSettings> {
+  try {
+    const { value } = await Preferences.get({ key: PREF_KEY_SETTINGS });
+    if (value) return { ...DEFAULT_SETTINGS, ...JSON.parse(value) } as NotificationSettings;
+  } catch { /* fallthrough */ }
+  return { ...DEFAULT_SETTINGS };
+}
+
+export async function saveNotificationSettings(settings: NotificationSettings): Promise<void> {
+  await Preferences.set({ key: PREF_KEY_SETTINGS, value: JSON.stringify(settings) });
 }
 
 /** 날짜 문자열(YYYY-MM-DD) 기준으로 예약된 알림 id 목록을 저장/로드 */
@@ -30,94 +54,43 @@ async function saveScheduledIds(dateKey: string, ids: number[]): Promise<void> {
   await Preferences.set({ key: PREF_KEY_PREFIX + dateKey, value: JSON.stringify(ids) });
 }
 
-const DEFAULT_START = 7;
-const DEFAULT_END   = 22;
-
-export async function getNotificationAllowedStartHour(): Promise<number> {
-  const { value } = await Preferences.get({ key: "notification_allowed_start_hour" });
-  const n = value !== null ? parseInt(value) : NaN;
-  return isNaN(n) ? DEFAULT_START : n;
-}
-
-export async function getNotificationAllowedEndHour(): Promise<number> {
-  const { value } = await Preferences.get({ key: "notification_allowed_end_hour" });
-  const n = value !== null ? parseInt(value) : NaN;
-  return isNaN(n) ? DEFAULT_END : n;
-}
-
-export async function setNotificationAllowedHours(start: number, end: number): Promise<void> {
-  await Preferences.set({ key: "notification_allowed_start_hour", value: String(start) });
-  await Preferences.set({ key: "notification_allowed_end_hour",   value: String(end)   });
-}
-
 /**
- * 오늘의 운세에서 best_window / caution_window 힌트를 로컬 알림으로 예약.
- * - 이미 지난 시각은 스킵
+ * 오늘의 운세를 플래너로 분석해 로컬 알림으로 예약.
+ * - planner → settings filter → message generation → schedule
  * - 같은 날 중복 예약 방지
- * - 최대 2개
  */
 export async function scheduleDailyFortuneNotifications(
   fortune: DailyFortune,
   date: string,
 ): Promise<void> {
   try {
-    const hints = fortune.notificationHints;
-    if (!hints || hints.length === 0) return;
-
-    const now = new Date();
     const existingIds = await loadScheduledIds(date);
+    if (existingIds.length > 0) return;
 
-    // 이미 이 날짜에 예약 완료된 경우 스킵
-    if (existingIds.length >= 2) return;
+    const settings  = await loadNotificationSettings();
+    const planned   = planNotifications(fortune, date);
+    const filtered  = applyNotificationSettings(planned, settings, date);
+    if (filtered.length === 0) return;
 
-    const targets = hints.filter(h =>
-      h.type === "best_window" || h.type === "caution_window"
-    ).slice(0, 2);
-
+    const now    = new Date();
+    const dateNum = parseInt(date.replace(/-/g, ""));
     const newIds: number[] = [];
-    let bestWindowHour: number | null = null;
 
-    for (const hint of targets) {
-      // caution_window 추가 필터
-      if (hint.type === "caution_window") {
-        // score >= 50 이면 스킵
-        if (hint.score >= 50) continue;
-        // quiet hours: 0~5시 스킵
-        if (hint.hour >= 0 && hint.hour <= 5) continue;
-        // best_window 와 2시간 이내면 스킵
-        if (bestWindowHour !== null && Math.abs(hint.hour - bestWindowHour) < 2) continue;
-      }
-
-      // 예약 시각 구성
-      const [y, m, d] = date.split("-").map(Number);
-      const minute = hint.type === "best_window" ? -10 : 0;
-      const scheduleAt = new Date(y, m - 1, d, hint.hour, minute, 0, 0);
-
-      // 허용 시간대 적용
-      let startHour = await getNotificationAllowedStartHour();
-      let endHour   = await getNotificationAllowedEndHour();
-      if (startHour > endHour) { startHour = DEFAULT_START; endHour = DEFAULT_END; }
-      const scheduledHour = scheduleAt.getHours();
-      if (scheduledHour < startHour) { scheduleAt.setHours(startHour, 0, 0, 0); }
-      if (scheduleAt.getHours() > endHour) continue;
-
-      // 이미 지난 시각이면 스킵
+    for (const n of filtered) {
+      const scheduleAt = n.triggerTime;
       if (scheduleAt <= now) continue;
 
-      // 간단한 결정적 id: 날짜 + 시각 기반
-      const id = parseInt(date.replace(/-/g, "")) * 100 + hint.hour;
-
-      // 이미 같은 id가 예약되어 있으면 스킵
+      const id = dateNum * 100 + scheduleAt.getHours();
       if (existingIds.includes(id)) continue;
 
-      if (hint.type === "best_window") bestWindowHour = hint.hour;
+      const { title, body } = generateNotificationMessage(n, "L1");
+      console.log("[NOTI_SCHEDULE]", n.type, "at", scheduleAt.toString(), "—", title);
 
-      console.log("[NOTI_SCHEDULE]", hint.type, "hintHour:", hint.hour, "scheduledAt:", scheduleAt.toString());
       await LocalNotifications.schedule({
         notifications: [{
           id,
-          title: HINT_TITLES[hint.type] ?? "운세 알림",
-          body:  hint.label,
+          title,
+          body,
           schedule: { at: scheduleAt },
           smallIcon: "ic_stat_icon_config_sample",
           iconColor: "#c9a84c",
@@ -133,6 +106,50 @@ export async function scheduleDailyFortuneNotifications(
     }
   } catch {
     // 알림 실패는 앱 동작에 영향 없음
+  }
+}
+
+const DEBUG_NOTI_ID_BASE = 990001;
+
+/** 디버그 전용: 오늘의 플래너 알림을 즉시 (~1분 후) 실제 로컬 알림으로 전송 */
+export async function sendDebugTestNotificationsForToday(
+  fortune: DailyFortune,
+  date: string,
+): Promise<void> {
+  try {
+    const { display } = await LocalNotifications.requestPermissions();
+    if (display !== "granted") return;
+
+    const settings = await loadNotificationSettings();
+    const planned  = planNotifications(fortune, date);
+    const filtered = applyNotificationSettings(planned, settings, date);
+    if (filtered.length === 0) {
+      console.log("[DEBUG_NOTI] no planned notifications for today");
+      return;
+    }
+
+    await LocalNotifications.cancel({
+      notifications: [0, 1, 2].map(i => ({ id: DEBUG_NOTI_ID_BASE + i })),
+    });
+
+    const offsets = [60, 70, 80]; // seconds from now
+    const notifications = filtered.slice(0, 3).map((n, i) => {
+      const { title, body } = generateNotificationMessage(n, "L1");
+      const scheduleAt = new Date(Date.now() + offsets[i] * 1000);
+      console.log(`[DEBUG_NOTI] #${i} ${n.type} at ${scheduleAt.toISOString()} — ${title}`);
+      return {
+        id: DEBUG_NOTI_ID_BASE + i,
+        title,
+        body,
+        schedule: { at: scheduleAt },
+        smallIcon: "ic_stat_icon_config_sample",
+        iconColor: "#c9a84c",
+      };
+    });
+
+    await LocalNotifications.schedule({ notifications });
+  } catch (e) {
+    console.warn("[DEBUG_NOTI] failed", e);
   }
 }
 

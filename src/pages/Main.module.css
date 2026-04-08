@@ -67,21 +67,28 @@
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text);
-  min-width: 84px;
+  min-width: 120px;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .settingsBtn {
-  background: none;
+  background: transparent;
   border: none;
-  color: var(--text-muted);
-  font-size: 1.15rem;
-  cursor: pointer;
-  padding: 0.3rem;
   border-radius: 8px;
-  transition: background 0.15s;
+  padding: 8px;
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.55);
 }
 .settingsBtn:hover { background: var(--bg); }
+
+.settingsBtn:active {
+  background: rgba(0,0,0,0.05);
+}
 
 /* ══════════════════════════════════════
    Tab Bar
@@ -192,6 +199,23 @@
 .cellEmpty      { cursor: default; }
 .cellSelected   { border-color: var(--accent-mint) !important; background: var(--accent-mint-bg); }
 .cellToday      { border-color: rgba(201,145,42,0.5) !important; }
+.cellDim {
+  opacity: 0.38;
+}
+
+.cellDim:hover {
+  background: transparent;
+  cursor: default;
+}
+
+.cellDim .solarDay {
+  color: var(--text-dim);
+}
+
+.cellDim .lunarDay,
+.cellDim .scoreNum {
+  display: none;
+}
 
 .solarDay {
   font-size: 0.88rem;
@@ -274,7 +298,7 @@
   margin-top: 0.25rem;
   line-height: 1.45;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -517,32 +541,81 @@
 .segmentList {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.4rem;
+}
+
+.segmentAccordion {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.segmentAccordionHighlight {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(17,17,17,0.04);
 }
 
 .segmentRow {
   display: grid;
-  grid-template-columns: 7.5rem 2.2rem 1fr auto;
+  grid-template-columns: 7rem 3.2rem 1fr;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.5rem;
+  padding: 0.55rem 0.6rem;
   border-radius: 8px;
+  cursor: default;
   transition: background 0.1s;
 }
-.segmentRow:hover     { background: var(--bg); }
-.segmentRowNow        { background: var(--accent-mint-bg); border-radius: 8px; }
-.segmentRowBest       { background: var(--accent-gold-bg); border-radius: 8px; }
+.segmentRowNow {
+  background: var(--accent-mint-bg);
+  border-radius: 8px;
+  box-shadow: inset 2px 0 0 var(--accent-mint);
+  border-left: 3px solid var(--accent-mint);
+  padding-left: 9px;
+
+}
+.segmentRowOpen {
+  background: var(--bg);
+  border-radius: 8px 8px 0 0;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.segmentRowNow.segmentRowOpen { background: var(--accent-mint-bg); border-radius: 8px 8px 0 0; }
 
 .segmentTime {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+.segmentRowNow .segmentTime {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.segmentScoreWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
 
 .segmentScore {
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 700;
   text-align: right;
+}
+.segmentRowNow .segmentScore {
+  font-weight: 800;
+}
+
+.scoreBadgeHigh {
+  font-size: 0.52rem;
+  color: var(--accent-gold);
+  line-height: 1;
+  opacity: 0.8;
+}
+.scoreBadgeLow {
+  font-size: 0.52rem;
+  color: var(--danger);
+  line-height: 1;
+  opacity: 0.8;
 }
 
 .segmentTags {
@@ -550,6 +623,80 @@
   color: var(--text-muted);
 }
 
+.segmentRight {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  justify-self: end;
+}
+
+/* Notification type markers */
+.notiMarker {
+  width: 1rem;
+  height: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  opacity: 0.9;
+  line-height: 1;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.notiMarkerFlow  { color: var(--accent-gold); background: var(--accent-gold-bg); }
+.notiMarkerLow   { color: var(--danger); background: var(--danger-bg); }
+.notiMarkerPoint { color: var(--accent-mint); background: var(--accent-mint-bg); }
+
+/* Clock icon (notification scheduled) */
+.notiClockIcon {
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0.72;
+}
+
+/* Chevron toggle */
+.segmentChevron {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  display: inline-block;
+  transition: transform 0.2s;
+  line-height: 1;
+}
+.segmentChevronOpen { transform: rotate(90deg); }
+
+/* Expanded body */
+.segmentBody {
+  background: var(--bg);
+  border-radius: 0 0 10px 10px;
+  padding: 0.68rem 0.9rem 0.85rem;
+}
+.segmentBodyNow {
+  background: var(--accent-mint-bg);
+  border-radius: 0 0 10px 10px;
+  padding: 0.68rem 0.9rem 0.85rem;
+}
+.segmentBodyText {
+  font-size: 0.78rem;
+  color: var(--text-sub);
+  line-height: 1.5;
+  opacity: 0.92;
+  margin: 0;
+}
+
+/* Scheduled notification hint */
+.notiScheduledHint {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.63rem;
+  color: var(--accent-mint);
+  background: var(--accent-mint-bg);
+  padding: 0.15rem 0.45rem;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+/* Legacy — kept for compat */
 .segmentMarker {
   font-size: 0.6rem;
   font-weight: 700;
@@ -779,7 +926,71 @@
   font-size: 0.72rem;
   color: var(--accent-mint);
   font-weight: 600;
+  opacity: 0.8;
 }
+
+.notiItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.notiItem:last-of-type { border-bottom: none; }
+
+.notiItemText { flex: 1; gap: 2px; }
+
+.notiItemLabel {
+  font-size: 0.84rem;
+  color: var(--text);
+  font-weight: 500;
+  display: block;
+}
+
+.notiItemHelper {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  display: block;
+  line-height: 1.4;
+}
+
+.notiItemControl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.notiToggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.notiToggle input { opacity: 0; width: 0; height: 0; }
+.notiToggleTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  background: var(--border);
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.notiToggleTrack::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px;
+  left: 3px;
+  transition: left 0.2s;
+}
+.notiToggle input:checked + .notiToggleTrack { background: var(--accent-mint); }
+.notiToggle input:checked + .notiToggleTrack::after { left: 19px; }
 
 /* Legacy aliases for backward compat (unused in new layout but safe) */
 .detailTopRow    { display: none; }
