@@ -17,12 +17,44 @@ async function setPreference(key: string, value: string): Promise<void> {
   }
 }
 
+async function removePreference(key: string): Promise<void> {
+  try {
+    const { Preferences } = await import("@capacitor/preferences");
+    await Preferences.remove({ key });
+  } catch {
+    // 웹 브라우저 환경에서는 무시
+  }
+}
+
+async function listPreferenceKeys(): Promise<string[]> {
+  try {
+    const { Preferences } = await import("@capacitor/preferences");
+    const { keys } = await Preferences.keys();
+    return keys;
+  } catch {
+    return [];
+  }
+}
+
+/** 위젯 캐시 전체 삭제
+ *  - 전체 재계산/사용자 변경 시 호출하는 용도
+ *  - 평소 월 조회 때는 호출하지 않음
+ */
+export async function clearWidgetCache(): Promise<void> {
+  const keys = await listPreferenceKeys();
+  const targets = keys.filter(
+      (key) => key === "widget_data" || key.startsWith("widget_monthly_"),
+  );
+
+  await Promise.all(targets.map((key) => removePreference(key)));
+  await refreshWidget();
+}
+
 /** 위젯에서 읽을 오늘의 운세를 SharedPreferences에 저장 */
 export async function saveWidgetData(fortune: DailyFortune): Promise<void> {
   await setPreference("widget_data", JSON.stringify({
     score:     fortune.scores.overall,
     badge:     fortune.badge,
-    summary:   fortune.summary,
     date:      fortune.date,
     wealth:    fortune.scores.wealth,
     love:      fortune.scores.love,
@@ -31,11 +63,14 @@ export async function saveWidgetData(fortune: DailyFortune): Promise<void> {
     relations: fortune.scores.relations,
     study:     fortune.scores.study,
   }));
+
+  await refreshWidget();
 }
 
 /** 달력 위젯에서 읽을 월간 운세 전체를 SharedPreferences에 저장 */
 export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promise<void> {
   const key = `widget_monthly_${result.year}_${result.month}`;
+
   const payload = {
     year:  result.year,
     month: result.month,
@@ -52,6 +87,7 @@ export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promi
       study:      f.scores.study,
     })),
   };
+
   await setPreference(key, JSON.stringify(payload));
 }
 
@@ -88,15 +124,34 @@ function saveCache(key: string, data: MonthlyFortuneResult): void {
   localStorage.setItem("saju_cache", JSON.stringify(cache));
 }
 
+function getTodayLocalString(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export async function getMonthlyFortune(
-  user: SajuUser,
-  year: number,
-  month: number,
+    user: SajuUser,
+    year: number,
+    month: number,
 ): Promise<MonthlyFortuneResult> {
   const key = getCacheKey(year, month);
   const cache = loadCache();
+
   if (cache[key]) {
-    saveWidgetMonthlyData(cache[key]);
+    await saveWidgetMonthlyData(cache[key]);
+
+    const todayStr = getTodayLocalString();
+    const todayFortune = cache[key].daily_fortunes.find(d => d.date === todayStr);
+
+    if (todayFortune) {
+      await saveWidgetData(todayFortune);
+    } else {
+      await refreshWidget();
+    }
+
     return cache[key];
   }
 
@@ -105,30 +160,40 @@ export async function getMonthlyFortune(
 
   // 사주 (동기) — 성별 반영 (대운 순역방향)
   const sajuProfile = calculateSajuProfile(
-    user.birth_year, user.birth_month, user.birth_day, hour, user.gender,
-    user.injong_rules,
+      user.birth_year, user.birth_month, user.birth_day, hour, user.gender,
+      user.injong_rules,
   );
 
   // 자미두수 (동기) — 성별 반영
   const ziweiProfile = buildZiweiProfile(
-    user.birth_year, user.birth_month, user.birth_day, hour, year, isMale,
+      user.birth_year, user.birth_month, user.birth_day, hour, year, isMale,
   );
 
   // 서양 점성술 (비동기 — Moshier 에페메리스)
   const astroProfile = await buildAstroProfile(
-    user.birth_year, user.birth_month, user.birth_day, user.birth_hour,
-    undefined, undefined, user.birth_minute,
+      user.birth_year, user.birth_month, user.birth_day, user.birth_hour,
+      undefined, undefined, user.birth_minute,
   );
 
   const birthDate = new Date(user.birth_year, user.birth_month - 1, user.birth_day);
   const aggregator = new FortuneAggregator(
-    sajuProfile, ziweiProfile, astroProfile, undefined, birthDate, true,
+      sajuProfile, ziweiProfile, astroProfile, undefined, birthDate, true,
   );
 
   const result = aggregator.getMonthlyFortune(year, month);
   saveCache(key, result);
-  await saveWidgetMonthlyData(result); // 달력 위젯용 월간 데이터 저장
-  refreshWidget(); // 사주 변경 시 위젯 즉시 갱신
+
+  await saveWidgetMonthlyData(result);
+
+  const todayStr = getTodayLocalString();
+  const todayFortune = result.daily_fortunes.find(d => d.date === todayStr);
+
+  if (todayFortune) {
+    await saveWidgetData(todayFortune);
+  } else {
+    await refreshWidget();
+  }
+
   return result;
 }
 

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.saju.fortune',
-  appName: '사주 운세',
+  appName: '하루온도',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

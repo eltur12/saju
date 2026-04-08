@@ -1,5 +1,6 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Preferences } from "@capacitor/preferences";
+import { refreshWidget } from "../plugins/widgetPlugin";
 import type { DailyFortune } from "../engines/aggregator";
 import {
   planNotifications,
@@ -92,8 +93,8 @@ export async function scheduleDailyFortuneNotifications(
           title,
           body,
           schedule: { at: scheduleAt },
-          smallIcon: "ic_stat_icon_config_sample",
-          iconColor: "#c9a84c",
+          smallIcon: "ic_notification_small",
+          iconColor: "#3aab8c",
         }],
       });
 
@@ -103,6 +104,7 @@ export async function scheduleDailyFortuneNotifications(
     if (newIds.length > 0) {
       console.log("[NOTI_SCHEDULE] newly scheduled ids:", newIds);
       await saveScheduledIds(date, [...existingIds, ...newIds]);
+      refreshWidget(); // 알림 예약 완료 후 위젯 동기화
     }
   } catch {
     // 알림 실패는 앱 동작에 영향 없음
@@ -132,7 +134,7 @@ export async function sendDebugTestNotificationsForToday(
       notifications: [0, 1, 2].map(i => ({ id: DEBUG_NOTI_ID_BASE + i })),
     });
 
-    const offsets = [60, 70, 80]; // seconds from now
+    const offsets = [5, 10, 15]; // seconds from now (debug only)
     const notifications = filtered.slice(0, 3).map((n, i) => {
       const { title, body } = generateNotificationMessage(n, "L1");
       const scheduleAt = new Date(Date.now() + offsets[i] * 1000);
@@ -142,8 +144,8 @@ export async function sendDebugTestNotificationsForToday(
         title,
         body,
         schedule: { at: scheduleAt },
-        smallIcon: "ic_stat_icon_config_sample",
-        iconColor: "#c9a84c",
+        smallIcon: "ic_notification_small",
+        iconColor: "#3aab8c",
       };
     });
 

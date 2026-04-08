@@ -40,17 +40,17 @@ const TEN_GOD_TODOS: Record<string, { do: string; dont: string }> = {
 
 // 자연스러운 한국어로 factor 설명
 const FACTOR_LABELS: Record<string, string> = {
-  "傷官":"창의력이 넘치는",
+  "傷官":"창의력이 살아나는",
   "偏財":"재물 기운이 흐르는",
   "正財":"안정적인 재물 흐름의",
-  "食神":"풍요로운 기운의",
-  "正官":"책임감이 빛나는",
+  "食神":"여유로운 기운의",
+  "正官":"책임감이 두드러지는",
   "偏官":"신중함이 필요한",
   "正印":"배움과 지혜의",
-  "偏印":"내면의 직관이 깨어나는",
+  "偏印":"내면을 살피기 좋은",
   "比肩":"독립적인 에너지의",
   "劫財":"재정 점검이 필요한",
-  "化祿":"복록이 흐르는",
+  "化祿":"흐름이 활발한",
   "化權":"권위 에너지가 강한",
   "化科":"총명함이 빛나는",
   "化忌":"조심스러운 기운의",
@@ -59,18 +59,18 @@ const FACTOR_LABELS: Record<string, string> = {
 // 따뜻하고 자연스러운 말투의 요약 템플릿
 const SUMMARY_TEMPLATES: Record<string, string[]> = {
   "대길": [
-    "{factor} 날이에요. 자신 있게 움직여 보세요!",
-    "오늘은 에너지가 넘치는 {factor} 날이에요. 적극적으로 도전해 보세요.",
-    "{factor} 날이에요. 좋은 기운이 가득하니 하고 싶은 일을 시작하기 딱 좋아요.",
+    "{factor} 날이에요. 자신 있게 움직여 봐도 좋아요.",
+    "오늘은 흐름이 좋은 {factor} 날이에요. 하고 싶은 일을 차근차근 진행해 보세요.",
+    "{factor} 날이에요. 흐름이 좋은 만큼 하고 싶은 일을 시작해보기 좋아요.",
   ],
   "길": [
-    "{factor} 날이에요. 꾸준히 움직이면 좋은 결과로 이어질 거예요.",
-    "좋은 흐름이 느껴지는 {factor} 날이에요. 계획대로 차근차근 진행해 보세요.",
-    "{factor} 날이에요. 긍정적인 마음으로 하루를 보내면 좋을 것 같아요.",
+    "{factor} 날이에요. 꾸준히 이어가면 좋은 흐름을 유지할 수 있어요.",
+    "안정적인 흐름이 이어지는 {factor} 날이에요. 계획대로 차근차근 진행해 보세요.",
+    "{factor} 날이에요. 차분하게 흐름을 이어가기 좋은 날이에요.",
   ],
   "보통": [
     "{factor} 날이에요. 무리하지 않고 편안하게 지내 보세요.",
-    "평온한 {factor} 날이에요. 큰 기복 없이 안정적인 하루가 될 것 같아요.",
+    "평온한 {factor} 날이에요. 큰 기복 없이 안정적으로 이어지는 흐름이에요.",
     "{factor} 날이에요. 자신을 잘 돌보며 차분하게 보내 보세요.",
   ],
   "주의": [
@@ -152,7 +152,7 @@ export function generateSummary(scores: ScoreMap, sajuFactors: Record<string, un
   } else if ((sajuFactors.active_stars as string[])?.length > 0) {
     factor = `특별한 기운이 감도는`;
   } else {
-    factor = `오늘의 에너지(${overall}점)가 흐르는`;
+    factor = `오늘의 에너지가 흐르는`;
   }
 
   const templates = SUMMARY_TEMPLATES[badge] ?? SUMMARY_TEMPLATES["보통"];

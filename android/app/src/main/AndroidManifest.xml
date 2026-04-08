@@ -60,6 +60,19 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
+        <!-- 점수 요약 위젯 (widget_fortune.xml) -->
+        <receiver
+            android:name=".FortuneScoreWidget"
+            android:exported="true"
+            android:label="하루온도 위젯">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_score" />
+        </receiver>
+
         <!-- 달력 위젯 GridView 어댑터 서비스 -->
         <service
             android:name=".FortuneWidgetService"

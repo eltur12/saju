@@ -214,7 +214,7 @@ export class FortuneAggregator {
 
 function buildMonthlySummary(avg: number, peakDays: number[]): string {
   const peakStr = peakDays.slice(0, 3).map(d => `${d}일`).join("·");
-  if (avg >= 70) return `전반적으로 에너지가 상승하는 달. 특히 ${peakStr}이 최고 길일.`;
-  if (avg >= 60) return `안정적인 흐름 속 기복이 있는 달. ${peakStr}을 공략하세요.`;
-  return `에너지 소모가 많은 달. ${peakStr}에 집중하고 나머지는 수성에 집중.`;
+  if (avg >= 70) return `전반적으로 흐름이 좋은 달이에요. 특히 ${peakStr}이 주목할 만한 날이에요.`;
+  if (avg >= 60) return `안정적인 흐름 속 기복이 있는 달이에요. ${peakStr}을 잘 활용해 보세요.`;
+  return `에너지 소모가 많은 달이에요. ${peakStr}에 집중하고 나머지는 차분하게 이어가세요.`;
 }

@@ -17,6 +17,7 @@ import {
   generateNotificationMessage,
 } from "../engines/notificationPlanner";
 import type { PlannedNotification } from "../engines/notificationPlanner";
+import { getFlowState, getFlowSentence } from "../utils/flowState";
 
 const DAY_NAMES = ["일","월","화","수","목","금","토"];
 const DOW_KO    = ["일","월","화","수","목","금","토"];
@@ -47,6 +48,14 @@ function getBadgeClass(badge: string) {
   return `${styles.badge} ${styles[`badge-${badge}`]}`;
 }
 
+const BADGE_LABELS: Record<string, string> = {
+  "대길": "좋은 흐름",
+  "길":   "안정적",
+};
+function getBadgeLabel(badge: string): string {
+  return BADGE_LABELS[badge] ?? badge;
+}
+
 interface Props { onBack: () => void }
 
 export default function Main({ onBack }: Props) {
@@ -72,6 +81,7 @@ export default function Main({ onBack }: Props) {
   const [notiLowEnabled,   setNotiLowEnabled]   = useState(true);
   const [notiAllowNight,   setNotiAllowNight]   = useState(false);
   const [notiSaved, setNotiSaved]           = useState(false);
+  const [testNotiSent, setTestNotiSent]     = useState(false);
   const [settingsOpen, setSettingsOpen]     = useState(false);
   const [settingsView, setSettingsView]     = useState<SettingsView>("main");
   const hasScheduledTodayRef                = useRef(false);
@@ -96,6 +106,8 @@ export default function Main({ onBack }: Props) {
       return;
     }
     await sendDebugTestNotificationsForToday(todayFortune, dateStr);
+    setTestNotiSent(true);
+    setTimeout(() => setTestNotiSent(false), 5000);
   };
 
   const handleNotiSave = async () => {
@@ -340,6 +352,18 @@ export default function Main({ onBack }: Props) {
     return generateNotificationMessage(dailyNotif, "L2").body;
   }, [plannedNotifications, selected]);
 
+  const nowDelta = useMemo(() => {
+    if (!nowSegment || !selected?.timeSegments) return undefined;
+    const idx = selected.timeSegments.findIndex(s => s.startHour === nowSegment.startHour);
+    if (idx <= 0) return undefined;
+    return nowSegment.score - selected.timeSegments[idx - 1].score;
+  }, [nowSegment, selected]);
+
+  const nowFlowSentence = useMemo(() => {
+    if (!isSelectedToday || !nowSegment) return "";
+    return getFlowSentence(getFlowState(nowSegment.score, nowDelta));
+  }, [isSelectedToday, nowSegment, nowDelta]);
+
   return (
       <div className={styles.container}>
 
@@ -385,7 +409,7 @@ export default function Main({ onBack }: Props) {
                 ))}
               </div>
               {loading ? (
-                  <div className={styles.loading}>운세 계산 중...</div>
+                  <div className={styles.loading}>흐름 계산 중...</div>
               ) : (
                   <div className={styles.calendarGrid}>
                     {cells.map((cell, idx) => {
@@ -439,7 +463,7 @@ export default function Main({ onBack }: Props) {
                 <span className={`${styles.previewScore} ${getScoreClass(selected.scores.overall)}`}>
                   {selected.scores.overall}
                 </span>
-                      <span className={getBadgeClass(selected.badge)}>{selected.badge}</span>
+                      <span className={getBadgeClass(selected.badge)}>{getBadgeLabel(selected.badge)}</span>
                       <button className={styles.previewBtn} onClick={() => setTab("detail")}>
                         자세히 보기
                       </button>
@@ -472,9 +496,12 @@ export default function Main({ onBack }: Props) {
                   <span className={`${styles.heroScoreNum} ${getScoreClass(selected.scores.overall)}`}>
                     {selected.scores.overall}
                   </span>
-                        <span className={getBadgeClass(selected.badge)}>{selected.badge}</span>
+                        <span className={getBadgeClass(selected.badge)}>{getBadgeLabel(selected.badge)}</span>
                       </div>
                       <p className={styles.heroSummary}>{dailySummary}</p>
+                      {nowFlowSentence && (
+                        <p className={styles.heroFlowState}>{nowFlowSentence}</p>
+                      )}
                     </div>
 
                     {/* ── 카테고리 점수 ── */}
@@ -675,6 +702,7 @@ export default function Main({ onBack }: Props) {
                           <button className={styles.notiTestBtn} onClick={sendTestNotification}>
                             알림 테스트
                           </button>
+                          {testNotiSent && <span className={styles.notiSavedMsg}>잠시 후 알림이 도착합니다</span>}
                         </div>
 
                       </div>

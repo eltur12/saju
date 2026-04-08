@@ -416,6 +416,13 @@
   padding-left: 0.75rem;
 }
 
+.heroFlowState {
+  font-size: 0.78rem;
+  color: var(--accent-mint);
+  margin-top: 0.5rem;
+  padding-left: 0.75rem;
+}
+
 /* Badge */
 .badge {
   display: inline-block;

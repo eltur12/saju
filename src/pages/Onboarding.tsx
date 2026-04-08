@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { saveUser } from "../api/fortuneApi";
+import { saveUser, clearWidgetCache } from "../api/fortuneApi";
 import type { SajuUser } from "../api/fortuneApi";
 import styles from "./Onboarding.module.css";
 
@@ -36,7 +36,7 @@ export default function Onboarding({ onComplete }: Props) {
   // 월/년 변경 시 day가 범위를 벗어나면 마지막 날로 클램핑
   if (day > daysInMonth) setDay(daysInMonth);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const user: SajuUser = {
       birth_year:  year,
       birth_month: month,
@@ -44,15 +44,17 @@ export default function Onboarding({ onComplete }: Props) {
       gender,
       ...(hour >= 0 ? { birth_hour: hour } : {}),
     };
+
     saveUser(user);
+    await clearWidgetCache();
     onComplete();
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.logo}>🌙</div>
-      <h1 className={styles.title}>사주 운세</h1>
-      <p className={styles.subtitle}>생년월일을 입력하면 매일의 운세를 알려드려요</p>
+      <h1 className={styles.title}>하루온도</h1>
+      <p className={styles.subtitle}>생년월일을 입력하면 매일의 흐름을 알려드려요</p>
 
       <div className={styles.card}>
         <div className={styles.section}>
@@ -115,7 +117,7 @@ export default function Onboarding({ onComplete }: Props) {
         </div>
 
         <button className={styles.btn} onClick={handleSubmit}>
-          운세 확인하기
+          시작하기
         </button>
         <p className={styles.hint}>입력 정보는 기기에만 저장됩니다</p>
       </div>
