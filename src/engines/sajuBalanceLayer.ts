@@ -273,12 +273,18 @@ export function applySajuBalanceAdjustment(
   }
   // balanced: 변경 없음
 
-  // B. 오늘 오행 상호작용
+  // B. 오늘 오행 상호작용 (Task 4: 카테고리별 차등 배수)
   const domainKeys: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
+  const FAVORABLE_MULTS:   Record<string, number> = {
+    love: 1.06, relations: 1.06, health: 1.05, wealth: 1.03, career: 1.03, study: 1.03,
+  };
+  const UNFAVORABLE_MULTS: Record<string, number> = {
+    love: 0.93, relations: 0.93, health: 0.95, wealth: 0.97, career: 0.97, study: 0.97,
+  };
   if (todayElem && favorable.includes(todayElem)) {
-    for (const d of domainKeys) { multipliers[d] *= 1.05; }
+    for (const d of domainKeys) { multipliers[d] *= FAVORABLE_MULTS[d as string] ?? 1.05; }
   } else if (todayElem && unfavorable.includes(todayElem)) {
-    for (const d of domainKeys) { multipliers[d] *= 0.95; }
+    for (const d of domainKeys) { multipliers[d] *= UNFAVORABLE_MULTS[d as string] ?? 0.95; }
   }
 
   // C. 오행 불균형 보정

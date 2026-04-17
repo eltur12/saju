@@ -21,6 +21,15 @@ const PATTERN_BIAS: Record<string, number[]> = {
 type DomainKey = keyof Omit<ScoreMap, "overall">;
 const DOMAIN_KEYS: DomainKey[] = ["wealth", "love", "health", "career", "relations", "study"];
 
+/** Task 8: 시간대 십성 → 활성 카테고리 매핑 */
+const TENGOD_ACTIVE_DOMAIN: Record<string, DomainKey> = {
+  "재성": "wealth",
+  "관성": "career",
+  "식상": "love",
+  "인성": "study",
+  "비겁": "relations",
+};
+
 function dominantDomain(scores: DailyFortune["scores"]): DomainKey {
   return DOMAIN_KEYS.reduce((best, k) => scores[k] > scores[best] ? k : best, DOMAIN_KEYS[0]);
 }
@@ -305,6 +314,14 @@ export function generateTimeSegments(
       }
     }
 
+    // Task 8: 시간대 활성 카테고리 보너스 (+2~+4)
+    const segTenGod       = dayMaster ? getTenGodName(dayMaster, segElem) : "";
+    const activeDomain    = TENGOD_ACTIVE_DOMAIN[segTenGod];
+    const activeDomScore  = activeDomain ? dailyFortune.scores[activeDomain] : 0;
+    const activeCatBonus  = activeDomain
+      ? (activeDomScore >= 70 ? 4 : activeDomScore >= 60 ? 3 : 2)
+      : 0;
+
     const total = base
       + adjustedBiases[idx]
       + elemBias
@@ -313,7 +330,8 @@ export function generateTimeSegments(
       + moodBias
       + polarityBias
       + ziweiDelta
-      + astroBias;
+      + astroBias
+      + activeCatBonus;
 
     return Math.max(0, Math.min(100, total));
   });

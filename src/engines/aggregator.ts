@@ -25,6 +25,11 @@ const DOMAIN_WEIGHTS: Partial<Record<keyof ScoreMap, DomainWeight>> = {
   study:    { saju: 0.45, ziwei: 0.25, astro: 0.30 },
 };
 
+/** Task 2: 카테고리별 일별 민감도 배수 */
+const DAILY_SENSITIVITY: Partial<Record<keyof ScoreMap, number>> = {
+  love: 1.25, relations: 1.25, health: 1.15, wealth: 1.10, study: 1.08, career: 0.90,
+};
+
 /** FIX 5: 극단 구간 소프트 압축 */
 function softScale(score: number): number {
   if (score > 85) {
@@ -132,11 +137,25 @@ export class FortuneAggregator {
       const zSoft = softScale(zClamped);
       const aSoft = softScale(aClamped);
 
-      // FIX 6: 기존 가중치 그대로 병합
-      const combined = sSoft * w.saju + zSoft * w.ziwei + aSoft * w.astro;
+      // FIX 6: daily_delta = 각 엔진의 BASE 편차를 가중 합산 (base 성분은 BASE 하나로 고정)
+      const dailyDelta = (sSoft - BASE) * w.saju + (zSoft - BASE) * w.ziwei + (aSoft - BASE) * w.astro;
+
+      // Task 5: 음수 daily_delta 상한 -12 (패널티 누적 방지, BASE 절대값 개입 없음)
+      const clampedDelta = Math.max(-12, dailyDelta);
+
+      // Task 2: 카테고리별 민감도 — daily_delta에만 적용
+      const sens = DAILY_SENSITIVITY[cat] ?? 1.0;
 
       // FIX 7: 최종 클램프
-      merged[cat] = Math.max(0, Math.min(100, Math.round(combined)));
+      merged[cat] = Math.max(0, Math.min(100, Math.round(BASE + clampedDelta * sens)));
+    }
+
+    const domainCats: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
+
+    // Task 1: Base 스프레드 압축 — 카테고리 평균 기준 편차를 0.65 배율로 압축
+    const catAvg = domainCats.reduce((s, c) => s + (merged[c] as number), 0) / domainCats.length;
+    for (const c of domainCats) {
+      merged[c] = Math.max(0, Math.min(100, Math.round(catAvg + (merged[c] - catAvg) * 0.65)));
     }
 
     // FIX 7: overall = 6개 영역 단순 평균 후 클램프
@@ -164,6 +183,30 @@ export class FortuneAggregator {
     }
 
     const merged  = this.mergeScores(sajuScoresForMerge, ziweiResult.scores, astroResult.scores);
+
+    // Task 6: Love 점수 안정화 — love < 카테고리 평균 - 5 일 때만 보정
+    {
+      const dc: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
+      const avg6 = dc.reduce((s, c) => s + merged[c], 0) / dc.length;
+      if (merged.love < avg6 - 5) {
+        const tenGodDay = sajuResult.factors.ten_god_of_day as string | undefined;
+        const exprBoost = (tenGodDay === "食神" || tenGodDay === "傷官")
+          ? Math.round(30 * 0.15) : 0;
+        const boost = Math.round(merged.relations * 0.20) + exprBoost;
+        merged.love = Math.min(100, merged.love + Math.min(8, boost));
+        merged.overall = Math.max(0, Math.min(100,
+          Math.round(dc.reduce((s, c) => s + merged[c], 0) / dc.length)));
+      }
+      // Task 9: Relation stabilization — activates only when love is above average
+      const avg6r = dc.reduce((s, c) => s + merged[c], 0) / dc.length;
+      if (merged.relations < avg6r - 5 && merged.love > avg6r) {
+        const relBoost = Math.min(12, Math.round(merged.love * 0.20));
+        merged.relations = Math.min(100, merged.relations + relBoost);
+        merged.overall = Math.max(0, Math.min(100,
+          Math.round(dc.reduce((s, c) => s + merged[c], 0) / dc.length)));
+      }
+    }
+
     const badge   = scoreToBadge(merged.overall);
     const lunar   = getLunarDate(targetDate);
     const summary = generateSummary(merged, sajuResult.factors, ziweiResult.factors);
@@ -189,6 +232,48 @@ export class FortuneAggregator {
 
     for (let day = 1; day <= daysInMonth; day++) {
       dailyList.push(this.getDailyFortune(new Date(year, month - 1, day)));
+    }
+
+    // Task 7: 순위 고착 방지 — 카테고리 자체 일별 신호 조건 충족 시에만 보정
+    {
+      const rc: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
+      let topStreak = { cat: "" as keyof ScoreMap, count: 0 };
+      let botStreak = { cat: "" as keyof ScoreMap, count: 0 };
+
+      for (let i = 0; i < dailyList.length; i++) {
+        const d    = dailyList[i];
+        const prev = dailyList[i - 1];
+        const sorted = [...rc].sort((a, b) => d.scores[b] - d.scores[a]);
+        const top = sorted[0];
+        const bot = sorted[sorted.length - 1];
+
+        topStreak = top === topStreak.cat
+          ? { cat: top, count: topStreak.count + 1 } : { cat: top, count: 1 };
+        botStreak = bot === botStreak.cat
+          ? { cat: bot, count: botStreak.count + 1 } : { cat: bot, count: 1 };
+
+        // 1위 보정: 연속 3일+ AND 해당 카테고리의 일별 변화량이 약할 때만
+        if (topStreak.count >= 3) {
+          const topDayDelta = prev ? Math.abs(d.scores[top] - prev.scores[top]) : 0;
+          if (topDayDelta < 5) {
+            const adj = topDayDelta < 3 ? 4 : 2;
+            d.scores[top] = Math.max(0, d.scores[top] - adj);
+            d.scores.overall = Math.max(0, Math.min(100,
+              Math.round(rc.reduce((s, c) => s + d.scores[c], 0) / rc.length)));
+          }
+        }
+
+        // 꼴찌 보정: 연속 3일+ AND 해당 카테고리의 오늘 신호가 양수(전일 대비 상승)일 때만
+        if (botStreak.count >= 3) {
+          const botDayDelta = prev ? d.scores[bot] - prev.scores[bot] : 0;
+          if (botDayDelta > 0) {
+            const adj = botDayDelta > 3 ? 4 : 2;
+            d.scores[bot] = Math.min(100, d.scores[bot] + adj);
+            d.scores.overall = Math.max(0, Math.min(100,
+              Math.round(rc.reduce((s, c) => s + d.scores[c], 0) / rc.length)));
+          }
+        }
+      }
     }
 
     const overallScores = dailyList.map(d => d.scores.overall);

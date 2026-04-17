@@ -241,11 +241,19 @@ function getBranchRelations(targetBranch: string, chartBranches: string[]): Bran
   return filtered;
 }
 
+/** Task 3: 지지 관계 카테고리별 가중치 */
+const BRANCH_REL_CAT_W: Record<string, number> = {
+  love: 1.2, relations: 1.2, health: 1.1, wealth: 1.0, study: 0.9, career: 0.8,
+};
+
 function applyBranchRelationsToScore(scores: ScoreMap, targetBranch: string, chartBranches: string[]): ScoreMap {
   const rels = getBranchRelations(targetBranch, chartBranches);
   let result = { ...scores };
   for (const rel of rels) {
-    result = addScore(result, uniformScore(rel.value));
+    const weighted: Partial<ScoreMap> = { overall: rel.value };
+    (["wealth", "love", "health", "career", "relations", "study"] as (keyof ScoreMap)[])
+      .forEach(c => { weighted[c] = Math.round(rel.value * (BRANCH_REL_CAT_W[c as string] ?? 1.0)); });
+    result = addScore(result, weighted);
   }
   return result;
 }
