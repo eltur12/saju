@@ -71,7 +71,6 @@ export default function Main({ onBack }: Props) {
   const [loading, setLoading]               = useState(true);
   const [selected, setSelected]             = useState<DailyFortune | null>(null);
   const [user, setUser]                     = useState<SajuUser | null>(null);
-  const [autoSelectToday, setAutoSelectToday] = useState(true);
   const [tab, setTab]                       = useState<TabId>("calendar");
   const [pendingDay, setPendingDay]         = useState<{ year: number; month: number; day: number } | null>(null);
   const [notiStart, setNotiStart]           = useState(7);
@@ -85,6 +84,7 @@ export default function Main({ onBack }: Props) {
   const [settingsOpen, setSettingsOpen]     = useState(false);
   const [settingsView, setSettingsView]     = useState<SettingsView>("main");
   const hasScheduledTodayRef                = useRef(false);
+  const prevTodayStrRef                    = useRef(todayStr);
 
   useEffect(() => {
     loadNotificationSettings().then(s => {
@@ -156,7 +156,6 @@ export default function Main({ onBack }: Props) {
     if (!u) return;
     setYear(pendingDay.year);
     setMonth(pendingDay.month);
-    setAutoSelectToday(false);
   }, [pendingDay]);
 
   useEffect(() => {
@@ -196,14 +195,20 @@ export default function Main({ onBack }: Props) {
     if (user) load(year, month, user);
   }, [year, month, user, load]);
 
+  // Sync selected to today on initial load and on midnight day change.
+  // Relies on existing re-renders; no timer needed.
   useEffect(() => {
-    if (!loading && data && autoSelectToday) {
-      const f = data.daily_fortunes[todayDate - 1];
-      if (f) setSelected(f);
-      setAutoSelectToday(false);
+    if (loading || !data) {
+      prevTodayStrRef.current = todayStr;
+      return;
     }
-  }, [loading, data, autoSelectToday, todayDate]);
-
+    const dayChanged = prevTodayStrRef.current !== todayStr;
+    prevTodayStrRef.current = todayStr;
+    if (selected === null || dayChanged) {
+      const f = data.daily_fortunes.find(d => d.date === todayStr);
+      if (f) setSelected(f);
+    }
+  }, [loading, data, selected, todayStr]);
 
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
@@ -219,7 +224,6 @@ export default function Main({ onBack }: Props) {
       const f = data?.daily_fortunes[todayDate - 1];
       if (f) setSelected(f);
     } else {
-      setAutoSelectToday(true);
       setYear(todayYear);
       setMonth(todayMonth);
     }
