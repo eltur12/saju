@@ -27,7 +27,7 @@ const DOMAIN_WEIGHTS: Partial<Record<keyof ScoreMap, DomainWeight>> = {
 
 /** Task 2: 카테고리별 일별 민감도 배수 */
 const DAILY_SENSITIVITY: Partial<Record<keyof ScoreMap, number>> = {
-  love: 1.25, relations: 1.25, health: 1.15, wealth: 1.10, study: 1.08, career: 0.90,
+  love: 1.25, relations: 1.10, health: 1.15, wealth: 1.10, study: 1.08, career: 0.90,
 };
 
 /** FIX 5: 극단 구간 소프트 압축 */
@@ -146,8 +146,8 @@ export class FortuneAggregator {
       // Task 2: 카테고리별 민감도 — daily_delta에만 적용
       const sens = DAILY_SENSITIVITY[cat] ?? 1.0;
 
-      // FIX 7: 최종 클램프
-      merged[cat] = Math.max(0, Math.min(100, Math.round(BASE + clampedDelta * sens)));
+      // FIX 7: 최종 클램프 (float 유지 — 최종 반올림은 getDailyFortune에서 1회 적용)
+      merged[cat] = Math.max(0, Math.min(100, BASE + clampedDelta * sens));
     }
 
     const domainCats: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
@@ -155,14 +155,13 @@ export class FortuneAggregator {
     // Task 1: Base 스프레드 압축 — 카테고리 평균 기준 편차를 0.65 배율로 압축
     const catAvg = domainCats.reduce((s, c) => s + (merged[c] as number), 0) / domainCats.length;
     for (const c of domainCats) {
-      merged[c] = Math.max(0, Math.min(100, Math.round(catAvg + (merged[c] - catAvg) * 0.65)));
+      merged[c] = Math.max(0, Math.min(100, catAvg + (merged[c] - catAvg) * 0.65));
     }
 
-    // FIX 7: overall = 6개 영역 단순 평균 후 클램프
-    merged.overall = Math.round(
+    // FIX 7: overall = 6개 영역 단순 평균 후 클램프 (float 유지)
+    merged.overall = Math.max(0, Math.min(100,
       (merged.wealth + merged.love + merged.health + merged.career + merged.relations + merged.study) / 6
-    );
-    merged.overall = Math.max(0, Math.min(100, merged.overall));
+    ));
 
     return merged;
   }
@@ -190,21 +189,26 @@ export class FortuneAggregator {
       const avg6 = dc.reduce((s, c) => s + merged[c], 0) / dc.length;
       if (merged.love < avg6 - 5) {
         const tenGodDay = sajuResult.factors.ten_god_of_day as string | undefined;
-        const exprBoost = (tenGodDay === "食神" || tenGodDay === "傷官")
-          ? Math.round(30 * 0.15) : 0;
-        const boost = Math.round(merged.relations * 0.20) + exprBoost;
+        const exprBoost = (tenGodDay === "食神" || tenGodDay === "傷官") ? 30 * 0.15 : 0;
+        const boost = merged.relations * 0.20 + exprBoost;
         merged.love = Math.min(100, merged.love + Math.min(8, boost));
         merged.overall = Math.max(0, Math.min(100,
-          Math.round(dc.reduce((s, c) => s + merged[c], 0) / dc.length)));
+          dc.reduce((s, c) => s + merged[c], 0) / dc.length));
       }
       // Task 9: Relation stabilization — activates only when love is above average
       const avg6r = dc.reduce((s, c) => s + merged[c], 0) / dc.length;
       if (merged.relations < avg6r - 5 && merged.love > avg6r) {
-        const relBoost = Math.min(12, Math.round(merged.love * 0.20));
+        const relBoost = Math.min(12, merged.love * 0.20);
         merged.relations = Math.min(100, merged.relations + relBoost);
         merged.overall = Math.max(0, Math.min(100,
-          Math.round(dc.reduce((s, c) => s + merged[c], 0) / dc.length)));
+          dc.reduce((s, c) => s + merged[c], 0) / dc.length));
       }
+    }
+
+    // 최종 반올림 — 모든 중간 연산 완료 후 1회만 적용
+    const allCats: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study", "overall"];
+    for (const c of allCats) {
+      merged[c] = Math.max(0, Math.min(100, Math.round(merged[c])));
     }
 
     const badge   = scoreToBadge(merged.overall);

@@ -57,14 +57,14 @@ type DomainInfluence = Omit<ScoreMap, 'overall'>;
 const TEN_GOD_INFLUENCE: Record<string, DomainInfluence> = {
   "比肩": { wealth:0,   love:0,   health:0,  career:0,   relations:0,  study:0  },
   "劫財": { wealth:-8,  love:-4,  health:-2, career:-3,  relations:-5, study:-2 },
-  "食神": { wealth:10,  love:5,   health:8,  career:6,   relations:6,  study:8  },
-  "傷官": { wealth:-3,  love:-4,  health:-2, career:3,   relations:-6, study:6  },
+  "食神": { wealth:10,  love:5,   health:8,  career:6,   relations:11, study:8  },
+  "傷官": { wealth:-3,  love:-4,  health:-2, career:3,   relations:-1, study:6  },
   "偏財": { wealth:8,   love:3,   health:2,  career:6,   relations:5,  study:3  },
   "正財": { wealth:12,  love:3,   health:4,  career:8,   relations:5,  study:3  },
   "偏官": { wealth:-5,  love:-5,  health:-8, career:-5,  relations:-7, study:-3 },
   "正官": { wealth:5,   love:2,   health:4,  career:10,  relations:6,  study:3  },
-  "偏印": { wealth:0,   love:6,   health:3,  career:5,   relations:4,  study:10 },
-  "正印": { wealth:5,   love:3,   health:5,  career:8,   relations:5,  study:12 },
+  "偏印": { wealth:0,   love:6,   health:3,  career:5,   relations:6,  study:2  },
+  "正印": { wealth:5,   love:3,   health:5,  career:10,  relations:5,  study:4  },
 };
 
 const SPECIAL_STARS: Record<string, ScoreMap> = {
@@ -252,7 +252,10 @@ function applyBranchRelationsToScore(scores: ScoreMap, targetBranch: string, cha
   for (const rel of rels) {
     const weighted: Partial<ScoreMap> = { overall: rel.value };
     (["wealth", "love", "health", "career", "relations", "study"] as (keyof ScoreMap)[])
-      .forEach(c => { weighted[c] = Math.round(rel.value * (BRANCH_REL_CAT_W[c as string] ?? 1.0)); });
+      .forEach(c => {
+        const w = (c === "relations" && rel.value < 0) ? 0.9 : (BRANCH_REL_CAT_W[c as string] ?? 1.0);
+        weighted[c] = Math.round(rel.value * w);
+      });
     result = addScore(result, weighted);
   }
   return result;

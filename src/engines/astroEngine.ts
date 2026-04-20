@@ -64,7 +64,7 @@ function aspectStrength(symbol: string, orb: number): number {
 const PLANET_AFFINITY: Record<string, ScoreMap> = {
   "Sun":      { overall:1.0, wealth:0.7, love:0.5, health:0.8, career:1.0,  relations:0.6, study:0.7 },
   "Moon":     { overall:0.8, wealth:0.5, love:1.2, health:1.0, career:0.5,  relations:0.7, study:0.4 },
-  "Mercury":  { overall:0.7, wealth:0.7, love:0.5, health:0.5, career:0.8,  relations:0.7, study:1.2 },
+  "Mercury":  { overall:0.7, wealth:0.7, love:0.5, health:0.5, career:0.8,  relations:1.0, study:0.6 },
   "Venus":    { overall:0.8, wealth:0.8, love:1.5, health:0.7, career:0.6,  relations:1.0, study:0.4 },
   "Mars":     { overall:0.8, wealth:0.7, love:0.7, health:0.8, career:1.0,  relations:0.5, study:0.5 },
   "Jupiter":  { overall:1.0, wealth:1.2, love:0.8, health:0.8, career:1.0,  relations:0.8, study:1.0 },
@@ -94,7 +94,7 @@ const HOUSE_WEIGHT: Record<number, ScoreMap> = {
   6:  { overall:0.5, wealth:0.5, love:0.3, health:1.5, career:0.7, relations:0.4, study:0.4 },
   7:  { overall:0.5, wealth:0.5, love:1.5, health:0.3, career:0.5, relations:1.2, study:0.3 },
   8:  { overall:0.5, wealth:0.8, love:0.5, health:0.5, career:0.3, relations:0.4, study:0.3 },
-  9:  { overall:0.7, wealth:0.5, love:0.3, health:0.3, career:0.7, relations:0.4, study:1.2 },
+  9:  { overall:0.7, wealth:0.5, love:0.3, health:0.3, career:0.9, relations:0.4, study:1.0 },
   10: { overall:0.7, wealth:0.8, love:0.3, health:0.3, career:1.5, relations:0.5, study:0.5 },
   11: { overall:0.7, wealth:0.5, love:0.8, health:0.3, career:0.8, relations:1.2, study:0.5 },
   12: { overall:0.2, wealth:-0.2, love:-0.2, health:0.3, career:-0.3, relations:-0.2, study:0.2 },
