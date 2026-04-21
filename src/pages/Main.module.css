@@ -383,6 +383,22 @@
   margin-bottom: 0.75rem;
 }
 
+.heroDateNav {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.dayNavBtn {
+  background: none;
+  border: none;
+  padding: 0 0.2rem;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+}
+
 .heroDate {
   font-size: 1rem;
   font-weight: 700;
@@ -505,10 +521,89 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* ── Radar Chart ── */
+.radarSection {
+  padding: 0 1rem 0.25rem;
+}
+
+.radarSvg {
+  width: 100%;
+  max-width: 200px;
+  display: block;
+  margin: 0 auto 0.75rem;
+}
+
+.radarStroke {
+  stroke-dasharray: 700;
+  stroke-dashoffset: 700;
+  animation: radarDraw 0.5s ease-out forwards;
+}
+
+.radarFill {
+  animation: radarFadeIn 0.3s ease-out 0.35s forwards;
+}
+
+@keyframes radarDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes radarFadeIn {
+  to { fill-opacity: 0.13; }
+}
+
+.radarBars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+
+.radarBarRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.radarBarLabel {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  width: 2.4rem;
+  flex-shrink: 0;
+}
+
+.radarBarTrack {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.radarBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-mint);
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: barFill 0.5s ease-out forwards;
+}
+
+@keyframes barFill {
+  to { transform: scaleX(1); }
+}
+
+.radarBarVal {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+  width: 1.6rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
 /* ── Category Score Grid ── */
 .scoreGrid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.5rem;
 }
 

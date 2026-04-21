@@ -22,13 +22,15 @@ import { getFlowState, getFlowSentence } from "../utils/flowState";
 
 const DAY_NAMES = ["일","월","화","수","목","금","토"];
 const DOW_KO    = ["일","월","화","수","목","금","토"];
-const SCORE_CATS: { key: keyof DailyFortune["scores"]; label: string }[] = [
-  { key: "overall", label: "종합" },
-  { key: "wealth",  label: "재물" },
-  { key: "love",    label: "애정" },
-  { key: "health",  label: "건강" },
-  { key: "career",  label: "직업" },
+const RADAR_CATS: { key: keyof DailyFortune["scores"]; label: string }[] = [
+  { key: "wealth",    label: "재물" },
+  { key: "love",      label: "애정" },
+  { key: "health",    label: "건강" },
+  { key: "career",    label: "직업" },
+  { key: "relations", label: "관계" },
+  { key: "study",     label: "학습" },
 ];
+
 
 type TabId = "calendar" | "detail";
 type SettingsView = "main" | "noti";
@@ -43,6 +45,13 @@ function getScoreClass(score: number) {
   if (score >= 65) return styles["score-green"];
   if (score >= 55) return styles["score-gray"];
   return styles["score-red"];
+}
+
+function scoreColor(score: number): string {
+  if (score >= 75) return "var(--accent-gold)";
+  if (score >= 65) return "var(--accent-mint)";
+  if (score >= 55) return "var(--text-muted)";
+  return "var(--danger)";
 }
 
 function getBadgeClass(badge: string) {
@@ -316,6 +325,21 @@ export default function Main({ onBack }: Props) {
       ? `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일 (${DOW_KO[selectedDate.getDay()]})`
       : "";
 
+  const navigateDay = useCallback((dir: 1 | -1) => {
+    if (!selected) return;
+    const [y, m, d] = selected.date.split("-").map(Number);
+    const next = new Date(y, m - 1, d + dir);
+    const nextYear  = next.getFullYear();
+    const nextMonth = next.getMonth() + 1;
+    const nextDate  = next.getDate();
+    if (nextYear === year && nextMonth === month && data) {
+      const f = data.daily_fortunes[nextDate - 1];
+      if (f) setSelected(f);
+    } else {
+      setPendingDay({ year: nextYear, month: nextMonth, day: nextDate });
+    }
+  }, [selected, year, month, data]);
+
   // Now / best segments
   const isSelectedToday = selected?.date === todayStr;
   const nowSegment = (() => {
@@ -412,7 +436,7 @@ export default function Main({ onBack }: Props) {
                   <button className={styles.navBtn} onClick={nextMonth}>›</button>
                 </>
             ) : (
-                <span className={styles.headerTitle}>{selected ? `${selectedDayStr}${selected.date === todayStr ? " · 오늘" : ""}` : "오늘의 흐름"}</span>
+                <span />
             )}
           </div>
           <button className={styles.settingsBtn} onClick={openSettings} title="설정">⋮</button>
@@ -524,7 +548,11 @@ export default function Main({ onBack }: Props) {
                     {/* ── Hero: date + score + badge ── */}
                     <div className={styles.heroCard}>
                       <div className={styles.heroMeta}>
-                        <span className={styles.heroDate}>{selectedDayStr}</span>
+                        <div className={styles.heroDateNav}>
+                          <button className={styles.dayNavBtn} onClick={() => navigateDay(-1)}>‹</button>
+                          <span className={styles.heroDate}>{selectedDayStr}</span>
+                          <button className={styles.dayNavBtn} onClick={() => navigateDay(1)}>›</button>
+                        </div>
                         <span className={styles.heroLunar}>음력 {selected.lunar_date}</span>
                       </div>
                       <div className={styles.heroScoreRow}>
@@ -539,21 +567,67 @@ export default function Main({ onBack }: Props) {
                       )}
                     </div>
 
-                    {/* ── 카테고리 점수 ── */}
-                    <div className={styles.detailSection}>
-                      <div className={styles.sectionTitle}>카테고리</div>
-                      <div className={styles.scoreGrid}>
-                        {SCORE_CATS.map(({ key, label }) => (
-                            <div key={key} className={styles.scoreItem}>
-                              <span className={styles.scoreCat}>{label}</span>
-                              <span className={styles.scoreVal}>{selected.scores[key]}</span>
-                              <div className={styles.scoreBar}>
-                                <div className={styles.scoreBarFill} style={{ width: `${selected.scores[key]}%` }} />
-                              </div>
-                            </div>
-                        ))}
-                      </div>
-                    </div>
+                    {/* ── 레이더 차트 + 전체 바 ── */}
+                    {(() => {
+                      const CX = 80, CY = 80, R = 55;
+                      const axisPts = RADAR_CATS.map((_, i) => {
+                        const a = (i / 6) * 2 * Math.PI - Math.PI / 2;
+                        return [CX + R * Math.cos(a), CY + R * Math.sin(a)] as [number, number];
+                      });
+                      const dataPts = RADAR_CATS.map(({ key }, i) => {
+                        const a = (i / 6) * 2 * Math.PI - Math.PI / 2;
+                        const v = (selected.scores[key] as number) / 100;
+                        return [CX + v * R * Math.cos(a), CY + v * R * Math.sin(a)] as [number, number];
+                      });
+                      const polyPts    = dataPts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+                      const rings      = [0.25, 0.5, 0.75, 1.0];
+                      const radarColor = scoreColor(selected.scores.overall as number);
+                      return (
+                        <div className={styles.radarSection}>
+                          <svg viewBox="0 0 160 160" className={styles.radarSvg}>
+                            {rings.map(f => (
+                              <polygon key={f}
+                                points={axisPts.map(([x, y]) => `${(CX+(x-CX)*f).toFixed(1)},${(CY+(y-CY)*f).toFixed(1)}`).join(" ")}
+                                fill="none" stroke="var(--border)" strokeWidth="0.7" />
+                            ))}
+                            {axisPts.map(([x, y], i) => (
+                              <line key={i} x1={CX} y1={CY} x2={x.toFixed(1)} y2={y.toFixed(1)}
+                                stroke="var(--border)" strokeWidth="0.7" />
+                            ))}
+                            <polygon points={polyPts} fill={radarColor} fillOpacity="0" stroke="none"
+                              className={styles.radarFill} />
+                            <polygon points={polyPts} fill="none" stroke={radarColor} strokeWidth="1.5"
+                              className={styles.radarStroke} />
+                            {RADAR_CATS.map(({ label }, i) => {
+                              const a  = (i / 6) * 2 * Math.PI - Math.PI / 2;
+                              const LR = R + 14;
+                              return (
+                                <text key={i}
+                                  x={(CX + LR * Math.cos(a)).toFixed(1)}
+                                  y={(CY + LR * Math.sin(a)).toFixed(1)}
+                                  textAnchor="middle" dominantBaseline="middle"
+                                  fontSize="7.5" fill="var(--text-muted)">{label}</text>
+                              );
+                            })}
+                          </svg>
+                          <div className={styles.radarBars}>
+                            {RADAR_CATS.map(({ key, label }, i) => {
+                              const v = selected.scores[key] as number;
+                              return (
+                                <div key={key} className={styles.radarBarRow}>
+                                  <span className={styles.radarBarLabel}>{label}</span>
+                                  <div className={styles.radarBarTrack}>
+                                    <div className={styles.radarBarFill}
+                                      style={{ width: `${v}%`, animationDelay: `${i * 60}ms`, background: scoreColor(v) }} />
+                                  </div>
+                                  <span className={styles.radarBarVal}>{v}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* ── 시간대 흐름 (accordion) ── */}
                     {selected.timeSegments && selected.timeSegments.length > 0 && (
