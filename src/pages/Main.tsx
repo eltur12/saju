@@ -9,6 +9,7 @@ import {
   loadNotificationSettings,
   saveNotificationSettings,
   sendDebugTestNotificationsForToday,
+  requestNotificationPermission,
 } from "../services/notificationService";
 import styles from "./Main.module.css";
 import {
@@ -81,12 +82,15 @@ export default function Main({ onBack }: Props) {
   const [notiAllowNight,   setNotiAllowNight]   = useState(false);
   const [notiSaved, setNotiSaved]           = useState(false);
   const [testNotiSent, setTestNotiSent]     = useState(false);
+  const [debugOpen, setDebugOpen]           = useState(false);
   const [settingsOpen, setSettingsOpen]     = useState(false);
   const [settingsView, setSettingsView]     = useState<SettingsView>("main");
   const hasScheduledTodayRef                = useRef(false);
   const prevTodayStrRef                    = useRef(todayStr);
+  const [resumeTick, setResumeTick]         = useState(0);
 
   useEffect(() => {
+    requestNotificationPermission();
     loadNotificationSettings().then(s => {
       const [hh] = s.dailyTime.split(":").map(Number);
       setNotiStart(hh);
@@ -151,6 +155,19 @@ export default function Main({ onBack }: Props) {
   }, [handleDeepLink]);
 
   useEffect(() => {
+    const listenerPromise = App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) {
+        const now = new Date();
+        const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        if (prevTodayStrRef.current !== current) {
+          setResumeTick(t => t + 1);
+        }
+      }
+    });
+    return () => { listenerPromise.then(h => h.remove()); };
+  }, []);
+
+  useEffect(() => {
     if (!pendingDay) return;
     const u = getUser();
     if (!u) return;
@@ -182,7 +199,7 @@ export default function Main({ onBack }: Props) {
           if (!hasScheduledTodayRef.current) {
             hasScheduledTodayRef.current = true;
             await clearDailyFortuneNotifications(dateStr);
-            scheduleDailyFortuneNotifications(todayFortune, dateStr);
+            await scheduleDailyFortuneNotifications(todayFortune, dateStr);
           }
         }
       }
@@ -208,7 +225,21 @@ export default function Main({ onBack }: Props) {
       const f = data.daily_fortunes.find(d => d.date === todayStr);
       if (f) setSelected(f);
     }
-  }, [loading, data, selected, todayStr]);
+    if (dayChanged) {
+      const todayFortune = data.daily_fortunes.find(d => d.date === todayStr);
+      if (!todayFortune) {
+        setYear(todayYear);
+        setMonth(todayMonth);
+        return;
+      }
+      hasScheduledTodayRef.current = false;
+      void (async () => {
+        await clearDailyFortuneNotifications(todayStr);
+        await scheduleDailyFortuneNotifications(todayFortune, todayStr);
+        hasScheduledTodayRef.current = true;
+      })();
+    }
+  }, [loading, data, selected, todayStr, resumeTick]);
 
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
@@ -610,6 +641,46 @@ export default function Main({ onBack }: Props) {
             </div>
         )}
 
+        {/* ── Notification Debug Viewer ── */}
+        {debugOpen && (
+          <>
+            <div className={styles.overlay} onClick={() => setDebugOpen(false)} />
+            <div className={styles.bottomSheet}>
+              <div className={styles.sheetHandle} />
+              <div className={styles.sheetTitle}>알림 예약 확인</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
+                현재 시각: {new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                {" · "}선택 날짜: {selected?.date ?? "없음"}
+              </div>
+              {plannedNotifications.length === 0 ? (
+                <div style={{ color: "var(--text-muted)", fontSize: "0.82rem", lineHeight: 1.7 }}>
+                  <div>오늘 예약된 알림이 없습니다</div>
+                  <div style={{ marginTop: "0.4rem", fontSize: "0.74rem" }}>
+                    • 시간이 이미 지났을 수 있습니다<br />
+                    • 설정에서 비활성화되어 있을 수 있습니다
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                  {plannedNotifications.map((n, i) => {
+                    const now = new Date();
+                    const hhmm = `${String(n.triggerTime.getHours()).padStart(2, "0")}:${String(n.triggerTime.getMinutes()).padStart(2, "0")}`;
+                    const isPast = n.triggerTime <= now;
+                    const isVisible = visibleNotifications.some(v => v.type === n.type && v.triggerTime.getTime() === n.triggerTime.getTime());
+                    const status = isPast ? "⏭️ 지난 시간" : isVisible ? "✅ 예약됨" : "❌ 필터링됨";
+                    return (
+                      <div key={i} style={{ fontSize: "0.8rem", display: "flex", justifyContent: "space-between", padding: "0.3rem 0", borderBottom: "1px solid var(--border)" }}>
+                        <span style={{ color: "var(--text-muted)" }}>{n.type} · {hhmm}</span>
+                        <span>{status}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
         {/* ── Settings Bottom Sheet ── */}
         {settingsOpen && (
             <>
@@ -707,6 +778,9 @@ export default function Main({ onBack }: Props) {
                             알림 테스트
                           </button>
                           {testNotiSent && <span className={styles.notiSavedMsg}>잠시 후 알림이 도착합니다</span>}
+                          <button className={styles.notiTestBtn} onClick={() => setDebugOpen(true)}>
+                            예약 확인
+                          </button>
                         </div>
 
                       </div>
