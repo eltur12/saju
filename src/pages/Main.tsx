@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { getMonthlyFortune, getUser, clearUser, saveWidgetData } from "../api/fortuneApi";
+import { getMonthlyFortune, getUser, clearUser } from "../api/fortuneApi";
 import { App } from "@capacitor/app";
 import type { MonthlyFortuneResult, DailyFortune } from "../engines/aggregator";
 import type { SajuUser } from "../api/fortuneApi";
 import {
+  handleDayRollover,
   scheduleDailyFortuneNotifications,
   clearDailyFortuneNotifications,
   loadNotificationSettings,
@@ -11,6 +12,7 @@ import {
   sendDebugTestNotificationsForToday,
   requestNotificationPermission,
 } from "../services/notificationService";
+import { addDayRolloverListener } from "../plugins/widgetPlugin";
 import styles from "./Main.module.css";
 import {
   planNotifications,
@@ -97,6 +99,8 @@ export default function Main({ onBack }: Props) {
   const hasScheduledTodayRef                = useRef(false);
   const prevTodayStrRef                    = useRef(todayStr);
   const [resumeTick, setResumeTick]         = useState(0);
+  const dataRef = useRef<MonthlyFortuneResult | null>(null);
+  dataRef.current = data;
 
   useEffect(() => {
     requestNotificationPermission();
@@ -177,6 +181,27 @@ export default function Main({ onBack }: Props) {
   }, []);
 
   useEffect(() => {
+    const handle = addDayRolloverListener(async () => {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth() + 1;
+      const d = now.getDate();
+      const str = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const todayFortune = dataRef.current?.daily_fortunes.find(f => f.date === str);
+      if (todayFortune) {
+        hasScheduledTodayRef.current = false;
+        await handleDayRollover(todayFortune, str);
+        hasScheduledTodayRef.current = true;
+        setSelected(todayFortune);
+      } else {
+        setYear(y);
+        setMonth(m);
+      }
+    });
+    return () => { handle.then(h => h.remove()); };
+  }, []);
+
+  useEffect(() => {
     if (!pendingDay) return;
     const u = getUser();
     if (!u) return;
@@ -203,12 +228,10 @@ export default function Main({ onBack }: Props) {
       if (y === now.getFullYear() && m === now.getMonth() + 1) {
         const todayFortune = result.daily_fortunes[now.getDate() - 1];
         if (todayFortune) {
-          saveWidgetData(todayFortune);
           const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
           if (!hasScheduledTodayRef.current) {
             hasScheduledTodayRef.current = true;
-            await clearDailyFortuneNotifications(dateStr);
-            await scheduleDailyFortuneNotifications(todayFortune, dateStr);
+            await handleDayRollover(todayFortune, dateStr);
           }
         }
       }
@@ -243,8 +266,7 @@ export default function Main({ onBack }: Props) {
       }
       hasScheduledTodayRef.current = false;
       void (async () => {
-        await clearDailyFortuneNotifications(todayStr);
-        await scheduleDailyFortuneNotifications(todayFortune, todayStr);
+        await handleDayRollover(todayFortune, todayStr);
         hasScheduledTodayRef.current = true;
       })();
     }

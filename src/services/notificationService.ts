@@ -1,6 +1,7 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Preferences } from "@capacitor/preferences";
 import { refreshWidget } from "../plugins/widgetPlugin";
+import { saveWidgetData } from "../api/fortuneApi";
 import type { DailyFortune } from "../engines/aggregator";
 import {
   planNotifications,
@@ -109,6 +110,13 @@ export async function scheduleDailyFortuneNotifications(
   } catch {
     // 알림 실패는 앱 동작에 영향 없음
   }
+}
+
+/** 자정 도래 시 위젯 데이터 + 알림을 한 번에 갱신 */
+export async function handleDayRollover(fortune: DailyFortune, dateStr: string): Promise<void> {
+  await saveWidgetData(fortune);
+  await clearDailyFortuneNotifications(dateStr);
+  await scheduleDailyFortuneNotifications(fortune, dateStr);
 }
 
 const DEBUG_NOTI_ID_BASE = 990001;
