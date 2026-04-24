@@ -46,7 +46,7 @@ export async function saveNotificationSettings(settings: NotificationSettings): 
 }
 
 /** 날짜 문자열(YYYY-MM-DD) 기준으로 예약된 알림 id 목록을 저장/로드 */
-async function loadScheduledIds(dateKey: string): Promise<number[]> {
+export async function loadScheduledIds(dateKey: string): Promise<number[]> {
   const { value } = await Preferences.get({ key: PREF_KEY_PREFIX + dateKey });
   if (!value) return [];
   try { return JSON.parse(value) as number[]; } catch { return []; }

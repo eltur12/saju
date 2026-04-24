@@ -8,6 +8,7 @@ import {
   scheduleDailyFortuneNotifications,
   clearDailyFortuneNotifications,
   loadNotificationSettings,
+  loadScheduledIds,
   saveNotificationSettings,
   sendDebugTestNotificationsForToday,
   requestNotificationPermission,
@@ -99,6 +100,7 @@ export default function Main({ onBack }: Props) {
   const hasScheduledTodayRef                = useRef(false);
   const prevTodayStrRef                    = useRef(todayStr);
   const [resumeTick, setResumeTick]         = useState(0);
+  const [scheduledIds, setScheduledIds]     = useState<number[]>([]);
   const dataRef = useRef<MonthlyFortuneResult | null>(null);
   dataRef.current = data;
 
@@ -136,13 +138,30 @@ export default function Main({ onBack }: Props) {
       dailyTime:    `${String(notiStart).padStart(2, "0")}:00`,
     };
     await saveNotificationSettings(settings);
+
     const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const todayFortune = data?.daily_fortunes[now.getDate() - 1];
-    if (year === now.getFullYear() && month === now.getMonth() + 1 && todayFortune) {
+    const ny = now.getFullYear(), nm = now.getMonth() + 1, nd = now.getDate();
+    const dateStr = `${ny}-${String(nm).padStart(2, "0")}-${String(nd).padStart(2, "0")}`;
+
+    let todayFortune: DailyFortune | undefined =
+      (data?.year === ny && data?.month === nm) ? data.daily_fortunes[nd - 1] : undefined;
+
+    if (!todayFortune) {
+      const u = getUser();
+      if (u) {
+        const result = await getMonthlyFortune(u, ny, nm);
+        todayFortune = result.daily_fortunes[nd - 1];
+      }
+    }
+
+    if (todayFortune) {
       await clearDailyFortuneNotifications(dateStr);
       await scheduleDailyFortuneNotifications(todayFortune, dateStr);
+      if (selected?.date === dateStr) {
+        setScheduledIds(await loadScheduledIds(dateStr));
+      }
     }
+
     setNotiSaved(true);
     setTimeout(() => setNotiSaved(false), 2000);
   };
@@ -427,6 +446,20 @@ export default function Main({ onBack }: Props) {
     return map;
   }, [visibleNotifications]);
 
+  useEffect(() => {
+    if (!selected) {
+      setScheduledIds([]);
+      return;
+    }
+    loadScheduledIds(selected.date).then(setScheduledIds);
+  }, [selected?.date]);
+
+  const scheduledHourSet = useMemo(() => {
+    if (!selected) return new Set<number>();
+    const dateNum = parseInt(selected.date.replace(/-/g, ""));
+    return new Set(scheduledIds.map(id => id - dateNum * 100));
+  }, [selected, scheduledIds]);
+
   const dailySummary = useMemo(() => {
     const dailyNotif = plannedNotifications.find(n => n.type === "DAILY");
     if (!dailyNotif || !selected) return selected?.summary ?? "";
@@ -694,7 +727,7 @@ export default function Main({ onBack }: Props) {
                                         {visibleNotif?.type === "POINT" && (
                                             <span className={`${styles.notiMarker} ${styles.notiMarkerPoint}`}>●</span>
                                         )}
-                                        {visibleNotif && <span className={styles.notiClockIcon}>⏰</span>}
+                                        {scheduledHourSet.has(seg.startHour) && <span className={styles.notiClockIcon}>⏰</span>}
                             </span>
                                     </div>
                                     {detailNotif && (
