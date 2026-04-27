@@ -104,6 +104,9 @@ export default function Main({ onBack }: Props) {
   const [scheduledHours, setScheduledHours] = useState<Set<number>>(new Set());
   const dataRef = useRef<MonthlyFortuneResult | null>(null);
   const [showExactAlarmGuide, setShowExactAlarmGuide] = useState(false);
+  const [reasonOpen, setReasonOpen] = useState<boolean>(
+    () => localStorage.getItem("daily_reason_open") === "true"
+  );
   dataRef.current = data;
 
   useEffect(() => {
@@ -722,6 +725,90 @@ export default function Main({ onBack }: Props) {
                         </div>
                       );
                     })()}
+
+                    {/* ── 왜 이런 흐름일까요? ── */}
+                    <div className={styles.reasonCard}>
+                      <div
+                        className={styles.reasonCardHeader}
+                        onClick={() => {
+                          const next = !reasonOpen;
+                          setReasonOpen(next);
+                          localStorage.setItem("daily_reason_open", String(next));
+                        }}
+                      >
+                        <span className={styles.reasonCardTitle}>왜 이런 흐름일까요?</span>
+                        <span className={styles.reasonCardToggle}>{reasonOpen ? "−" : "+"}</span>
+                      </div>
+                      {reasonOpen && (
+                          <div className={styles.reasonCardBody}>
+                            {(() => {
+                              const rs = selected.reasonSources;
+
+                              if (!rs) {
+                                return (
+                                    <div className={styles.reasonItemText} style={{ paddingTop: "0.5rem" }}>
+                                      흐름 데이터를 불러오는 중이에요.
+                                    </div>
+                                );
+                              }
+
+                              const sections = [
+                                { label: "사주", src: rs.saju },
+                                { label: "자미두수", src: rs.ziwei },
+                                { label: "별자리", src: rs.astro },
+                              ];
+
+                              return sections.map(({ label, src }) => {
+                                if (!src) return null;
+
+                                const chips =
+                                    src.chips && src.chips.length > 0
+                                        ? src.chips
+                                        : [
+                                          {
+                                            key: src.key,
+                                            polarity: (src.polarity ?? "neutral") as
+                                                | "positive"
+                                                | "negative"
+                                                | "neutral",
+                                          },
+                                        ];
+
+                                return (
+                                    <div key={label} className={styles.reasonItem}>
+                                      <span className={styles.reasonItemLabel}>{label}</span>
+
+                                      <div className={styles.reasonLine}>
+                                        <span className={styles.reasonKeywords}>{src.text}</span>
+
+                                        <div className={styles.reasonChips}>
+                                          {chips.map((chip, i) => {
+                                            const chipClass = [
+                                              styles.reasonChip,
+                                              chip.polarity === "positive"
+                                                  ? styles.reasonChipPos
+                                                  : chip.polarity === "negative"
+                                                      ? styles.reasonChipNeg
+                                                      : "",
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" ");
+
+                                            return (
+                                              <span key={`${chip.key}-${i}`} className={chipClass}>
+                                                {chip.key}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                      )}
+                    </div>
 
                     {/* ── 시간대 흐름 (accordion) ── */}
                     {selected.timeSegments && selected.timeSegments.length > 0 && (

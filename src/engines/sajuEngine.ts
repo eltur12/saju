@@ -285,6 +285,11 @@ export interface SajuEngineProfile {
   injong_rules?: Record<string, "jeoljong" | "byeongjong">;
 }
 
+const _DOMAIN6_SAJU = ["wealth", "love", "health", "career", "relations", "study"] as const;
+function _avgDelta6(after: ScoreMap, before: ScoreMap): number {
+  return _DOMAIN6_SAJU.reduce((s, c) => s + (after[c] - before[c]), 0) / 6;
+}
+
 export class SajuEngine {
   private day_stem: string;
   private month_stem: string;
@@ -536,7 +541,7 @@ export class SajuEngine {
     return [HEAVENLY_STEMS[stemIdx], EARTHLY_BRANCHES[branchIdx]];
   }
 
-  calculate(targetDate: Date): { scores: ScoreMap; factors: Record<string, unknown> } {
+  calculate(targetDate: Date): { scores: ScoreMap; factors: Record<string, unknown>; contributions: { key: string; value: number }[] } {
     const [targetStem, targetBranch] = this.dateToStemBranch(targetDate);
     const [monthStem, monthBranch] = this.dateToMonthPillar(targetDate);
     const chartBranches = [this.day_branch, this.month_branch, this.year_branch, this.hour_branch];
@@ -549,13 +554,17 @@ export class SajuEngine {
     // 출생 월주 천간 (0.53)
     scores = this.applyTenGod(scores, this.month_stem, 0.53);
     // 현재 월주 천간 (0.47)
+    const _bMonthTg = { ...scores };
     scores = this.applyTenGod(scores, monthStem, 0.47);
+    const _cMonthTg = { key: this.getTenGod(monthStem) ?? "", value: _avgDelta6(scores, _bMonthTg) };
     // 특별성
     scores = this.applySpecialStars(scores);
     // 대운
     scores = this.applyDayun(scores);
     // 현재 일진 지지 관계
+    const _bBranch = { ...scores };
     scores = applyBranchRelationsToScore(scores, targetBranch, chartBranches);
+    const _cBranch = { key: targetBranch, value: _avgDelta6(scores, _bBranch) };
     // 현재 월 지지 관계
     scores = applyBranchRelationsToScore(scores, monthBranch, chartBranches);
     // 천간 충
@@ -573,7 +582,9 @@ export class SajuEngine {
       }
     }
     // 일진 천간 십성 (0.33)
+    const _bDayTg = { ...scores };
     scores = this.applyTenGod(scores, targetStem, 0.33);
+    const _cDayTg = { key: this.getTenGod(targetStem) ?? "", value: _avgDelta6(scores, _bDayTg) };
 
     // 일간 오행 극 건강 패널티
     const ELEMENT_克: Record<string, string> = {
@@ -608,6 +619,7 @@ export class SajuEngine {
         active_stars:             this.special_stars,
         natal_fixed_penalty:      this.natal_fixed_penalty.overall,
       },
+      contributions: [_cDayTg, _cMonthTg, _cBranch].filter(c => c.key !== ""),
     };
   }
 

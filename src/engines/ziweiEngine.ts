@@ -117,6 +117,11 @@ function dateToEarthlyBranch(d: Date): string {
 // 엔진
 // ──────────────────────────────────────────────
 
+const _DOMAIN6_ZW = ["wealth", "love", "health", "career", "relations", "study"] as const;
+function _avgDelta6Zw(after: ScoreMap, before: ScoreMap): number {
+  return _DOMAIN6_ZW.reduce((s, c) => s + (after[c] - before[c]), 0) / 6;
+}
+
 export class ZiweiEngine {
   private palaces: Record<string, PalaceData>;
   private sihua: Record<string, { palace: string; star: string }>;
@@ -274,7 +279,7 @@ export class ZiweiEngine {
     return result;
   }
 
-  calculate(targetDate: Date): { scores: ScoreMap; factors: Record<string, unknown> } {
+  calculate(targetDate: Date): { scores: ScoreMap; factors: Record<string, unknown>; contributions: { key: string; value: number }[] } {
     const scores = zeroScore();
     const todayBranch = dateToEarthlyBranch(targetDate);
 
@@ -306,6 +311,7 @@ export class ZiweiEngine {
       }
     }
 
+    const _bActivePalace = { ...result };
     if (activePalaceName) {
       // 활성화 궁 기본 보정 — 균등(uniform) 적용 (규칙서 "직장 직접 상승" 등은 단순 flat값)
       const activationBase = PALACE_ACTIVATION[activePalaceName] ?? 0;
@@ -340,10 +346,16 @@ export class ZiweiEngine {
       }
     }
 
+    const _cActivePalace = activePalaceName
+      ? { key: activePalaceName, value: _avgDelta6Zw(result, _bActivePalace) }
+      : null;
+
     // 유월(流月): 달력 월 기준 활성 궁 (0.4 가중치)
+    const _bMonthly = { ...result };
     const monthlyPalace = this.monthly_palaces[targetDate.getMonth()] ?? "命宮";
     const monthlyScores = this.palaceScore(monthlyPalace);
     keys.forEach(k => { result[k] += Math.trunc((monthlyScores[k] ?? 0) * 0.4); });
+    const _cMonthly = { key: monthlyPalace, value: _avgDelta6Zw(result, _bMonthly) };
 
     return {
       scores: result,
@@ -355,6 +367,7 @@ export class ZiweiEngine {
         today_branch:      todayBranch,
         active_palace:     activePalaceName || null,
       },
+      contributions: [_cActivePalace, _cMonthly].filter(Boolean) as { key: string; value: number }[],
     };
   }
 }

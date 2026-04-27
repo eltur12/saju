@@ -194,14 +194,21 @@ export class AstrologyEngine {
     return { activeAspects, transitPositions, transitVenusRetrograde };
   }
 
-  calculate(targetDate: Date, _birthDate?: Date): { scores: ScoreMap; factors: Record<string, unknown> } {
+  calculate(targetDate: Date, _birthDate?: Date): { scores: ScoreMap; factors: Record<string, unknown>; contributions: { key: string; value: number }[] } {
     const scores = this.natalBaseScores();
     const { activeAspects, transitPositions, transitVenusRetrograde } = this.calcTransitAspects(targetDate);
     const activeSummary: string[] = [];
+    const _aspContribs: { key: string; value: number }[] = [];
+    const _D6 = ["wealth", "love", "health", "career", "relations", "study"] as const;
 
     for (const asp of activeAspects) {
       const strength = aspectStrength(asp.aspect, asp.orb);
       const affinity = PLANET_AFFINITY[asp.transit_planet] ?? DEFAULT_AFFINITY;
+      const delta6 = _D6.reduce((s, k) => s + Math.trunc(strength * affinity[k] * 0.5), 0) / 6;
+      _aspContribs.push({
+        key:   `${asp.transit_planet} ${asp.aspect} natal ${asp.natal_planet} (orb ${asp.orb.toFixed(1)}°)`,
+        value: delta6,
+      });
       const keys = Object.keys(scores) as (keyof ScoreMap)[];
       keys.forEach(k => {
         scores[k] += Math.trunc(strength * affinity[k] * 0.5);
@@ -221,6 +228,7 @@ export class AstrologyEngine {
     if (transitVenusRetrograde) {
       scores.love   -= 5;
       scores.wealth -= 3;
+      _aspContribs.push({ key: "venus_retrograde_transit", value: (-5 + -3) / 6 });
     }
 
     // 연도별 트랜짓 고정 보정 (토성·목성 장기 트랜짓)
@@ -244,6 +252,7 @@ export class AstrologyEngine {
         venus_retrograde_natal:    this.venus_retrograde,
         venus_retrograde_transit:  transitVenusRetrograde,
       },
+      contributions: _aspContribs,
     };
   }
 }

@@ -10,6 +10,7 @@ import { getLunarDate } from "../utils/lunarConverter";
 import { generateTodos, generateSummary } from "./todoGenerator";
 import { generateTimeSegments } from "./timeSegmentLayer";
 import { generateNotificationHints } from "./notificationHintLayer";
+import { buildReasonSources, type ReasonSources } from "./reasonLayer";
 
 /**
  * 도메인별 엔진 가중치 (규칙서 기준)
@@ -69,6 +70,7 @@ export interface DailyFortune {
     score: number;
     label: string;
   }>;
+  reasonSources?: ReasonSources;
 }
 
 export interface MonthlyFortuneResult {
@@ -223,6 +225,10 @@ export class FortuneAggregator {
       badge,
       summary,
       todos,
+      reasonSources: buildReasonSources(
+        sajuResult.factors,  ziweiResult.factors,  astroResult.factors,
+        sajuResult.contributions, ziweiResult.contributions, astroResult.contributions,
+      ),
       balance_debug: balanceDebug,
     };
     fortune.timeSegments = generateTimeSegments(fortune);
