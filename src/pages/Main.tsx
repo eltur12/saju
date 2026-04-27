@@ -8,12 +8,13 @@ import {
   scheduleDailyFortuneNotifications,
   clearDailyFortuneNotifications,
   loadNotificationSettings,
-  loadScheduledIds,
+  loadNotificationReadyHours,
   saveNotificationSettings,
   sendDebugTestNotificationsForToday,
   requestNotificationPermission,
+  saveMonthlyNotificationReadyData, cleanupOldNotificationReadyData,
 } from "../services/notificationService";
-import { addDayRolloverListener } from "../plugins/widgetPlugin";
+import { addDayRolloverListener, scheduleTodayNotifications, canScheduleExactAlarms, openExactAlarmSettings } from "../plugins/widgetPlugin";
 import styles from "./Main.module.css";
 import {
   planNotifications,
@@ -100,12 +101,12 @@ export default function Main({ onBack }: Props) {
   const hasScheduledTodayRef                = useRef(false);
   const prevTodayStrRef                    = useRef(todayStr);
   const [resumeTick, setResumeTick]         = useState(0);
-  const [scheduledIds, setScheduledIds]     = useState<number[]>([]);
+  const [scheduledHours, setScheduledHours] = useState<Set<number>>(new Set());
   const dataRef = useRef<MonthlyFortuneResult | null>(null);
+  const [showExactAlarmGuide, setShowExactAlarmGuide] = useState(false);
   dataRef.current = data;
 
   useEffect(() => {
-    requestNotificationPermission();
     loadNotificationSettings().then(s => {
       const [hh] = s.dailyTime.split(":").map(Number);
       setNotiStart(hh);
@@ -146,19 +147,33 @@ export default function Main({ onBack }: Props) {
     let todayFortune: DailyFortune | undefined =
       (data?.year === ny && data?.month === nm) ? data.daily_fortunes[nd - 1] : undefined;
 
+    // todayMonthResult tracks which MonthlyFortuneResult covers today —
+    // used to regenerate all ready-data with the new settings
+    let todayMonthResult: MonthlyFortuneResult | undefined =
+      (data?.year === ny && data?.month === nm) ? data : undefined;
+
     if (!todayFortune) {
       const u = getUser();
       if (u) {
         const result = await getMonthlyFortune(u, ny, nm);
         todayFortune = result.daily_fortunes[nd - 1];
+        todayMonthResult = result;
       }
+    }
+
+    // Re-persist ready data for every day in today's month with updated settings.
+    // Awaited so that the clock-emoji refresh below reads the freshly written data.
+    if (todayMonthResult) {
+      await saveMonthlyNotificationReadyData(todayMonthResult, settings).catch(() => {});
+      await cleanupOldNotificationReadyData(todayMonthResult.year, todayMonthResult.month);
+      await scheduleTodayNotifications();
     }
 
     if (todayFortune) {
       await clearDailyFortuneNotifications(dateStr);
       await scheduleDailyFortuneNotifications(todayFortune, dateStr);
       if (selected?.date === dateStr) {
-        setScheduledIds(await loadScheduledIds(dateStr));
+        setScheduledHours(await loadNotificationReadyHours(dateStr));
       }
     }
 
@@ -194,6 +209,13 @@ export default function Main({ onBack }: Props) {
         if (prevTodayStrRef.current !== current) {
           setResumeTick(t => t + 1);
         }
+
+        (async () => {
+          const can = await canScheduleExactAlarms();
+          if (can) {
+            await scheduleTodayNotifications();
+          }
+        })();
       }
     });
     return () => { listenerPromise.then(h => h.remove()); };
@@ -243,6 +265,18 @@ export default function Main({ onBack }: Props) {
     try {
       const result = await getMonthlyFortune(u, y, m);
       setData(result);
+
+      // Persist notification-ready data for native Android scheduler, then trigger
+      // native scheduleToday so first-launch alarms are set without waiting for next
+      // app open or date rollover.
+      loadNotificationSettings().then(settings =>
+          saveMonthlyNotificationReadyData(result, settings)
+              .then(async () => {
+                await cleanupOldNotificationReadyData(result.year, result.month);
+                await scheduleTodayNotifications();
+              })
+      ).catch(() => {});
+
       const now = new Date();
       if (y === now.getFullYear() && m === now.getMonth() + 1) {
         const todayFortune = result.daily_fortunes[now.getDate() - 1];
@@ -262,6 +296,20 @@ export default function Main({ onBack }: Props) {
   useEffect(() => {
     if (user) load(year, month, user);
   }, [year, month, user, load]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const checkExactAlarmPermission = async () => {
+      const can = await canScheduleExactAlarms();
+
+      if (!can) {
+        setShowExactAlarmGuide(true);
+      }
+    };
+
+    checkExactAlarmPermission();
+  }, [user]);
 
   // Sync selected to today on initial load and on midnight day change.
   // Relies on existing re-renders; no timer needed.
@@ -447,18 +495,9 @@ export default function Main({ onBack }: Props) {
   }, [visibleNotifications]);
 
   useEffect(() => {
-    if (!selected) {
-      setScheduledIds([]);
-      return;
-    }
-    loadScheduledIds(selected.date).then(setScheduledIds);
+    if (!selected) { setScheduledHours(new Set()); return; }
+    loadNotificationReadyHours(selected.date).then(setScheduledHours);
   }, [selected?.date]);
-
-  const scheduledHourSet = useMemo(() => {
-    if (!selected) return new Set<number>();
-    const dateNum = parseInt(selected.date.replace(/-/g, ""));
-    return new Set(scheduledIds.map(id => id - dateNum * 100));
-  }, [selected, scheduledIds]);
 
   const dailySummary = useMemo(() => {
     const dailyNotif = plannedNotifications.find(n => n.type === "DAILY");
@@ -727,7 +766,7 @@ export default function Main({ onBack }: Props) {
                                         {visibleNotif?.type === "POINT" && (
                                             <span className={`${styles.notiMarker} ${styles.notiMarkerPoint}`}>●</span>
                                         )}
-                                        {scheduledHourSet.has(seg.startHour) && <span className={styles.notiClockIcon}>⏰</span>}
+                                        {isSelectedToday && scheduledHours.has(seg.startHour) && <span className={styles.notiClockIcon}>⏰</span>}
                             </span>
                                     </div>
                                     {detailNotif && (
@@ -918,6 +957,47 @@ export default function Main({ onBack }: Props) {
               </div>
             </>
         )}
+
+        {showExactAlarmGuide && (
+            <>
+              <div className={styles.overlay} onClick={() => setShowExactAlarmGuide(false)} />
+              <div className={styles.bottomSheet}>
+                <div className={styles.sheetHandle} />
+                <div className={styles.sheetTitle}>알림을 정확한 시간에 받으려면 권한이 필요해요</div>
+
+                <div style={{ fontSize: "0.82rem", lineHeight: 1.6, color: "var(--text-muted)" }}>
+                  하루온도는 설정한 시간에 오늘의 흐름과 좋은 타이밍을 알려드려요.
+                  <br /><br />
+                  알림 권한을 허용해야 받을 수 있고,
+                  ‘알람 및 리마인더’ 권한을 허용하면 더 정확한 시간에 도착해요.
+                </div>
+
+                <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+                  <button
+                      className={styles.notiSaveBtn}
+                      onClick={async () => {
+                        await requestNotificationPermission();
+                        const can = await canScheduleExactAlarms();
+                        if (!can) {
+                          await openExactAlarmSettings();
+                        }
+                        setShowExactAlarmGuide(false);
+                      }}
+                  >
+                    알림 허용하기
+                  </button>
+
+                  <button
+                      className={styles.notiTestBtn}
+                      onClick={() => setShowExactAlarmGuide(false)}
+                  >
+                    나중에 할게요
+                  </button>
+                </div>
+              </div>
+            </>
+        )}
+
       </div>
   );
 }

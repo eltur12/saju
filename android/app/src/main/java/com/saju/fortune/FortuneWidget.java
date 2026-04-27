@@ -77,6 +77,7 @@ public class FortuneWidget extends AppWidgetProvider {
         switch (action) {
             case Intent.ACTION_DATE_CHANGED: {
                 resetToCurrentMonth(context);
+                NativeNotificationScheduler.scheduleToday(context);
                 break;
             }
             case ACTION_DAY_CLICK: {

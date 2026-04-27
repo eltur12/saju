@@ -60,6 +60,21 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
+        <!-- 네이티브 AlarmManager 알림 수신기 -->
+        <receiver
+            android:name=".NotificationAlarmReceiver"
+            android:exported="false" />
+
+        <!-- 기기 재부팅 후 알림 재등록 -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
         <!-- 점수 요약 위젯 (widget_fortune.xml) -->
         <receiver
             android:name=".FortuneScoreWidget"
@@ -89,4 +104,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>
