@@ -62,6 +62,15 @@ public class FortuneWidget extends AppWidgetProvider {
         if (action == null) return;
 
         AppWidgetManager mgr = AppWidgetManager.getInstance(context);
+
+        if (Intent.ACTION_DATE_CHANGED.equals(action)) {
+            resetToCurrentMonth(context);
+            NativeNotificationScheduler.scheduleToday(context);
+            int[] ids = mgr.getAppWidgetIds(new ComponentName(context, FortuneWidget.class));
+            for (int id : ids) updateWidget(context, mgr, id);
+            return;
+        }
+
         int widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
 
         if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
