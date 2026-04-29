@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import WheelPickerModal from "../components/WheelPickerModal";
 import { getMonthlyFortune, getUser, clearUser } from "../api/fortuneApi";
 import { App } from "@capacitor/app";
 import type { MonthlyFortuneResult, DailyFortune } from "../engines/aggregator";
@@ -107,6 +108,8 @@ export default function Main({ onBack }: Props) {
   const [scheduledHours, setScheduledHours] = useState<Set<number>>(new Set());
   const dataRef = useRef<MonthlyFortuneResult | null>(null);
   const [showExactAlarmGuide, setShowExactAlarmGuide] = useState(false);
+  const [notiModalOpen, setNotiModalOpen] = useState(false);
+  const [draftNotiStart, setDraftNotiStart] = useState(notiStart);
   const [reasonOpen, setReasonOpen] = useState<boolean>(
     () => localStorage.getItem("daily_reason_open") === "true"
   );
@@ -985,13 +988,13 @@ export default function Main({ onBack }: Props) {
                           </div>
                           <div className={styles.notiItemControl}>
                             {notiDailyEnabled && (
-                                <select
-                                    className={styles.notiSelect}
-                                    value={notiStart}
-                                    onChange={e => setNotiStart(Number(e.target.value))}
+                                <button
+                                    type="button"
+                                    className={styles.notiPickerBtn}
+                                    onClick={() => { setDraftNotiStart(notiStart); setNotiModalOpen(true); }}
                                 >
-                                  {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23].map(h => <option key={h} value={h}>{h}시</option>)}
-                                </select>
+                                  {notiStart}시
+                                </button>
                             )}
                             <label className={styles.notiToggle}>
                               <input type="checkbox" checked={notiDailyEnabled} onChange={e => setNotiDailyEnabled(e.target.checked)} />
@@ -1059,6 +1062,19 @@ export default function Main({ onBack }: Props) {
               </div>
             </>
         )}
+
+        {/* ── Notification Time Picker Modal ── */}
+        <WheelPickerModal
+          open={notiModalOpen}
+          title="알림 시간 선택"
+          columns={[{
+            items: Array.from({ length: 24 }, (_, i) => ({ label: `${i}시`, value: i })),
+            value: draftNotiStart,
+            onChange: setDraftNotiStart,
+          }]}
+          onClose={() => setNotiModalOpen(false)}
+          onConfirm={() => { setNotiStart(draftNotiStart); setNotiModalOpen(false); }}
+        />
 
         {showExactAlarmGuide && (
             <>

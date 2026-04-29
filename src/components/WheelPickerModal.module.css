@@ -1,0 +1,66 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 200;
+}
+
+.sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-radius: 20px 20px 0 0;
+  z-index: 201;
+  padding: 0 1rem 2.5rem;
+}
+
+.handle {
+  width: 40px;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  margin: 0.75rem auto 0.25rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 0.25rem;
+}
+
+.title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #111111;
+}
+
+.cancelBtn {
+  font-size: 0.85rem;
+  color: #999999;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  font-family: inherit;
+}
+
+.confirmBtn {
+  font-size: 0.85rem;
+  color: #3aab8c;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  font-family: inherit;
+}
+
+.pickerRow {
+  display: flex;
+  gap: 0;
+}

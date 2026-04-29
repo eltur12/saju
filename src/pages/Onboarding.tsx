@@ -2,6 +2,7 @@ import { useState } from "react";
 import { saveUser, clearWidgetCache } from "../api/fortuneApi";
 import type { SajuUser } from "../api/fortuneApi";
 import styles from "./Onboarding.module.css";
+import WheelPickerModal from "../components/WheelPickerModal";
 
 const HOURS = [
   { label: "모름", value: -1 },
@@ -28,13 +29,47 @@ export default function Onboarding({ onComplete }: Props) {
   const [hour, setHour]     = useState(-1);
   const [gender, setGender] = useState<"M" | "F">("M");
 
+  const [birthModalOpen, setBirthModalOpen] = useState(false);
+  const [draftYear, setDraftYear]   = useState(1990);
+  const [draftMonth, setDraftMonth] = useState(1);
+  const [draftDay, setDraftDay]     = useState(1);
+
+  const [timeModalOpen, setTimeModalOpen] = useState(false);
+  const [draftHour, setDraftHour]   = useState(-1);
+
   const currentYear = new Date().getFullYear();
-  const years  = Array.from({ length: currentYear - 1929 }, (_, i) => 1930 + i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
   const daysInMonth = new Date(year, month, 0).getDate();
-  const days   = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   // 월/년 변경 시 day가 범위를 벗어나면 마지막 날로 클램핑
   if (day > daysInMonth) setDay(daysInMonth);
+
+  const draftDaysInMonth = new Date(draftYear, draftMonth, 0).getDate();
+
+  const yearItems  = Array.from({ length: currentYear - 1929 }, (_, i) => ({ label: `${1930 + i}년`, value: 1930 + i }));
+  const monthItems = Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}월`, value: i + 1 }));
+  const draftDayItems = Array.from({ length: draftDaysInMonth }, (_, i) => ({ label: `${i + 1}일`, value: i + 1 }));
+
+  const openBirthModal = () => {
+    setDraftYear(year); setDraftMonth(month); setDraftDay(day);
+    setBirthModalOpen(true);
+  };
+  const confirmBirth = () => {
+    setYear(draftYear); setMonth(draftMonth); setDay(draftDay);
+    setBirthModalOpen(false);
+  };
+
+  const openTimeModal = () => { setDraftHour(hour); setTimeModalOpen(true); };
+  const confirmTime   = () => { setHour(draftHour); setTimeModalOpen(false); };
+
+  const onDraftYearChange = (y: number) => {
+    setDraftYear(y);
+    const max = new Date(y, draftMonth, 0).getDate();
+    if (draftDay > max) setDraftDay(max);
+  };
+  const onDraftMonthChange = (m: number) => {
+    setDraftMonth(m);
+    const max = new Date(draftYear, m, 0).getDate();
+    if (draftDay > max) setDraftDay(max);
+  };
 
   const handleSubmit = async () => {
     const user: SajuUser = {
@@ -80,40 +115,22 @@ export default function Onboarding({ onComplete }: Props) {
         <div className={styles.section}>
           <label className={styles.label}>생년월일</label>
           <div className={styles.selectRow}>
-            <select
-              className={styles.select}
-              value={year}
-              onChange={e => setYear(+e.target.value)}
-            >
-              {years.map(y => <option key={y} value={y}>{y}년</option>)}
-            </select>
-            <select
-              className={styles.select}
-              value={month}
-              onChange={e => setMonth(+e.target.value)}
-            >
-              {months.map(m => <option key={m} value={m}>{m}월</option>)}
-            </select>
-            <select
-              className={styles.select}
-              value={day}
-              onChange={e => setDay(+e.target.value)}
-            >
-              {days.map(d => <option key={d} value={d}>{d}일</option>)}
-            </select>
+            <button type="button" className={styles.pickerBtn} onClick={openBirthModal}>{year}년</button>
+            <button type="button" className={styles.pickerBtn} onClick={openBirthModal}>{month}월</button>
+            <button type="button" className={styles.pickerBtn} onClick={openBirthModal}>{day}일</button>
           </div>
         </div>
 
         <div className={styles.section}>
           <label className={styles.label}>태어난 시간 (선택)</label>
-          <select
-            className={styles.select}
-            value={hour}
-            onChange={e => setHour(+e.target.value)}
+          <button
+            type="button"
+            className={styles.pickerBtn}
             style={{ width: "100%" }}
+            onClick={openTimeModal}
           >
-            {HOURS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
-          </select>
+            {HOURS.find(h => h.value === hour)?.label ?? "모름"}
+          </button>
         </div>
 
         <button className={styles.btn} onClick={handleSubmit}>
@@ -121,6 +138,28 @@ export default function Onboarding({ onComplete }: Props) {
         </button>
         <p className={styles.hint}>입력 정보는 기기에만 저장됩니다</p>
       </div>
+
+      <WheelPickerModal
+        open={birthModalOpen}
+        title="생년월일 선택"
+        columns={[
+          { items: yearItems,     value: draftYear,  onChange: onDraftYearChange },
+          { items: monthItems,    value: draftMonth, onChange: onDraftMonthChange },
+          { items: draftDayItems, value: draftDay,   onChange: setDraftDay },
+        ]}
+        onClose={() => setBirthModalOpen(false)}
+        onConfirm={confirmBirth}
+      />
+
+      <WheelPickerModal
+        open={timeModalOpen}
+        title="태어난 시간 선택"
+        columns={[
+          { items: HOURS, value: draftHour, onChange: setDraftHour },
+        ]}
+        onClose={() => setTimeModalOpen(false)}
+        onConfirm={confirmTime}
+      />
     </div>
   );
 }

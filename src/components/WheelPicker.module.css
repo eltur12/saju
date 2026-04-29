@@ -1,0 +1,42 @@
+.wrapper {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+}
+
+.highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(58, 171, 140, 0.08);
+  border-top: 1.5px solid rgba(58, 171, 140, 0.25);
+  border-bottom: 1.5px solid rgba(58, 171, 140, 0.25);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.scroller {
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.scroller::-webkit-scrollbar { display: none; }
+
+.item {
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.92rem;
+  color: #aaaaaa;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.itemSelected {
+  color: #111111;
+  font-size: 1rem;
+  font-weight: 600;
+}
