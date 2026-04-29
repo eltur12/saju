@@ -6,6 +6,9 @@ type WidgetPlugin = {
   scheduleTodayNotifications: () => Promise<void>;
   canScheduleExactAlarms: () => Promise<{ canScheduleExactAlarms: boolean }>;
   openExactAlarmSettings: () => Promise<void>;
+  getNotificationRegistrationStatus: (options: {
+    entries: Array<{ id: number }>;
+  }) => Promise<{ statuses: Array<{ id: number; registered: boolean }> }>;
 
   addListener: (
       eventName: string,
@@ -51,6 +54,21 @@ export async function canScheduleExactAlarms(): Promise<boolean> {
   } catch (e) {
     console.warn("[NOTI_NATIVE] canScheduleExactAlarms failed", e);
     return true;
+  }
+}
+
+// debug-only: check which ready-entry IDs have live PendingIntents in AlarmManager
+export async function getNotificationRegistrationStatus(
+  entries: Array<{ id: number }>,
+): Promise<Map<number, boolean>> {
+  if (Capacitor.getPlatform() !== "android" || entries.length === 0) return new Map();
+  try {
+    const { statuses } = await Widget.getNotificationRegistrationStatus({ entries });
+    const map = new Map<number, boolean>();
+    for (const s of statuses) map.set(s.id, s.registered);
+    return map;
+  } catch {
+    return new Map();
   }
 }
 

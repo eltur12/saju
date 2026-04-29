@@ -14,11 +14,14 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.os.Build;
 import android.provider.Settings;
 import android.content.Intent;
 import android.net.Uri;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
+import org.json.JSONObject;
 
 @CapacitorPlugin(name = "Widget")
 public class WidgetPlugin extends Plugin {
@@ -102,5 +105,40 @@ public class WidgetPlugin extends Plugin {
         }
 
         call.resolve();
+    }
+
+    /** Debug-only: checks whether each ready-entry ID has a live PendingIntent in AlarmManager. */
+    @PluginMethod
+    public void getNotificationRegistrationStatus(PluginCall call) {
+        JSArray inputEntries = call.getArray("entries");
+        JSArray statuses = new JSArray();
+
+        if (inputEntries != null) {
+            for (int i = 0; i < inputEntries.length(); i++) {
+                try {
+                    JSONObject entry = inputEntries.getJSONObject(i);
+                    long id = entry.getLong("id");
+                    int requestCode = (int) (id % 1_000_000_000L);
+
+                    // Mirror cancelEntries(): bare intent (no extras) is sufficient —
+                    // PendingIntent identity does not consider extras.
+                    Intent intent = new Intent(getContext(), NotificationAlarmReceiver.class);
+                    PendingIntent pi = PendingIntent.getBroadcast(
+                            getContext(),
+                            requestCode,
+                            intent,
+                            PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+
+                    JSObject status = new JSObject();
+                    status.put("id", id);
+                    status.put("registered", pi != null);
+                    statuses.put(status);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        JSObject ret = new JSObject();
+        ret.put("statuses", statuses);
+        call.resolve(ret);
     }
 }

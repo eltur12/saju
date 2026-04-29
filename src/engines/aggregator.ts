@@ -11,6 +11,7 @@ import { generateTodos, generateSummary } from "./todoGenerator";
 import { generateTimeSegments } from "./timeSegmentLayer";
 import { generateNotificationHints } from "./notificationHintLayer";
 import { buildReasonSources, type ReasonSources } from "./reasonLayer";
+import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 
 /**
  * 도메인별 엔진 가중치 (규칙서 기준)
@@ -45,9 +46,9 @@ function softScale(score: number): number {
 const BASE = 60; // 기본 베이스 점수
 
 export function scoreToBadge(score: number): string {
-  if (score >= 80) return "대길";
-  if (score >= 65) return "길";
-  if (score >= 52) return "보통";
+  if (score >= SCORE_GOLD) return "대길";
+  if (score >= SCORE_MINT) return "길";
+  if (score >= SCORE_GRAY) return "보통";
   return "주의";
 }
 

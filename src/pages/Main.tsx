@@ -14,7 +14,7 @@ import {
   requestNotificationPermission,
   saveMonthlyNotificationReadyData, cleanupOldNotificationReadyData,
 } from "../services/notificationService";
-import { addDayRolloverListener, scheduleTodayNotifications, canScheduleExactAlarms, openExactAlarmSettings } from "../plugins/widgetPlugin";
+import { addDayRolloverListener, scheduleTodayNotifications, canScheduleExactAlarms, openExactAlarmSettings, getNotificationRegistrationStatus } from "../plugins/widgetPlugin";
 import styles from "./Main.module.css";
 import {
   planNotifications,
@@ -23,6 +23,8 @@ import {
 } from "../engines/notificationPlanner";
 import type { PlannedNotification } from "../engines/notificationPlanner";
 import { getFlowState, getFlowSentence } from "../utils/flowState";
+import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
+import { Preferences } from "@capacitor/preferences";
 
 const DAY_NAMES = ["일","월","화","수","목","금","토"];
 const DOW_KO    = ["일","월","화","수","목","금","토"];
@@ -45,16 +47,16 @@ function fmtHour(h: number) {
 
 
 function getScoreClass(score: number) {
-  if (score >= 75) return styles["score-gold"];
-  if (score >= 65) return styles["score-green"];
-  if (score >= 55) return styles["score-gray"];
+  if (score >= SCORE_GOLD) return styles["score-gold"];
+  if (score >= SCORE_MINT) return styles["score-green"];
+  if (score >= SCORE_GRAY) return styles["score-gray"];
   return styles["score-red"];
 }
 
 function scoreColor(score: number): string {
-  if (score >= 75) return "var(--accent-gold)";
-  if (score >= 65) return "var(--accent-mint)";
-  if (score >= 55) return "var(--text-muted)";
+  if (score >= SCORE_GOLD) return "var(--accent-gold)";
+  if (score >= SCORE_MINT) return "var(--accent-mint)";
+  if (score >= SCORE_GRAY) return "var(--text-muted)";
   return "var(--danger)";
 }
 
@@ -96,6 +98,7 @@ export default function Main({ onBack }: Props) {
   const [notiSaved, setNotiSaved]           = useState(false);
   const [testNotiSent, setTestNotiSent]     = useState(false);
   const [debugOpen, setDebugOpen]           = useState(false);
+  const [debugEntries, setDebugEntries]     = useState<Array<{ id: number; type: string; triggerAt: string; title: string; registered?: boolean }> | null>(null);
   const [settingsOpen, setSettingsOpen]     = useState(false);
   const [settingsView, setSettingsView]     = useState<SettingsView>("main");
   const hasScheduledTodayRef                = useRef(false);
@@ -119,6 +122,17 @@ export default function Main({ onBack }: Props) {
       setNotiAllowNight(s.allowNight);
     });
   }, []);
+
+  const openDebugOverlay = async () => {
+    if (!selected) return;
+    const key = `fortune_notifications_ready_${selected.date}`;
+    const { value } = await Preferences.get({ key });
+    const raw: Array<{ id: number; type: string; triggerAt: string; title: string }> =
+      value ? JSON.parse(value) : [];
+    const statusMap = await getNotificationRegistrationStatus(raw.map(e => ({ id: e.id })));
+    setDebugEntries(raw.map(e => ({ ...e, registered: statusMap.get(e.id) })));
+    setDebugOpen(true);
+  };
 
   const sendTestNotification = async () => {
     const now = new Date();
@@ -907,26 +921,27 @@ export default function Main({ onBack }: Props) {
                 현재 시각: {new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
                 {" · "}선택 날짜: {selected?.date ?? "없음"}
               </div>
-              {plannedNotifications.length === 0 ? (
+              {!debugEntries || debugEntries.length === 0 ? (
                 <div style={{ color: "var(--text-muted)", fontSize: "0.82rem", lineHeight: 1.7 }}>
-                  <div>오늘 예약된 알림이 없습니다</div>
-                  <div style={{ marginTop: "0.4rem", fontSize: "0.74rem" }}>
-                    • 시간이 이미 지났을 수 있습니다<br />
-                    • 설정에서 비활성화되어 있을 수 있습니다
-                  </div>
+                  준비된 알림 데이터 없음
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                  {plannedNotifications.map((n, i) => {
+                  {debugEntries.map((e, i) => {
                     const now = new Date();
-                    const hhmm = `${String(n.triggerTime.getHours()).padStart(2, "0")}:${String(n.triggerTime.getMinutes()).padStart(2, "0")}`;
-                    const isPast = n.triggerTime <= now;
-                    const isVisible = visibleNotifications.some(v => v.type === n.type && v.triggerTime.getTime() === n.triggerTime.getTime());
-                    const status = isPast ? "⏭️ 지난 시간" : isVisible ? "✅ 예약됨" : "❌ 필터링됨";
+                    const isPast = new Date(e.triggerAt) <= now;
+                    const status = isPast
+                      ? "SKIP"
+                      : e.registered === true
+                        ? "✅ 준비됨"
+                        : "🕒 예정됨";
                     return (
-                      <div key={i} style={{ fontSize: "0.8rem", display: "flex", justifyContent: "space-between", padding: "0.3rem 0", borderBottom: "1px solid var(--border)" }}>
-                        <span style={{ color: "var(--text-muted)" }}>{n.type} · {hhmm}</span>
-                        <span>{status}</span>
+                      <div key={i} style={{ fontSize: "0.8rem", padding: "0.3rem 0", borderBottom: "1px solid var(--border)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "var(--text-muted)" }}>{e.type} · {e.triggerAt.slice(11, 16)}</span>
+                          <span>{status}</span>
+                        </div>
+                        <div style={{ fontSize: "0.74rem", color: "var(--text-sub)", marginTop: "0.1rem" }}>{e.title}</div>
                       </div>
                     );
                   })}
@@ -975,7 +990,7 @@ export default function Main({ onBack }: Props) {
                                     value={notiStart}
                                     onChange={e => setNotiStart(Number(e.target.value))}
                                 >
-                                  {[6,7,8,9,10,11,12].map(h => <option key={h} value={h}>{h}시</option>)}
+                                  {[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23].map(h => <option key={h} value={h}>{h}시</option>)}
                                 </select>
                             )}
                             <label className={styles.notiToggle}>
@@ -1033,7 +1048,7 @@ export default function Main({ onBack }: Props) {
                             알림 테스트
                           </button>
                           {testNotiSent && <span className={styles.notiSavedMsg}>잠시 후 알림이 도착합니다</span>}
-                          <button className={styles.notiTestBtn} onClick={() => setDebugOpen(true)}>
+                          <button className={styles.notiTestBtn} onClick={openDebugOverlay}>
                             예약 확인
                           </button>
                         </div>
