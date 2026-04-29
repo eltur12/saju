@@ -5,6 +5,7 @@ import { FortuneAggregator, type MonthlyFortuneResult, type DailyFortune } from 
 import { calculateSajuProfile } from "../utils/sajuCalculator";
 import { buildZiweiProfile } from "../utils/ziweiCalculator";
 import { buildAstroProfile } from "../utils/astroCalculator";
+import { normalizeBirthDateTimeByRegion } from "../utils/sajuTime";
 import { refreshWidget } from "../plugins/widgetPlugin";
 import { buildProfileInsight, type ProfileInsight } from "../engines/profileInsightLayer";
 
@@ -95,7 +96,7 @@ export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promi
 }
 
 /** 캐시 스키마 버전 — 필드 변경 시 올리면 캐시 무효화 */
-const CACHE_VERSION = "v7";
+const CACHE_VERSION = "v8";
 
 export interface SajuUser {
   birth_year: number;
@@ -103,6 +104,8 @@ export interface SajuUser {
   birth_day: number;
   birth_hour?: number;
   birth_minute?: number;
+  /** 출생지 도시 id (BIRTH_REGIONS) — 진태양시 보정에 사용 */
+  birth_region?: string;
   gender: "M" | "F";
   /** 인종법(引從法): 십성별 절종/병종 규칙 — 차트 분석 후 설정 */
   injong_rules?: Record<string, "jeoljong" | "byeongjong">;
@@ -158,24 +161,34 @@ export async function getMonthlyFortune(
     return cache[key];
   }
 
-  const hour = user.birth_hour ?? 12;
   const isMale = user.gender === "M";
+
+  // 출생지 경도 기반 진태양시 보정
+  const normalizedBirth = normalizeBirthDateTimeByRegion({
+    year:     user.birth_year,
+    month:    user.birth_month,
+    day:      user.birth_day,
+    hour:     user.birth_hour  ?? 12,
+    minute:   user.birth_minute ?? 0,
+    regionId: user.birth_region ?? "seoul",
+  });
 
   // 사주 (동기) — 성별 반영 (대운 순역방향)
   const sajuProfile = calculateSajuProfile(
-      user.birth_year, user.birth_month, user.birth_day, hour, user.gender,
-      user.injong_rules,
+      normalizedBirth.year, normalizedBirth.month, normalizedBirth.day,
+      normalizedBirth.hour, user.gender, user.injong_rules, normalizedBirth.minute,
   );
 
-  // 자미두수 (동기) — 성별 반영
+  // 자미두수 (동기) — 성별 반영 (minute 미지원, 보정된 hour만 전달)
   const ziweiProfile = buildZiweiProfile(
-      user.birth_year, user.birth_month, user.birth_day, hour, year, isMale,
+      normalizedBirth.year, normalizedBirth.month, normalizedBirth.day,
+      normalizedBirth.hour, year, isMale,
   );
 
   // 서양 점성술 (비동기 — Moshier 에페메리스)
   const astroProfile = await buildAstroProfile(
-      user.birth_year, user.birth_month, user.birth_day, user.birth_hour,
-      undefined, undefined, user.birth_minute,
+      normalizedBirth.year, normalizedBirth.month, normalizedBirth.day,
+      normalizedBirth.hour, undefined, undefined, normalizedBirth.minute,
   );
 
   const birthDate = new Date(user.birth_year, user.birth_month - 1, user.birth_day);

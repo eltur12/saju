@@ -3,6 +3,7 @@ import { calculateSajuProfile } from '../utils/sajuCalculator';
 import { computeElementDistribution } from './sajuBalanceLayer';
 import { createChart } from '../lib/orrery/ziwei';
 import { buildAstroProfile } from '../utils/astroCalculator';
+import { normalizeBirthDateTimeByRegion } from '../utils/sajuTime';
 import { lonToSign, ZODIAC_KO } from '../lib/orrery/natal';
 import { STEM_ELEMENT, BRANCH_ELEMENT, HEAVENLY_STEMS } from './sajuEngine';
 import { JIJANGGAN } from '../lib/orrery/constants';
@@ -129,14 +130,35 @@ export interface ProfileInsight {
 }
 
 export async function buildProfileInsight(user: SajuUser): Promise<ProfileInsight> {
-  const birthTimeUnknown = user.birth_hour === undefined;
-  const hour = user.birth_hour ?? 12;
-  const birthTimeLabel = birthTimeUnknown ? "모름" : (HOUR_LABELS[hour] ?? `${hour}시`);
+  const birthTimeUnknown = user.birth_hour == null;
+  const birthTimeLabel = birthTimeUnknown ? "모름" : (HOUR_LABELS[user.birth_hour!] ?? `${user.birth_hour}시`);
   const isMale = user.gender === "M";
 
+  // Normalize birth datetime using regional solar-time correction.
+  // Ensures all engines operate on the same corrected time base.
+  // Only applied when birth time is known; unknown time uses 12:00 fallback unchanged.
+  const normalizedBirth = birthTimeUnknown
+    ? null
+    : normalizeBirthDateTimeByRegion({
+        year:     user.birth_year,
+        month:    user.birth_month,
+        day:      user.birth_day,
+        hour:     user.birth_hour!,
+        minute:   user.birth_minute ?? 0,
+        regionId: user.birth_region ?? "seoul",
+      });
+
+  // calc* values are used for all engine calls below.
+  // When birth time is unknown: raw date, 12:00 fallback (no correction applied).
+  const calcYear   = normalizedBirth?.year   ?? user.birth_year;
+  const calcMonth  = normalizedBirth?.month  ?? user.birth_month;
+  const calcDay    = normalizedBirth?.day    ?? user.birth_day;
+  const calcHour   = normalizedBirth?.hour   ?? 12;
+  const calcMinute = normalizedBirth?.minute ?? 0;
+
   const sajuResult = calculateSaju({
-    year: user.birth_year, month: user.birth_month, day: user.birth_day,
-    hour, minute: 0, gender: user.gender,
+    year: calcYear, month: calcMonth, day: calcDay,
+    hour: calcHour, minute: calcMinute, gender: user.gender,
     unknownTime: birthTimeUnknown,
   });
 
@@ -157,8 +179,8 @@ export async function buildProfileInsight(user: SajuUser): Promise<ProfileInsigh
   };
 
   const sajuProfile = calculateSajuProfile(
-      user.birth_year, user.birth_month, user.birth_day,
-      user.birth_hour, user.gender, user.injong_rules,
+      calcYear, calcMonth, calcDay,
+      calcHour, user.gender, user.injong_rules, calcMinute,
   );
 
   const dist = computeElementDistribution(sajuProfile);
@@ -178,8 +200,11 @@ export async function buildProfileInsight(user: SajuUser): Promise<ProfileInsigh
   const dayMasterYinYang: "+" | "-" = stemIdx % 2 === 0 ? "+" : "-";
   const seasonElement = ELEMENT_KO[STEM_ELEMENT[sajuProfile.month_stem] ?? ""] ?? "";
 
+  // Ziwei chart is hour-based.
+  // Minute does not affect the result, but we pass it for consistency
+  // with other engines and future extensibility.
   const ziweiChart = createChart(
-      user.birth_year, user.birth_month, user.birth_day, hour, 0, isMale,
+      calcYear, calcMonth, calcDay, calcHour, calcMinute, isMale,
   );
   const mingGongBranch = ziweiChart.mingGongZhi;
   const wuXingJu = ziweiChart.wuXingJu.name;
@@ -190,8 +215,8 @@ export async function buildProfileInsight(user: SajuUser): Promise<ProfileInsigh
   }));
 
   const astroProfile = await buildAstroProfile(
-      user.birth_year, user.birth_month, user.birth_day,
-      user.birth_hour, undefined, undefined, user.birth_minute,
+      calcYear, calcMonth, calcDay,
+      calcHour, undefined, undefined, calcMinute,
   );
 
   const getSign = (id: string): string => {

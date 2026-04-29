@@ -142,3 +142,11 @@
   text-align: center;
   margin-top: 1rem;
 }
+
+.birthDateHint {
+  margin-top: 0.3rem;
+  font-size: 0.65rem;
+  color: rgba(0, 0, 0, 0.8);
+  opacity: 0.9;
+  line-height: 1.4;
+}

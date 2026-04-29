@@ -43,11 +43,13 @@ export function calculateSajuProfile(
   birthHour?: number,
   gender: 'M' | 'F' = 'M',
   injongRules?: Record<string, "jeoljong" | "byeongjong">,
+  birthMinute?: number,
 ): SajuEngineProfile {
   const hour   = birthHour ?? 12;
+  const minute = birthMinute ?? 0;
   const result = orreryCalcSaju({
     year: birthYear, month: birthMonth, day: birthDay,
-    hour, minute: 0, gender,
+    hour, minute, gender,
   });
 
   // pillars 순서: [시주(0), 일주(1), 월주(2), 년주(3)]

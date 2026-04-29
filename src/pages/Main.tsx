@@ -25,6 +25,8 @@ import {
 } from "../engines/notificationPlanner";
 import type { PlannedNotification } from "../engines/notificationPlanner";
 import { getFlowState, getFlowSentence } from "../utils/flowState";
+import { normalizeBirthDateTimeByRegion } from "../utils/sajuTime";
+import { getBirthRegionById } from "../constants/cities";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 import { Preferences } from "@capacitor/preferences";
 import {BRANCH_ELEMENT, STEM_ELEMENT} from "../engines/sajuEngine.ts";
@@ -60,6 +62,13 @@ type SettingsView = "main" | "noti";
 function fmtHour(h: number) {
   return String(h).padStart(2, "0") + ":00";
 }
+
+const HOUR_BRANCH_LABELS = ["자시","축시","인시","묘시","진시","사시","오시","미시","신시","유시","술시","해시"];
+function getHourBranch(hour: number): string {
+  return HOUR_BRANCH_LABELS[Math.floor((hour + 1) / 2) % 12];
+}
+
+function pad2(n: number) { return String(n).padStart(2, "0"); }
 
 
 function getScoreClass(score: number) {
@@ -127,6 +136,7 @@ export default function Main({ onBack }: Props) {
   const [draftNotiStart, setDraftNotiStart] = useState(notiStart);
   const [profile, setProfile] = useState<ProfileInsight | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [infoTooltip, setInfoTooltip] = useState<"region" | "saju" | null>(null);
   const [reasonOpen, setReasonOpen] = useState<boolean>(
       () => localStorage.getItem("daily_reason_open") === "true"
   );
@@ -559,6 +569,20 @@ export default function Main({ onBack }: Props) {
     return getFlowSentence(getFlowState(nowSegment.score, nowDelta));
   }, [isSelectedToday, nowSegment, nowDelta]);
 
+  const normalizedBirthDisplay = useMemo(() => {
+    if (!user || user.birth_hour === undefined) return "시간 미입력";
+    const nb = normalizeBirthDateTimeByRegion({
+      year:     user.birth_year,
+      month:    user.birth_month,
+      day:      user.birth_day,
+      hour:     user.birth_hour,
+      minute:   user.birth_minute ?? 0,
+      regionId: user.birth_region ?? "seoul",
+    });
+    const branch = getHourBranch(nb.hour);
+    return `${nb.year}.${pad2(nb.month)}.${pad2(nb.day)} ${pad2(nb.hour)}:${pad2(nb.minute)} · ${branch}`;
+  }, [user]);
+
   return (
       <div className={styles.container}>
 
@@ -688,35 +712,99 @@ export default function Main({ onBack }: Props) {
                           <div className={styles.profileCard}>
                             <div className={styles.profileCardTitle}>출생정보</div>
                             <div className={styles.profileInfoGrid}>
+
+                              {/* 생년월일 */}
                               <div className={styles.profileInfoRow}>
                                 <span className={styles.profileInfoLabel}>생년월일</span>
                                 <span className={styles.profileInfoValue}>
-                              {profile.input.birthYear}.{String(profile.input.birthMonth).padStart(2,"0")}.{String(profile.input.birthDay).padStart(2,"0")}
-                            </span>
+                                  {profile.input.birthYear}.{pad2(profile.input.birthMonth)}.{pad2(profile.input.birthDay)}
+                                </span>
                               </div>
+
+                              {/* 성별 */}
                               <div className={styles.profileInfoRow}>
                                 <span className={styles.profileInfoLabel}>성별</span>
                                 <span className={styles.profileInfoValue}>{profile.input.gender === "M" ? "남성" : "여성"}</span>
                               </div>
+
+                              {/* 시간 */}
                               <div className={styles.profileInfoRow}>
-                                <span className={styles.profileInfoLabel}>태어난 시</span>
-                                <span className={styles.profileInfoValue}>{profile.input.birthTimeLabel}</span>
+                                <span className={styles.profileInfoLabel}>시간</span>
+                                <span className={styles.profileInfoValue}>
+                                  {user?.birth_hour === undefined
+                                    ? "모름"
+                                    : `${pad2(user.birth_hour)}:${user.birth_minute !== undefined ? pad2(user.birth_minute) : "모름"}`}
+                                </span>
                               </div>
+
+                              {/* 지역 ⓘ */}
+                              <div className={styles.profileInfoRow}>
+                                <span className={styles.profileInfoLabel}>
+                                  <span className={styles.infoIconWrap}>
+                                    지역
+                                    <button
+                                      className={styles.infoBtn}
+                                      onClick={() => setInfoTooltip(t => t === "region" ? null : "region")}
+                                    >i</button>
+                                  </span>
+                                </span>
+                                <span className={styles.profileInfoValue}>
+                                  {user?.birth_region
+                                      ? getBirthRegionById(user.birth_region).name
+                                      : "모름"}
+                                </span>
+                              </div>
+                              {infoTooltip === "region" && (
+                                <div className={styles.inlineInfoBox}>
+                                  출생 지역을 모르는 경우에는 서울 기준으로 계산됩니다.
+                                </div>
+                              )}
+
+                              {/* 사주정보 ⓘ */}
+                              <div className={styles.profileInfoRow} style={{ gridColumn: "1 / -1" }}>
+                                <span className={styles.profileInfoLabel}>
+                                  <span className={styles.infoIconWrap}>
+                                    사주정보
+                                    <button
+                                      className={styles.infoBtn}
+                                      onClick={() => setInfoTooltip(t => t === "saju" ? null : "saju")}
+                                    >i</button>
+                                  </span>
+                                </span>
+                                <span className={`${styles.profileInfoValue} ${styles.sajuInfoValue}`}>
+                                  {normalizedBirthDisplay}
+                                </span>
+                              </div>
+                              {infoTooltip === "saju" && (
+                                <div className={styles.inlineInfoBox}>
+                                  사주정보는 입력한 출생 시간에 출생 지역의 태양시 보정을 반영한 값이에요.<br/>
+                                  <br/>
+                                  하루온도는 자시를 23:00~00:59로 보고, 23:00 이후는 다음 날 기준으로 계산합니다.<br/>
+                                  <br/>
+                                  출생 시간이 없으면 정오 기준으로 계산됩니다.<br/>
+                                  분이 없으면 00분 기준으로 계산됩니다.<br/>
+                                  지역이 없으면 서울 기준으로 계산됩니다.
+                                </div>
+                              )}
+
+                              {/* 일간 */}
                               <div className={styles.profileInfoRow}>
                                 <span className={styles.profileInfoLabel}>일간</span>
                                 <span className={styles.profileInfoValue}>
-                              {profile.saju.dayMaster} ({profile.saju.dayMasterElement}{profile.saju.dayMasterYinYang})
-                            </span>
+                                  {profile.saju.dayMaster} ({profile.saju.dayMasterElement}{profile.saju.dayMasterYinYang})
+                                </span>
                               </div>
+
+                              {/* 신살 */}
                               {(profile.saju.specialStars?.length ?? 0) > 0 && (
-                                  <div className={styles.profileInfoRow} style={{ gridColumn: "1 / -1", alignItems: "flex-start" }}>
-                                    <span className={styles.profileInfoLabel}>신살</span>
-                                    <div className={styles.sajuStarChips}>
-                                      {(profile.saju.specialStars ?? []).map((star) => (
-                                          <span key={star} className={styles.sajuStarChip}>{star}</span>
-                                      ))}
-                                    </div>
+                                <div className={styles.profileInfoRow} style={{ gridColumn: "1 / -1", alignItems: "flex-start" }}>
+                                  <span className={styles.profileInfoLabel}>신살</span>
+                                  <div className={styles.sajuStarChips}>
+                                    {(profile.saju.specialStars ?? []).map((star) => (
+                                      <span key={star} className={styles.sajuStarChip}>{star}</span>
+                                    ))}
                                   </div>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -724,105 +812,98 @@ export default function Main({ onBack }: Props) {
                           {/* 사주명식표 */}
                           <div className={styles.profileCard}>
                             <div className={styles.profileCardTitle}>사주명식표</div>
+                            {(() => {
+                              const PILLAR_ORDER = ["hour", "day", "month", "year"] as const;
+                              return (
                             <table className={styles.sajuTable}>
                               <thead>
                               <tr className={styles.sajuTableHead}>
                                 <th className={styles.sajuRowLabelHead}></th>
-                                <th>년(年)</th>
-                                <th>월(月)</th>
-                                <th>일(日)</th>
                                 <th>시(時)</th>
+                                <th>일(日)</th>
+                                <th>월(月)</th>
+                                <th>년(年)</th>
                               </tr>
                               </thead>
                               <tbody className={styles.sajuTableBody}>
                               <tr>
                                 <td className={styles.sajuRowLabel}>천간</td>
-                                {(["year","month","day","hour"] as const).map(k => {
+                                {PILLAR_ORDER.map(k => {
                                   const p = profile.saju.pillars[k];
                                   const isDay = k === "day";
                                   return (
-                                      <td key={k}>
-                                        <div
-                                            className={`${styles.sajuGanzi} ${isDay ? styles.sajuDayGanzi : ""}`}
-                                            style={{
-                                              color: getElementColor(p.stem),
-                                              backgroundColor: `${getElementColor(p.stem)}22`,
-                                              borderRadius: "6px",
-                                              padding: "2px 4px",
-                                              margin: "2px",
-                                            }}
-                                        >
-                                          {p.stem}
-                                        </div>
-                                        <div className={styles.sajuTenGod}>{p.stemTenGod}</div>
-                                      </td>
+                                    <td key={k}>
+                                      <div
+                                        className={`${styles.sajuGanziBox} ${isDay ? styles.sajuDayGanzi : ""}`}
+                                        style={{
+                                          color: getElementColor(p.stem),
+                                          backgroundColor: `${getElementColor(p.stem)}22`,
+                                        }}
+                                      >
+                                        {p.stem}
+                                      </div>
+                                      <div className={styles.sajuTenGod}>
+                                        {isDay ? <span className={styles.dayStemBase}>일간</span> : p.stemTenGod}
+                                      </div>
+                                    </td>
                                   );
                                 })}
                               </tr>
                               <tr>
                                 <td className={styles.sajuRowLabel}>지지</td>
-                                {(["year","month","day","hour"] as const).map(k => {
+                                {PILLAR_ORDER.map(k => {
                                   const p = profile.saju.pillars[k];
                                   return (
-                                      <td key={k}>
-                                        <div
-                                            className={styles.sajuGanzi}
-                                            style={{
-                                              color: getElementColor(p.branch),
-                                              backgroundColor: `${getElementColor(p.branch)}22`,
-                                              borderRadius: "6px",
-                                              padding: "2px 4px",
-                                              margin: "2px",
-                                            }}
-                                        >
-                                          {p.branch}
-                                        </div>
-                                        <div className={styles.sajuTenGod}>{p.branchTenGod}</div>
-                                      </td>
+                                    <td key={k}>
+                                      <div
+                                        className={styles.sajuGanziBox}
+                                        style={{
+                                          color: getElementColor(p.branch),
+                                          backgroundColor: `${getElementColor(p.branch)}22`,
+                                        }}
+                                      >
+                                        {p.branch}
+                                      </div>
+                                      <div className={styles.sajuTenGod}>{p.branchTenGod}</div>
+                                    </td>
                                   );
                                 })}
                               </tr>
                               <tr className={styles.sajuJijangRow}>
-                                <td className={styles.sajuRowLabel} >지장간</td>
-                                {(["year","month","day","hour"] as const).map(k => {
+                                <td className={styles.sajuRowLabel}>지장간</td>
+                                {PILLAR_ORDER.map(k => {
                                   const p = profile.saju.pillars[k];
                                   return (
-                                      <td key={k} className={styles.sajuJijangCell} style={{ whiteSpace: "nowrap" }}>
+                                    <td key={k} className={styles.sajuJijangCell}>
+                                      <div className={styles.sajuJijangInner}>
                                         {(p.hiddenStems?.length ?? 0) > 0 ? (
-                                            p.hiddenStems.map((stem, idx) => {
-                                              const color = getElementColor(stem);
-                                              return (
-                                                  <span
-                                                      key={idx}
-                                                      style={{
-                                                        color,
-                                                        backgroundColor: `${color}22`,
-                                                        borderRadius: "5px",
-                                                        padding: "1px 3px",
-                                                        marginRight: "2px",
-                                                        fontSize: "0.75rem",
-                                                        display: "inline-block",
-                                                        whiteSpace: "nowrap",
-                                                      }}
-                                                  >
-                                                    {stem}
-                                                  </span>
-                                              );
-                                            })
+                                          p.hiddenStems.map((stem, idx) => {
+                                            const color = getElementColor(stem);
+                                            return (
+                                              <span
+                                                key={idx}
+                                                className={styles.sajuJijangStem}
+                                                style={{
+                                                  color,
+                                                  backgroundColor: `${color}22`,
+                                                }}
+                                              >
+                                                {stem}
+                                              </span>
+                                            );
+                                          })
                                         ) : (
-                                            "–"
+                                          <span style={{ color: "var(--text-dim)" }}>–</span>
                                         )}
-                                      </td>
+                                      </div>
+                                    </td>
                                   );
                                 })}
                               </tr>
                               </tbody>
                             </table>
-                            {profile.input.birthTimeUnknown && (
-                                <p style={{ fontSize: "0.62rem", color: "var(--text-muted)", marginTop: "0.3rem" }}>
-                                  * 태어난 시를 '모름'으로 설정한 경우, 정오(오시) 기준으로 표시됩니다
-                                </p>
-                            )}
+                            );
+                          })()}
                           </div>
 
                           {/* 오행 분포 */}

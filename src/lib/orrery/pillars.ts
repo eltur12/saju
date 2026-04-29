@@ -289,38 +289,16 @@ export function calcPillarIndices(
   if (so24day < 0) so24day += 60;
   else if (so24day > 59) so24day -= 60;
 
-  // 시주 (반시 체계: 30분 경계, 동경 127.5도 보정)
-  let i: number;
-  if (hour === 0 || (hour === 1 && min < 30)) {
-    i = 0; // 子 (조자시: 00:00~01:29)
-  } else if ((hour === 1 && min >= 30) || hour === 2 || (hour === 3 && min < 30)) {
-    i = 1; // 丑
-  } else if ((hour === 3 && min >= 30) || hour === 4 || (hour === 5 && min < 30)) {
-    i = 2; // 寅
-  } else if ((hour === 5 && min >= 30) || hour === 6 || (hour === 7 && min < 30)) {
-    i = 3; // 卯
-  } else if ((hour === 7 && min >= 30) || hour === 8 || (hour === 9 && min < 30)) {
-    i = 4; // 辰
-  } else if ((hour === 9 && min >= 30) || hour === 10 || (hour === 11 && min < 30)) {
-    i = 5; // 巳
-  } else if ((hour === 11 && min >= 30) || hour === 12 || (hour === 13 && min < 30)) {
-    i = 6; // 午
-  } else if ((hour === 13 && min >= 30) || hour === 14 || (hour === 15 && min < 30)) {
-    i = 7; // 未
-  } else if ((hour === 15 && min >= 30) || hour === 16 || (hour === 17 && min < 30)) {
-    i = 8; // 申
-  } else if ((hour === 17 && min >= 30) || hour === 18 || (hour === 19 && min < 30)) {
-    i = 9; // 酉
-  } else if ((hour === 19 && min >= 30) || hour === 20 || (hour === 21 && min < 30)) {
-    i = 10; // 戌
-  } else if ((hour === 21 && min >= 30) || hour === 22 || (hour === 23 && min < 30)) {
-    i = 11; // 亥
-  } else {
-    // 야자시: hour === 23 && min >= 30
-    i = 0; // 子
+  // 시주 (정시 체계: 2시간 고정 경계)
+  // 子: 23:00~00:59, 丑: 01:00~02:59, ..., 亥: 21:00~22:59
+  // branchIndex = floor((hour + 1) / 2) % 12
+  const i = Math.floor((hour + 1) / 2) % 12;
+
+  // 야자시(23:00~) 일주 처리 — hour === 23 일 때 통자시/야자시 규칙 적용
+  if (hour === 23) {
     const method = jasiMethod ?? 'unified';
     if (method === 'unified') {
-      // 통자시: 23:30부터 일주를 다음날로 넘김
+      // 통자시: 23시 이후는 다음날 일주로 넘김
       so24day += 1;
       if (so24day === 60) so24day = 0;
     }
