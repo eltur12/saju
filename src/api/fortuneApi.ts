@@ -6,6 +6,9 @@ import { calculateSajuProfile } from "../utils/sajuCalculator";
 import { buildZiweiProfile } from "../utils/ziweiCalculator";
 import { buildAstroProfile } from "../utils/astroCalculator";
 import { refreshWidget } from "../plugins/widgetPlugin";
+import { buildProfileInsight, type ProfileInsight } from "../engines/profileInsightLayer";
+
+export type { ProfileInsight };
 
 /** Capacitor Preferences — 네이티브 환경에서만 동작, 웹에서는 no-op */
 async function setPreference(key: string, value: string): Promise<void> {
@@ -214,7 +217,23 @@ export function saveUser(user: SajuUser): void {
   localStorage.setItem("saju_user", JSON.stringify(user));
 }
 
+export async function getProfileInsight(user: SajuUser): Promise<ProfileInsight> {
+  const cacheKey = "saju_profile_v2";
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (raw) return JSON.parse(raw) as ProfileInsight;
+  } catch { /* ignore */ }
+
+  const insight = await buildProfileInsight(user);
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(insight));
+  } catch { /* ignore */ }
+  return insight;
+}
+
 export function clearUser(): void {
   localStorage.removeItem("saju_user");
   localStorage.removeItem("saju_cache");
+  localStorage.removeItem("saju_profile_v1");
+  localStorage.removeItem("saju_profile_v2");
 }

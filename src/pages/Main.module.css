@@ -1220,6 +1220,316 @@
 .notiToggle input:checked + .notiToggleTrack { background: var(--accent-mint); }
 .notiToggle input:checked + .notiToggleTrack::after { left: 19px; }
 
+/* ══════════════════════════════════════
+   내 기본 프로필 섹션
+   ══════════════════════════════════════ */
+.profileSection {
+  margin-top: 0.75rem;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.profileHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.profileHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.profileHeaderTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profileHeaderSub {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.profileBody {
+  border-top: 1px solid var(--border);
+  padding: 0.9rem 1.1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* Individual cards inside profile */
+.profileCard {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+}
+
+.profileCardTitle {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.55rem;
+}
+
+/* 출생정보 */
+.profileInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem 0.8rem;
+}
+
+.profileInfoRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.profileInfoLabel {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.profileInfoValue {
+  font-size: 0.78rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+
+.sajuStarChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.sajuStarChip {
+  font-size: 0.65rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(58,171,140,0.35);
+  color: var(--accent-mint);
+  background: rgba(58,171,140,0.05);
+  white-space: nowrap;
+}
+
+/* 사주명식표 */
+.sajuTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sajuTableHead th {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: center;
+  padding: 0 0 0.3rem;
+}
+
+.sajuRowLabelHead {
+  width: 2.3rem;
+}
+
+.sajuRowLabel {
+  width: 2.3rem;
+  font-size: 0.58rem;
+  color: var(--text-dim);
+  text-align: left;
+  padding-right: 0.35rem;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.sajuTableBody td {
+  text-align: center;
+  padding: 0.22rem 0;
+}
+
+.sajuGanzi {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.sajuDayGanzi {
+  color: var(--accent-mint);
+}
+
+.sajuTenGod {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  margin-top: 0.08rem;
+}
+
+.sajuJijangRow td {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.35rem;
+}
+
+.sajuJijangCell {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+  letter-spacing: 0.05em;
+  padding: 0.3rem 0 0.15rem;
+}
+
+.sajuJijangLabel { display: none; }
+
+/* 오행 레이더 */
+.elemRadarRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.elemRadarSvg {
+  width: 44%;
+  flex-shrink: 0;
+  display: block;
+}
+
+.elemRadarSvgFull {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
+}
+
+.elemBars {
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+
+.elemBarRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.elemBarLabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  width: 1.6rem;
+  flex-shrink: 0;
+}
+
+.elemBarTrack {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.elemBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-mint);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: barFill 0.5s ease-out forwards;
+}
+
+.elemBarVal {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text);
+  width: 2rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* 자미두수 */
+.ziweiStarList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.ziweiStarChip {
+  font-size: 0.65rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.ziweiStarChipMain {
+  border-color: rgba(58,171,140,0.45);
+  color: var(--accent-mint);
+}
+
+.ziweiMetaRow {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.ziweiMetaItem {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+/* 별자리 */
+.astroGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 1rem;
+}
+
+.astroRow {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  align-items: baseline;
+  column-gap: 0.4rem;
+}
+
+.astroRowWide {
+  grid-column: 1 / -1;
+  grid-template-columns: 3.8rem 1fr;
+}
+
+.astroLabel {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.astroSign {
+  font-size: 0.78rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.astroRetro {
+  font-size: 0.58rem;
+  color: var(--danger);
+  margin-left: 0.2rem;
+}
+
 /* Legacy aliases for backward compat (unused in new layout but safe) */
 .detailTopRow    { display: none; }
 .detailScoreInline { display: none; }
@@ -1229,3 +1539,16 @@
 .detailSummaryBox{ display: none; }
 .notiSettingsRow { display: none; }
 .hintRow.debugOnly { display: none; }
+
+.profileCardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-bottom: 0.45rem;
+}
+
+.profileCardSub {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  line-height: 1.2;
+}

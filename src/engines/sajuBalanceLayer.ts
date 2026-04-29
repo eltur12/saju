@@ -73,7 +73,7 @@ export interface SajuBalanceResult {
  *   - 지지 4개: all branches (weight 1.0 each)
  *   - 지장간 정기 4개: 각 지지의 정기 천간 오행 (weight 0.5 each, simplified)
  */
-function computeElementDistribution(profile: SajuEngineProfile): Record<string, number> {
+export function computeElementDistribution(profile: SajuEngineProfile): Record<string, number> {
   const counts: Record<string, number> = { "木": 0, "火": 0, "土": 0, "金": 0, "水": 0 };
 
   // 천간 (3개)

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import WheelPickerModal from "../components/WheelPickerModal";
-import { getMonthlyFortune, getUser, clearUser } from "../api/fortuneApi";
+import { getMonthlyFortune, getProfileInsight, getUser, clearUser } from "../api/fortuneApi";
+import type { ProfileInsight } from "../api/fortuneApi";
 import { App } from "@capacitor/app";
 import type { MonthlyFortuneResult, DailyFortune } from "../engines/aggregator";
 import type { SajuUser } from "../api/fortuneApi";
@@ -26,6 +27,7 @@ import type { PlannedNotification } from "../engines/notificationPlanner";
 import { getFlowState, getFlowSentence } from "../utils/flowState";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 import { Preferences } from "@capacitor/preferences";
+import {BRANCH_ELEMENT, STEM_ELEMENT} from "../engines/sajuEngine.ts";
 
 const DAY_NAMES = ["일","월","화","수","목","금","토"];
 const DOW_KO    = ["일","월","화","수","목","금","토"];
@@ -37,6 +39,19 @@ const RADAR_CATS: { key: keyof DailyFortune["scores"]; label: string }[] = [
   { key: "relations", label: "관계" },
   { key: "study",     label: "학습" },
 ];
+
+const ELEMENT_COLOR: Record<string, string> = {
+  "木": "#5aad6e",
+  "火": "#e06060",
+  "土": "#c9912a",
+  "金": "#8f9aa6",
+  "水": "#4f7fd9",
+};
+
+function getElementColor(char: string) {
+  const element = STEM_ELEMENT[char] || BRANCH_ELEMENT[char];
+  return element ? ELEMENT_COLOR[element] ?? "#999" : "#999";
+}
 
 
 type TabId = "calendar" | "detail";
@@ -110,8 +125,10 @@ export default function Main({ onBack }: Props) {
   const [showExactAlarmGuide, setShowExactAlarmGuide] = useState(false);
   const [notiModalOpen, setNotiModalOpen] = useState(false);
   const [draftNotiStart, setDraftNotiStart] = useState(notiStart);
+  const [profile, setProfile] = useState<ProfileInsight | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState<boolean>(
-    () => localStorage.getItem("daily_reason_open") === "true"
+      () => localStorage.getItem("daily_reason_open") === "true"
   );
   dataRef.current = data;
 
@@ -131,7 +148,7 @@ export default function Main({ onBack }: Props) {
     const key = `fortune_notifications_ready_${selected.date}`;
     const { value } = await Preferences.get({ key });
     const raw: Array<{ id: number; type: string; triggerAt: string; title: string }> =
-      value ? JSON.parse(value) : [];
+        value ? JSON.parse(value) : [];
     const statusMap = await getNotificationRegistrationStatus(raw.map(e => ({ id: e.id })));
     setDebugEntries(raw.map(e => ({ ...e, registered: statusMap.get(e.id) })));
     setDebugOpen(true);
@@ -165,12 +182,12 @@ export default function Main({ onBack }: Props) {
     const dateStr = `${ny}-${String(nm).padStart(2, "0")}-${String(nd).padStart(2, "0")}`;
 
     let todayFortune: DailyFortune | undefined =
-      (data?.year === ny && data?.month === nm) ? data.daily_fortunes[nd - 1] : undefined;
+        (data?.year === ny && data?.month === nm) ? data.daily_fortunes[nd - 1] : undefined;
 
     // todayMonthResult tracks which MonthlyFortuneResult covers today —
     // used to regenerate all ready-data with the new settings
     let todayMonthResult: MonthlyFortuneResult | undefined =
-      (data?.year === ny && data?.month === nm) ? data : undefined;
+        (data?.year === ny && data?.month === nm) ? data : undefined;
 
     if (!todayFortune) {
       const u = getUser();
@@ -202,6 +219,11 @@ export default function Main({ onBack }: Props) {
   };
 
   useEffect(() => { setUser(getUser()); }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    getProfileInsight(user).then(setProfile).catch(() => {});
+  }, [user]);
 
   const handleDeepLink = useCallback((url: string) => {
     try {
@@ -643,6 +665,272 @@ export default function Main({ onBack }: Props) {
                     </div>
                   </div>
               )}
+
+              {/* ── 내 기본 프로필 ── */}
+              {profile && (
+                  <div className={styles.profileSection}>
+                    <div
+                        className={styles.profileHeader}
+                        onClick={() => setProfileOpen(o => !o)}
+                    >
+                      <div className={styles.profileHeaderText}>
+                      <span className={styles.profileHeaderTitle}>
+                        내 기본 프로필 {profileOpen ? "▴" : "▾"}
+                      </span>
+                        <span className={styles.profileHeaderSub}>오늘 흐름 계산에 쓰이는 기본 정보예요</span>
+                      </div>
+                    </div>
+
+                    {profileOpen && (
+                        <div className={styles.profileBody}>
+
+                          {/* 출생정보 */}
+                          <div className={styles.profileCard}>
+                            <div className={styles.profileCardTitle}>출생정보</div>
+                            <div className={styles.profileInfoGrid}>
+                              <div className={styles.profileInfoRow}>
+                                <span className={styles.profileInfoLabel}>생년월일</span>
+                                <span className={styles.profileInfoValue}>
+                              {profile.input.birthYear}.{String(profile.input.birthMonth).padStart(2,"0")}.{String(profile.input.birthDay).padStart(2,"0")}
+                            </span>
+                              </div>
+                              <div className={styles.profileInfoRow}>
+                                <span className={styles.profileInfoLabel}>성별</span>
+                                <span className={styles.profileInfoValue}>{profile.input.gender === "M" ? "남성" : "여성"}</span>
+                              </div>
+                              <div className={styles.profileInfoRow}>
+                                <span className={styles.profileInfoLabel}>태어난 시</span>
+                                <span className={styles.profileInfoValue}>{profile.input.birthTimeLabel}</span>
+                              </div>
+                              <div className={styles.profileInfoRow}>
+                                <span className={styles.profileInfoLabel}>일간</span>
+                                <span className={styles.profileInfoValue}>
+                              {profile.saju.dayMaster} ({profile.saju.dayMasterElement}{profile.saju.dayMasterYinYang})
+                            </span>
+                              </div>
+                              {(profile.saju.specialStars?.length ?? 0) > 0 && (
+                                  <div className={styles.profileInfoRow} style={{ gridColumn: "1 / -1", alignItems: "flex-start" }}>
+                                    <span className={styles.profileInfoLabel}>신살</span>
+                                    <div className={styles.sajuStarChips}>
+                                      {(profile.saju.specialStars ?? []).map((star) => (
+                                          <span key={star} className={styles.sajuStarChip}>{star}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 사주명식표 */}
+                          <div className={styles.profileCard}>
+                            <div className={styles.profileCardTitle}>사주명식표</div>
+                            <table className={styles.sajuTable}>
+                              <thead>
+                              <tr className={styles.sajuTableHead}>
+                                <th className={styles.sajuRowLabelHead}></th>
+                                <th>년(年)</th>
+                                <th>월(月)</th>
+                                <th>일(日)</th>
+                                <th>시(時)</th>
+                              </tr>
+                              </thead>
+                              <tbody className={styles.sajuTableBody}>
+                              <tr>
+                                <td className={styles.sajuRowLabel}>천간</td>
+                                {(["year","month","day","hour"] as const).map(k => {
+                                  const p = profile.saju.pillars[k];
+                                  const isDay = k === "day";
+                                  return (
+                                      <td key={k}>
+                                        <div
+                                            className={`${styles.sajuGanzi} ${isDay ? styles.sajuDayGanzi : ""}`}
+                                            style={{
+                                              color: getElementColor(p.stem),
+                                              backgroundColor: `${getElementColor(p.stem)}22`,
+                                              borderRadius: "6px",
+                                              padding: "2px 4px",
+                                              margin: "2px",
+                                            }}
+                                        >
+                                          {p.stem}
+                                        </div>
+                                        <div className={styles.sajuTenGod}>{p.stemTenGod}</div>
+                                      </td>
+                                  );
+                                })}
+                              </tr>
+                              <tr>
+                                <td className={styles.sajuRowLabel}>지지</td>
+                                {(["year","month","day","hour"] as const).map(k => {
+                                  const p = profile.saju.pillars[k];
+                                  return (
+                                      <td key={k}>
+                                        <div
+                                            className={styles.sajuGanzi}
+                                            style={{
+                                              color: getElementColor(p.branch),
+                                              backgroundColor: `${getElementColor(p.branch)}22`,
+                                              borderRadius: "6px",
+                                              padding: "2px 4px",
+                                              margin: "2px",
+                                            }}
+                                        >
+                                          {p.branch}
+                                        </div>
+                                        <div className={styles.sajuTenGod}>{p.branchTenGod}</div>
+                                      </td>
+                                  );
+                                })}
+                              </tr>
+                              <tr className={styles.sajuJijangRow}>
+                                <td className={styles.sajuRowLabel} >지장간</td>
+                                {(["year","month","day","hour"] as const).map(k => {
+                                  const p = profile.saju.pillars[k];
+                                  return (
+                                      <td key={k} className={styles.sajuJijangCell} style={{ whiteSpace: "nowrap" }}>
+                                        {(p.hiddenStems?.length ?? 0) > 0 ? (
+                                            p.hiddenStems.map((stem, idx) => {
+                                              const color = getElementColor(stem);
+                                              return (
+                                                  <span
+                                                      key={idx}
+                                                      style={{
+                                                        color,
+                                                        backgroundColor: `${color}22`,
+                                                        borderRadius: "5px",
+                                                        padding: "1px 3px",
+                                                        marginRight: "2px",
+                                                        fontSize: "0.75rem",
+                                                        display: "inline-block",
+                                                        whiteSpace: "nowrap",
+                                                      }}
+                                                  >
+                                                    {stem}
+                                                  </span>
+                                              );
+                                            })
+                                        ) : (
+                                            "–"
+                                        )}
+                                      </td>
+                                  );
+                                })}
+                              </tr>
+                              </tbody>
+                            </table>
+                            {profile.input.birthTimeUnknown && (
+                                <p style={{ fontSize: "0.62rem", color: "var(--text-muted)", marginTop: "0.3rem" }}>
+                                  * 태어난 시를 '모름'으로 설정한 경우, 정오(오시) 기준으로 표시됩니다
+                                </p>
+                            )}
+                          </div>
+
+                          {/* 오행 분포 */}
+                          {(() => {
+                            const elementCounts = profile.elementCounts ?? {
+                              wood:  profile.elements.wood,
+                              fire:  profile.elements.fire,
+                              earth: profile.elements.earth,
+                              metal: profile.elements.metal,
+                              water: profile.elements.water,
+                            };
+                            const items = [
+                              ["목", elementCounts.wood,  "#5aad6e"],
+                              ["화", elementCounts.fire,  "#e06060"],
+                              ["토", elementCounts.earth, "#c9912a"],
+                              ["금", elementCounts.metal, "#8f9aa6"],
+                              ["수", elementCounts.water, "#5577bb"],
+                            ] as const;
+                            const maxCount = Math.max(...items.map(([, count]) => count), 1);
+
+                            return (
+                                <div className={styles.profileCard}>
+                                  <div className={styles.profileCardHeader}>
+                                    <div className={styles.profileCardTitle}>오행 구성</div>
+                                    <div className={styles.profileCardSub}>
+                                      천간 · 지지 · 지장간 기준
+                                    </div>
+                                  </div>
+
+                                  <div className={styles.elemBars}>
+                                    {items.map(([label, count, color], i) => (
+                                        <div key={label} className={styles.elemBarRow}>
+                                          <span className={styles.elemBarLabel}>{label}</span>
+                                          <div className={styles.elemBarTrack}>
+                                            <div
+                                                className={styles.elemBarFill}
+                                                style={{
+                                                  width: `${(count / maxCount) * 100}%`,
+                                                  background: color,
+                                                  animationDelay: `${i * 50}ms`,
+                                                }}
+                                            />
+                                          </div>
+                                          <span className={styles.elemBarVal}>{count}</span>
+                                        </div>
+                                    ))}
+                                  </div>
+                                </div>
+                            );
+                          })()}
+
+                          {/* 자미두수 */}
+                          <div className={styles.profileCard}>
+                            <div className={styles.profileCardTitle}>자미두수</div>
+                            <div className={styles.ziweiMetaRow}>
+                              <div className={styles.ziweiMetaItem}>
+                                <span className={styles.profileInfoLabel}>명궁</span>
+                                <span className={styles.profileInfoValue}>{profile.ziwei.mingGongBranch}</span>
+                              </div>
+                              <div className={styles.ziweiMetaItem}>
+                                <span className={styles.profileInfoLabel}>오행국</span>
+                                <span className={styles.profileInfoValue}>{profile.ziwei.wuXingJu}</span>
+                              </div>
+                            </div>
+                            <div className={styles.ziweiStarList}>
+                              {profile.ziwei.mingGongStars.map(s => (
+                                  <span
+                                      key={s.name}
+                                      className={`${styles.ziweiStarChip} ${styles.ziweiStarChipMain}`}
+                                      title={[s.brightness, s.siHua].filter(Boolean).join(" ")}
+                                  >
+                              {s.name}{s.siHua ? ` ${s.siHua}` : ""}
+                            </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 별자리 */}
+                          <div className={styles.profileCard}>
+                            <div className={styles.profileCardTitle}>별자리</div>
+                            <div className={styles.astroGrid}>
+                              {[
+                                { label: "태양", sign: profile.astrology.sunSign },
+                                { label: "달",   sign: profile.astrology.moonSign },
+                                { label: "수성", sign: profile.astrology.mercurySign },
+                                { label: "금성", sign: profile.astrology.venusSign },
+                                { label: "화성", sign: profile.astrology.marsSign },
+                                { label: "목성", sign: profile.astrology.jupiterSign },
+                                { label: "토성", sign: profile.astrology.saturnSign },
+                              ].map(({ label, sign }) => (
+                                  <div key={label} className={styles.astroRow}>
+                                    <span className={styles.astroLabel}>{label}</span>
+                                    <span className={styles.astroSign}>{sign}</span>
+                                  </div>
+                              ))}
+                              <div className={`${styles.astroRow} ${styles.astroRowWide}`}>
+                                <span className={styles.astroLabel}>금성 역행</span>
+                                <span className={styles.astroSign}>
+                              {profile.astrology.venusRetrograde ? "예" : "아니오"}
+                            </span>
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+                    )}
+                  </div>
+              )}
             </div>
         )}
 
@@ -677,7 +965,7 @@ export default function Main({ onBack }: Props) {
                       </div>
                       <p className={styles.heroSummary}>{dailySummary}</p>
                       {nowFlowSentence && (
-                        <p className={styles.heroFlowState}>{nowFlowSentence}</p>
+                          <p className={styles.heroFlowState}>{nowFlowSentence}</p>
                       )}
                     </div>
 
@@ -697,61 +985,61 @@ export default function Main({ onBack }: Props) {
                       const rings      = [0.25, 0.5, 0.75, 1.0];
                       const radarColor = scoreColor(selected.scores.overall as number);
                       return (
-                        <div className={styles.radarSection}>
-                          <svg viewBox="0 0 160 160" className={styles.radarSvg}>
-                            {rings.map(f => (
-                              <polygon key={f}
-                                points={axisPts.map(([x, y]) => `${(CX+(x-CX)*f).toFixed(1)},${(CY+(y-CY)*f).toFixed(1)}`).join(" ")}
-                                fill="none" stroke="var(--border)" strokeWidth="0.7" />
-                            ))}
-                            {axisPts.map(([x, y], i) => (
-                              <line key={i} x1={CX} y1={CY} x2={x.toFixed(1)} y2={y.toFixed(1)}
-                                stroke="var(--border)" strokeWidth="0.7" />
-                            ))}
-                            <polygon points={polyPts} fill={radarColor} fillOpacity="0" stroke="none"
-                              className={styles.radarFill} />
-                            <polygon points={polyPts} fill="none" stroke={radarColor} strokeWidth="1.5"
-                              className={styles.radarStroke} />
-                            {RADAR_CATS.map(({ label }, i) => {
-                              const a  = (i / 6) * 2 * Math.PI - Math.PI / 2;
-                              const LR = R + 14;
-                              return (
-                                <text key={i}
-                                  x={(CX + LR * Math.cos(a)).toFixed(1)}
-                                  y={(CY + LR * Math.sin(a)).toFixed(1)}
-                                  textAnchor="middle" dominantBaseline="middle"
-                                  fontSize="7.5" fill="var(--text-muted)">{label}</text>
-                              );
-                            })}
-                          </svg>
-                          <div className={styles.radarBars}>
-                            {RADAR_CATS.map(({ key, label }, i) => {
-                              const v = selected.scores[key] as number;
-                              return (
-                                <div key={key} className={styles.radarBarRow}>
-                                  <span className={styles.radarBarLabel}>{label}</span>
-                                  <div className={styles.radarBarTrack}>
-                                    <div className={styles.radarBarFill}
-                                      style={{ width: `${v}%`, animationDelay: `${i * 60}ms`, background: scoreColor(v) }} />
-                                  </div>
-                                  <span className={styles.radarBarVal}>{v}</span>
-                                </div>
-                              );
-                            })}
+                          <div className={styles.radarSection}>
+                            <svg viewBox="0 0 160 160" className={styles.radarSvg}>
+                              {rings.map(f => (
+                                  <polygon key={f}
+                                           points={axisPts.map(([x, y]) => `${(CX+(x-CX)*f).toFixed(1)},${(CY+(y-CY)*f).toFixed(1)}`).join(" ")}
+                                           fill="none" stroke="var(--border)" strokeWidth="0.7" />
+                              ))}
+                              {axisPts.map(([x, y], i) => (
+                                  <line key={i} x1={CX} y1={CY} x2={x.toFixed(1)} y2={y.toFixed(1)}
+                                        stroke="var(--border)" strokeWidth="0.7" />
+                              ))}
+                              <polygon points={polyPts} fill={radarColor} fillOpacity="0" stroke="none"
+                                       className={styles.radarFill} />
+                              <polygon points={polyPts} fill="none" stroke={radarColor} strokeWidth="1.5"
+                                       className={styles.radarStroke} />
+                              {RADAR_CATS.map(({ label }, i) => {
+                                const a  = (i / 6) * 2 * Math.PI - Math.PI / 2;
+                                const LR = R + 14;
+                                return (
+                                    <text key={i}
+                                          x={(CX + LR * Math.cos(a)).toFixed(1)}
+                                          y={(CY + LR * Math.sin(a)).toFixed(1)}
+                                          textAnchor="middle" dominantBaseline="middle"
+                                          fontSize="7.5" fill="var(--text-muted)">{label}</text>
+                                );
+                              })}
+                            </svg>
+                            <div className={styles.radarBars}>
+                              {RADAR_CATS.map(({ key, label }, i) => {
+                                const v = selected.scores[key] as number;
+                                return (
+                                    <div key={key} className={styles.radarBarRow}>
+                                      <span className={styles.radarBarLabel}>{label}</span>
+                                      <div className={styles.radarBarTrack}>
+                                        <div className={styles.radarBarFill}
+                                             style={{ width: `${v}%`, animationDelay: `${i * 60}ms`, background: scoreColor(v) }} />
+                                      </div>
+                                      <span className={styles.radarBarVal}>{v}</span>
+                                    </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
                       );
                     })()}
 
                     {/* ── 왜 이런 흐름일까요? ── */}
                     <div className={styles.reasonCard}>
                       <div
-                        className={styles.reasonCardHeader}
-                        onClick={() => {
-                          const next = !reasonOpen;
-                          setReasonOpen(next);
-                          localStorage.setItem("daily_reason_open", String(next));
-                        }}
+                          className={styles.reasonCardHeader}
+                          onClick={() => {
+                            const next = !reasonOpen;
+                            setReasonOpen(next);
+                            localStorage.setItem("daily_reason_open", String(next));
+                          }}
                       >
                         <span className={styles.reasonCardTitle}>왜 이런 흐름일까요?</span>
                         <span className={styles.reasonCardToggle}>{reasonOpen ? "−" : "+"}</span>
@@ -812,7 +1100,7 @@ export default function Main({ onBack }: Props) {
                                                 .join(" ");
 
                                             return (
-                                              <span key={`${chip.key}-${i}`} className={chipClass}>
+                                                <span key={`${chip.key}-${i}`} className={chipClass}>
                                                 {chip.key}
                                               </span>
                                             );
@@ -915,43 +1203,43 @@ export default function Main({ onBack }: Props) {
 
         {/* ── Notification Debug Viewer ── */}
         {debugOpen && (
-          <>
-            <div className={styles.overlay} onClick={() => setDebugOpen(false)} />
-            <div className={styles.bottomSheet}>
-              <div className={styles.sheetHandle} />
-              <div className={styles.sheetTitle}>알림 예약 확인</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
-                현재 시각: {new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-                {" · "}선택 날짜: {selected?.date ?? "없음"}
+            <>
+              <div className={styles.overlay} onClick={() => setDebugOpen(false)} />
+              <div className={styles.bottomSheet}>
+                <div className={styles.sheetHandle} />
+                <div className={styles.sheetTitle}>알림 예약 확인</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
+                  현재 시각: {new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                  {" · "}선택 날짜: {selected?.date ?? "없음"}
+                </div>
+                {!debugEntries || debugEntries.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.82rem", lineHeight: 1.7 }}>
+                      준비된 알림 데이터 없음
+                    </div>
+                ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      {debugEntries.map((e, i) => {
+                        const now = new Date();
+                        const isPast = new Date(e.triggerAt) <= now;
+                        const status = isPast
+                            ? "SKIP"
+                            : e.registered === true
+                                ? "✅ 준비됨"
+                                : "🕒 예정됨";
+                        return (
+                            <div key={i} style={{ fontSize: "0.8rem", padding: "0.3rem 0", borderBottom: "1px solid var(--border)" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ color: "var(--text-muted)" }}>{e.type} · {e.triggerAt.slice(11, 16)}</span>
+                                <span>{status}</span>
+                              </div>
+                              <div style={{ fontSize: "0.74rem", color: "var(--text-sub)", marginTop: "0.1rem" }}>{e.title}</div>
+                            </div>
+                        );
+                      })}
+                    </div>
+                )}
               </div>
-              {!debugEntries || debugEntries.length === 0 ? (
-                <div style={{ color: "var(--text-muted)", fontSize: "0.82rem", lineHeight: 1.7 }}>
-                  준비된 알림 데이터 없음
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                  {debugEntries.map((e, i) => {
-                    const now = new Date();
-                    const isPast = new Date(e.triggerAt) <= now;
-                    const status = isPast
-                      ? "SKIP"
-                      : e.registered === true
-                        ? "✅ 준비됨"
-                        : "🕒 예정됨";
-                    return (
-                      <div key={i} style={{ fontSize: "0.8rem", padding: "0.3rem 0", borderBottom: "1px solid var(--border)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "var(--text-muted)" }}>{e.type} · {e.triggerAt.slice(11, 16)}</span>
-                          <span>{status}</span>
-                        </div>
-                        <div style={{ fontSize: "0.74rem", color: "var(--text-sub)", marginTop: "0.1rem" }}>{e.title}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </>
+            </>
         )}
 
         {/* ── Settings Bottom Sheet ── */}
@@ -1065,15 +1353,15 @@ export default function Main({ onBack }: Props) {
 
         {/* ── Notification Time Picker Modal ── */}
         <WheelPickerModal
-          open={notiModalOpen}
-          title="알림 시간 선택"
-          columns={[{
-            items: Array.from({ length: 24 }, (_, i) => ({ label: `${i}시`, value: i })),
-            value: draftNotiStart,
-            onChange: setDraftNotiStart,
-          }]}
-          onClose={() => setNotiModalOpen(false)}
-          onConfirm={() => { setNotiStart(draftNotiStart); setNotiModalOpen(false); }}
+            open={notiModalOpen}
+            title="알림 시간 선택"
+            columns={[{
+              items: Array.from({ length: 24 }, (_, i) => ({ label: `${i}시`, value: i })),
+              value: draftNotiStart,
+              onChange: setDraftNotiStart,
+            }]}
+            onClose={() => setNotiModalOpen(false)}
+            onConfirm={() => { setNotiStart(draftNotiStart); setNotiModalOpen(false); }}
         />
 
         {showExactAlarmGuide && (
