@@ -75,6 +75,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- 자정 위젯 갱신 AlarmManager 트리거 -->
+        <receiver
+            android:name=".MidnightRefreshReceiver"
+            android:exported="false" />
+
         <!-- 점수 요약 위젯 (widget_fortune.xml) -->
         <receiver
             android:name=".FortuneScoreWidget"

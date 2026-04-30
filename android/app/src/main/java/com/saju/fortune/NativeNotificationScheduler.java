@@ -30,6 +30,37 @@ public class NativeNotificationScheduler {
     private static final String PREFS_NAME = "CapacitorStorage";
     private static final String KEY_PREFIX = "fortune_notifications_ready_";
 
+    /** 다음 자정(+3초)에 MidnightRefreshReceiver를 깨우는 AlarmManager 알람 예약 */
+    public static void scheduleMidnightRefresh(Context context) {
+        Calendar midnight = Calendar.getInstance();
+        midnight.set(Calendar.HOUR_OF_DAY, 0);
+        midnight.set(Calendar.MINUTE, 0);
+        midnight.set(Calendar.SECOND, 3);
+        midnight.set(Calendar.MILLISECOND, 0);
+        midnight.add(Calendar.DAY_OF_MONTH, 1);
+
+        AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(context, MidnightRefreshReceiver.class);
+        PendingIntent pi = PendingIntent.getBroadcast(
+                context,
+                MIDNIGHT_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, midnight.getTimeInMillis(), pi);
+            Log.d(TAG, "scheduleMidnightRefresh(inexact): next=" + midnight.getTime());
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, midnight.getTimeInMillis(), pi);
+            Log.d(TAG, "scheduleMidnightRefresh(exact): next=" + midnight.getTime());
+        } else {
+            am.setExact(AlarmManager.RTC_WAKEUP, midnight.getTimeInMillis(), pi);
+            Log.d(TAG, "scheduleMidnightRefresh(exact-pre-M): next=" + midnight.getTime());
+        }
+    }
+
+    private static final int MIDNIGHT_REQUEST_CODE = 999_998;
+
     public static void scheduleToday(Context context) {
         String today = todayKey();
         String key   = KEY_PREFIX + today;
@@ -90,6 +121,9 @@ public class NativeNotificationScheduler {
         }
 
         Log.d(TAG, "scheduleToday done — " + scheduled + " alarm(s) set");
+
+        // 자정 위젯 갱신 알람도 함께 예약 (ACTION_DATE_CHANGED 브로드캐스트 미수신 대비)
+        scheduleMidnightRefresh(context);
     }
 
     public static void cancelToday(Context context) {

@@ -36,7 +36,9 @@ public class WidgetPlugin extends Plugin {
                 notifyListeners("dayRollover", new JSObject());
             }
         };
-        getContext().registerReceiver(dateChangeReceiver, new IntentFilter(Intent.ACTION_DATE_CHANGED));
+        IntentFilter filter = new IntentFilter(Intent.ACTION_DATE_CHANGED);
+        filter.addAction(MidnightRefreshReceiver.ACTION_MIDNIGHT);
+        getContext().registerReceiver(dateChangeReceiver, filter);
     }
 
     @Override
@@ -56,6 +58,23 @@ public class WidgetPlugin extends Plugin {
     @PluginMethod
     public void refresh(PluginCall call) {
         Context context = getContext();
+
+        // 위젯이 과거 날짜/월을 표시 중이면 오늘로 스냅 (자정 이후 갱신 시 타이밍 경쟁 방지)
+        java.util.Calendar now = java.util.Calendar.getInstance();
+        android.content.SharedPreferences wp =
+            context.getSharedPreferences(FortuneWidget.WIDGET_PREFS, Context.MODE_PRIVATE);
+        int dy = wp.getInt("display_year",  now.get(java.util.Calendar.YEAR));
+        int dm = wp.getInt("display_month", now.get(java.util.Calendar.MONTH) + 1);
+        int dd = wp.getInt("selected_day",  now.get(java.util.Calendar.DAY_OF_MONTH));
+        int ny = now.get(java.util.Calendar.YEAR);
+        int nm = now.get(java.util.Calendar.MONTH) + 1;
+        int nd = now.get(java.util.Calendar.DAY_OF_MONTH);
+        boolean pastMonth = dy < ny || (dy == ny && dm < nm);
+        boolean pastDayThisMonth = (dy == ny && dm == nm && dd < nd);
+        if (pastMonth || pastDayThisMonth) {
+            FortuneWidget.resetToCurrentMonth(context);
+        }
+
         AppWidgetManager mgr = AppWidgetManager.getInstance(context);
 
         // 달력 위젯 갱신
