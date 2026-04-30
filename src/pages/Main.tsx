@@ -140,6 +140,9 @@ export default function Main({ onBack }: Props) {
   const [reasonOpen, setReasonOpen] = useState<boolean>(
       () => localStorage.getItem("daily_reason_open") === "true"
   );
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [adjPrevScore, setAdjPrevScore] = useState<number | null>(null);
+  const [adjNextScore, setAdjNextScore] = useState<number | null>(null);
   dataRef.current = data;
 
   useEffect(() => {
@@ -235,6 +238,27 @@ export default function Main({ onBack }: Props) {
     getProfileInsight(user).then(setProfile).catch(() => {});
   }, [user]);
 
+  useEffect(() => {
+    if (!user || !data || !selected) return;
+    const fortunes = data.daily_fortunes;
+    const idx = fortunes.findIndex(f => f.date === selected.date);
+    if (idx === 0 && adjPrevScore === null) {
+      const prevM = month === 1 ? 12 : month - 1;
+      const prevY = month === 1 ? year - 1 : year;
+      getMonthlyFortune(user, prevY, prevM).then(r => {
+        const lastDay = r.daily_fortunes[r.daily_fortunes.length - 1];
+        setAdjPrevScore(lastDay.scores.overall as number);
+      }).catch(() => {});
+    }
+    if (idx === fortunes.length - 1 && adjNextScore === null) {
+      const nextM = month === 12 ? 1 : month + 1;
+      const nextY = month === 12 ? year + 1 : year;
+      getMonthlyFortune(user, nextY, nextM).then(r => {
+        setAdjNextScore(r.daily_fortunes[0].scores.overall as number);
+      }).catch(() => {});
+    }
+  }, [selected, data, user, month, year, adjPrevScore, adjNextScore]);
+
   const handleDeepLink = useCallback((url: string) => {
     try {
       const u = new URL(url);
@@ -314,6 +338,8 @@ export default function Main({ onBack }: Props) {
   const load = useCallback(async (y: number, m: number, u: SajuUser) => {
     setLoading(true);
     setSelected(null);
+    setAdjPrevScore(null);
+    setAdjNextScore(null);
     try {
       const result = await getMonthlyFortune(u, y, m);
       setData(result);
@@ -457,6 +483,18 @@ export default function Main({ onBack }: Props) {
       isCurrentMonth: false,
     });
   }
+
+  // Highest/lowest score dates in the visible month
+  const { maxScoreDates, minScoreDates } = useMemo(() => {
+    if (!data) return { maxScoreDates: new Set<string>(), minScoreDates: new Set<string>() };
+    const scores = data.daily_fortunes.map(f => f.scores.overall as number);
+    const maxScore = Math.max(...scores);
+    const minScore = Math.min(...scores);
+    const maxSet = new Set(data.daily_fortunes.filter(f => (f.scores.overall as number) === maxScore).map(f => f.date));
+    if (maxScore === minScore) return { maxScoreDates: maxSet, minScoreDates: new Set<string>() };
+    const minSet = new Set(data.daily_fortunes.filter(f => (f.scores.overall as number) === minScore).map(f => f.date));
+    return { maxScoreDates: maxSet, minScoreDates: minSet };
+  }, [data]);
 
   // Selected date display
   const selectedDate   = selected
@@ -659,9 +697,12 @@ export default function Main({ onBack }: Props) {
                             {fortune && (
                                 <>
                                   <span className={styles.lunarDay}>{fortune.lunar_date}</span>
-                                  <span className={`${styles.scoreNum} ${getScoreClass(fortune.scores.overall)}`}>
-                          {fortune.scores.overall}
-                        </span>
+                                  <span className={`${styles.scoreNum} ${getScoreClass(fortune.scores.overall)} ${
+                              maxScoreDates.has(fortune.date) ? styles["scoreNum--best"] :
+                              minScoreDates.has(fortune.date) ? styles["scoreNum--worst"] : ""
+                            }`}>
+                              {fortune.scores.overall}
+                            </span>
                                 </>
                             )}
                           </div>
@@ -701,7 +742,7 @@ export default function Main({ onBack }: Props) {
                       <span className={styles.profileHeaderTitle}>
                         내 기본 프로필 {profileOpen ? "▴" : "▾"}
                       </span>
-                        <span className={styles.profileHeaderSub}>오늘 흐름 계산에 쓰이는 기본 정보예요</span>
+                        <span className={styles.profileHeaderSub}>흐름 계산에 쓰이는 기본 정보예요</span>
                       </div>
                     </div>
 
@@ -1112,7 +1153,7 @@ export default function Main({ onBack }: Props) {
                       );
                     })()}
 
-                    {/* ── 오늘 흐름을 만든 요소 ── */}
+                    {/* ── 흐름을 만든 요소 ── */}
                     <div className={styles.reasonCard}>
                       <div
                           className={styles.reasonCardHeader}
@@ -1124,7 +1165,7 @@ export default function Main({ onBack }: Props) {
                       >
                         <div className={styles.reasonCardTitleWrap}>
                           <span className={styles.reasonCardTitle}>
-                            오늘 흐름을 만든 요소
+                            흐름을 만든 요소
                           </span>
                           <span className={styles.reasonCardSubtitle}>
                             가장 영향이 큰 요소
@@ -1203,6 +1244,94 @@ export default function Main({ onBack }: Props) {
                       )}
                     </div>
 
+                    {/* ── 간단 비교 ── */}
+                    {data && (() => {
+                      const fortunes = data.daily_fortunes;
+                      const idx      = fortunes.findIndex(f => f.date === selected.date);
+                      if (idx === -1) return null;
+
+                      const cur      = fortunes[idx].scores.overall as number;
+                      const prev     = idx > 0
+                          ? fortunes[idx - 1].scores.overall as number
+                          : adjPrevScore;
+                      const next     = idx < fortunes.length - 1
+                          ? fortunes[idx + 1].scores.overall as number
+                          : adjNextScore;
+
+                      const allScores   = [...fortunes.map(f => f.scores.overall as number)].sort((a, b) => b - a);
+                      const rank        = allScores.indexOf(cur);
+                      const ratio       = rank / allScores.length;
+                      const monthlyText = ratio <= 0.33
+                          ? "이번 달 안에서는 흐름이 좋은 편이에요"
+                          : ratio <= 0.66
+                              ? "이번 달 기준으로 무난한 흐름이에요"
+                              : "이번 달 안에서는 조금 가벼운 흐름이에요";
+
+                      const prevDiff = prev !== null ? cur - prev : 0;
+                      const nextDiff = next !== null ? next - cur : 0;
+
+                      type CompareLine = { text: string; diff: number | null };
+
+                      let prevLine: CompareLine | null = null;
+                      if (prev !== null && prevDiff !== 0) {
+                        const abs = Math.abs(prevDiff);
+                        const label = prevDiff > 0
+                          ? abs <= 5  ? "이전 날보다 살짝 따뜻해졌어요"
+                          : abs <= 10 ? "이전 날보다 조금 따뜻해졌어요"
+                                      : "이전 날보다 눈에 띄게 따뜻해졌어요"
+                          : abs <= 5  ? "이전 날보다 살짝 식었어요"
+                          : abs <= 10 ? "이전 날보다 조금 식었어요"
+                                      : "이전 날보다 눈에 띄게 식었어요";
+                        prevLine = { text: label, diff: prevDiff };
+                      }
+                      let nextLine: CompareLine | null = null;
+                      if (next !== null && nextDiff !== 0) {
+                        const abs = Math.abs(nextDiff);
+                        const label = nextDiff > 0
+                          ? abs <= 5  ? "다음 날은 살짝 따뜻해질 수 있어요"
+                          : abs <= 10 ? "다음 날은 조금 따뜻해질 수 있어요"
+                                      : "다음 날은 눈에 띄게 따뜻해질 수 있어요"
+                          : abs <= 5  ? "다음 날은 살짝 식을 수 있어요"
+                          : abs <= 10 ? "다음 날은 조금 식을 수 있어요"
+                                      : "다음 날은 눈에 띄게 식을 수 있어요";
+                        nextLine = { text: label, diff: nextDiff };
+                      }
+
+                      const lines: CompareLine[] = (
+                        [prevLine, nextLine, { text: monthlyText, diff: null }] as (CompareLine | null)[]
+                      ).filter(Boolean) as CompareLine[];
+                      if (lines.length === 0) return null;
+
+                      return (
+                          <div className={styles.reasonCard}>
+                            <div
+                                className={styles.reasonCardHeader}
+                                onClick={() => setCompareOpen(o => !o)}
+                            >
+                              <div className={styles.reasonCardTitleWrap}>
+                                <span className={styles.reasonCardTitle}>간단 비교</span>
+                                <span className={styles.reasonCardSubtitle}>이번 달 흐름 속 오늘의 위치</span>
+                              </div>
+                              <span className={styles.reasonCardToggle}>{compareOpen ? "−" : "+"}</span>
+                            </div>
+                            {compareOpen && (
+                                <div className={styles.compareBody}>
+                                  {lines.map((line, i) => (
+                                      <p key={i} className={styles.compareLine}>
+                                        {line.text}
+                                        {line.diff !== null && (
+                                          <span className={line.diff > 0 ? styles.comparePos : styles.compareNeg}>
+                                            {line.diff > 0 ? ` +${line.diff}` : ` -${Math.abs(line.diff)}`}
+                                          </span>
+                                        )}
+                                      </p>
+                                  ))}
+                                </div>
+                            )}
+                          </div>
+                      );
+                    })()}
+
                     {/* ── 시간대 흐름 (accordion) ── */}
                     {selected.timeSegments && selected.timeSegments.length > 0 && (
                         <div className={styles.detailSection}>
@@ -1261,9 +1390,9 @@ export default function Main({ onBack }: Props) {
                         </div>
                     )}
 
-                    {/* ── 오늘의 포인트 ── */}
+                    {/* ── 이 날의 포인트 ── */}
                     <div className={styles.detailSection}>
-                      <div className={styles.sectionTitle}>오늘의 포인트</div>
+                      <div className={styles.sectionTitle}>이 날의 포인트</div>
                       <div className={styles.todoRow}>
                         <div className={styles.todoCol}>
                           <div className={styles.todoTitle}>🟢</div>

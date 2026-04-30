@@ -163,6 +163,7 @@
 .calendarHeader {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
   margin-bottom: 0.3rem;
 }
 
@@ -194,6 +195,7 @@
   gap: 1px;
   border: 1.5px solid transparent;
   transition: background 0.15s;
+  overflow: hidden;
 }
 .cell:hover     { background: rgba(0,0,0,0.04); }
 .cellEmpty      { cursor: default; }
@@ -249,7 +251,23 @@
   font-size: 0.6rem;
   font-weight: 700;
   line-height: 1;
+  position: relative;
 }
+
+.scoreNum--best::after,
+.scoreNum--worst::after {
+  content: "";
+  position: absolute;
+  left: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.scoreNum--best::after  { background: var(--accent-gold); }
+.scoreNum--worst::after { background: var(--danger); }
 
 .loading {
   display: flex;
@@ -424,9 +442,9 @@
 }
 
 .heroSummary {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  line-height: 1.55;
+  font-size: 0.74rem;
+  color: var(--text-sub);
+  line-height: 1.4;
   margin-top: 0.75rem;
   border-left: 3px solid var(--accent-mint);
   padding-left: 0.75rem;
@@ -573,8 +591,8 @@
 }
 
 .radarBarLabel {
-  font-size: 0.68rem;
-  color: var(--text-muted);
+  font-size: 0.74rem;
+  color: var(--text-sub);
   width: 2.4rem;
   flex-shrink: 0;
 }
@@ -660,6 +678,25 @@
   gap: 0;
 }
 
+.compareBody {
+  padding-bottom: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.comparePos { color: rgba(60, 145, 110, 0.9); }
+.compareNeg { color: rgba(185, 90, 70, 0.9); }
+
+.compareLine {
+  border-top: 1px solid var(--border);
+  padding: 0.65rem 0 0.6rem;
+  font-size: 0.74rem;
+  color: var(--text-sub);
+  line-height: 1.4;
+  margin: 0;
+}
+
 .reasonItem {
   border-top: 1px solid var(--border);
   padding: 0.65rem 0 0.6rem;
@@ -690,9 +727,9 @@
 }
 
 .reasonKeywords {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--text-sub);
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .reasonChips {
@@ -905,9 +942,9 @@
   padding: 0.68rem 0.9rem 0.85rem;
 }
 .segmentBodyText {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: var(--text-sub);
-  line-height: 1.5;
+  line-height: 1.4;
   opacity: 0.92;
   margin: 0;
 }
