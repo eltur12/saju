@@ -617,6 +617,19 @@
   box-shadow: var(--shadow-sm);
 }
 
+.reasonCardTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.reasonCardSubtitle {
+  font-size: 0.58rem;
+  color: var(--text-sub, var(--text-muted));
+  opacity: 0.8;
+  letter-spacing: 0.04em;
+}
+
 .reasonCardHeader {
   display: flex;
   align-items: center;

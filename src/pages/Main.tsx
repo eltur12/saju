@@ -1112,7 +1112,7 @@ export default function Main({ onBack }: Props) {
                       );
                     })()}
 
-                    {/* ── 왜 이런 흐름일까요? ── */}
+                    {/* ── 오늘 흐름을 만든 요소 ── */}
                     <div className={styles.reasonCard}>
                       <div
                           className={styles.reasonCardHeader}
@@ -1122,7 +1122,14 @@ export default function Main({ onBack }: Props) {
                             localStorage.setItem("daily_reason_open", String(next));
                           }}
                       >
-                        <span className={styles.reasonCardTitle}>왜 이런 흐름일까요?</span>
+                        <div className={styles.reasonCardTitleWrap}>
+                          <span className={styles.reasonCardTitle}>
+                            오늘 흐름을 만든 요소
+                          </span>
+                          <span className={styles.reasonCardSubtitle}>
+                            가장 영향이 큰 요소
+                          </span>
+                        </div>
                         <span className={styles.reasonCardToggle}>{reasonOpen ? "−" : "+"}</span>
                       </div>
                       {reasonOpen && (
@@ -1254,12 +1261,12 @@ export default function Main({ onBack }: Props) {
                         </div>
                     )}
 
-                    {/* ── 오늘의 행동 ── */}
+                    {/* ── 오늘의 포인트 ── */}
                     <div className={styles.detailSection}>
-                      <div className={styles.sectionTitle}>오늘의 행동</div>
+                      <div className={styles.sectionTitle}>오늘의 포인트</div>
                       <div className={styles.todoRow}>
                         <div className={styles.todoCol}>
-                          <div className={styles.todoTitle}>하면 좋은 것</div>
+                          <div className={styles.todoTitle}>🟢</div>
                           <ul className={styles.todoList}>
                             {selected.todos.do_list.map((item, i) => (
                                 <li key={i} className={styles.todoItem}>{item}</li>
@@ -1267,7 +1274,7 @@ export default function Main({ onBack }: Props) {
                           </ul>
                         </div>
                         <div className={styles.todoCol}>
-                          <div className={`${styles.todoTitle} ${styles.todoTitleDanger}`}>피해야 할 것</div>
+                          <div className={`${styles.todoTitle} ${styles.todoTitleDanger}`}>🟡</div>
                           <ul className={styles.todoList}>
                             {selected.todos.dont_list.map((item, i) => (
                                 <li key={i} className={`${styles.todoItem} ${styles.dontItem}`}>{item}</li>
