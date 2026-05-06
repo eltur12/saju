@@ -64,7 +64,7 @@ function aspectStrength(symbol: string, orb: number): number {
 const PLANET_AFFINITY: Record<string, ScoreMap> = {
   "Sun":      { overall:1.0, wealth:0.7, love:0.5, health:0.8, career:1.0,  relations:0.6, study:0.7 },
   "Moon":     { overall:0.8, wealth:0.5, love:1.2, health:1.0, career:0.5,  relations:0.7, study:0.4 },
-  "Mercury":  { overall:0.7, wealth:0.7, love:0.5, health:0.5, career:0.8,  relations:1.0, study:0.6 },
+  "Mercury":  { overall:0.7, wealth:0.7, love:0.5, health:0.5, career:0.8,  relations:1.0, study:0.8 },
   "Venus":    { overall:0.8, wealth:0.8, love:1.5, health:0.7, career:0.6,  relations:1.0, study:0.4 },
   "Mars":     { overall:0.8, wealth:0.7, love:0.7, health:0.8, career:1.0,  relations:0.5, study:0.5 },
   "Jupiter":  { overall:1.0, wealth:1.2, love:0.8, health:0.8, career:1.0,  relations:0.8, study:1.0 },

@@ -16,8 +16,8 @@ const BRIGHTNESS_SCORE: Record<string, number> = {
 /** 활성화 궁별 기본 보정값 */
 const PALACE_ACTIVATION: Record<string, number> = {
   "命宮": 12, "財帛": 10, "官祿": 10, "夫妻": 8, "交友": 7,
-  "福德": 6,  "遷移": 5,  "田宅": 4,  "父母": 4, "子女": 3,
-  "兄弟": 2,  "疾厄": -5,
+  "福德": 6,  "遷移": 5,  "田宅": 4,  "父母": 6, "子女": 3,
+  "兄弟": 2,  "疾厄": -3,
 };
 
 /** 사화(四化) 활성화 보정 */
@@ -55,7 +55,7 @@ const PALACE_WEIGHT: Record<string, ScoreMap> = {
   "官祿":  { overall:0.5, wealth:0.5, love:0.3, health:0.3, career:1.5,  relations:0.4, study:0.5 },
   "田宅":  { overall:0.5, wealth:0.8, love:0.3, health:0.5, career:0.3,  relations:0.3, study:0.2 },
   "福德":  { overall:0.8, wealth:0.5, love:0.5, health:0.8, career:0.3,  relations:0.4, study:0.5 },
-  "父母":  { overall:0.3, wealth:0.3, love:0.3, health:0.5, career:0.5,  relations:0.5, study:0.7 },
+  "父母":  { overall:0.3, wealth:0.3, love:0.3, health:0.5, career:0.5,  relations:0.5, study:0.90 },
 };
 
 const DEFAULT_WEIGHT: ScoreMap = { overall:0.5, wealth:0.5, love:0.5, health:0.5, career:0.5, relations:0.5, study:0.5 };

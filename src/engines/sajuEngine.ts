@@ -57,14 +57,14 @@ type DomainInfluence = Omit<ScoreMap, 'overall'>;
 const TEN_GOD_INFLUENCE: Record<string, DomainInfluence> = {
   "比肩": { wealth:0,   love:0,   health:0,  career:0,   relations:0,  study:0  },
   "劫財": { wealth:-8,  love:-4,  health:-2, career:-3,  relations:-5, study:-2 },
-  "食神": { wealth:10,  love:5,   health:8,  career:6,   relations:11, study:8  },
+  "食神": { wealth:10,  love:5,   health:10, career:6,   relations:11, study:8  },
   "傷官": { wealth:-3,  love:-4,  health:-2, career:3,   relations:-1, study:6  },
   "偏財": { wealth:8,   love:3,   health:2,  career:6,   relations:5,  study:3  },
   "正財": { wealth:12,  love:3,   health:4,  career:8,   relations:5,  study:3  },
   "偏官": { wealth:-5,  love:-5,  health:-8, career:-5,  relations:-7, study:-3 },
   "正官": { wealth:5,   love:2,   health:4,  career:10,  relations:6,  study:3  },
   "偏印": { wealth:0,   love:6,   health:3,  career:5,   relations:6,  study:2  },
-  "正印": { wealth:5,   love:3,   health:5,  career:10,  relations:5,  study:4  },
+  "正印": { wealth:5,   love:3,   health:7,  career:10,  relations:5,  study:4  },
 };
 
 const SPECIAL_STARS: Record<string, ScoreMap> = {
@@ -590,16 +590,20 @@ export class SajuEngine {
     const ELEMENT_克: Record<string, string> = {
       "木": "土", "土": "水", "水": "火", "火": "金", "金": "木",
     };
-    const targetStemElement = STEM_ELEMENT[targetStem];
+    const targetStemElement   = STEM_ELEMENT[targetStem];
     const targetBranchElement = BRANCH_ELEMENT[targetBranch];
+    const ohaengClashStem     = !!(targetStemElement   && ELEMENT_克[targetStemElement]   === this.day_element);
+    const ohaengClashBranch   = !!(targetBranchElement && ELEMENT_克[targetBranchElement] === this.day_element);
     // 천간 오행이 일간을 극하면 -6
-    if (targetStemElement && ELEMENT_克[targetStemElement] === this.day_element) {
-      scores.health -= 6;
-    }
+    if (ohaengClashStem)   scores.health -= 6;
     // 지지 오행도 일간을 극하면 추가 -3 (천간·지지 동시 극이면 오행 압박 가중)
-    if (targetBranchElement && ELEMENT_克[targetBranchElement] === this.day_element) {
-      scores.health -= 3;
-    }
+    if (ohaengClashBranch) scores.health -= 3;
+
+    // 지지 관계 타입 목록 (state atom layer에서 사용)
+    const branchRelTypes = [
+      ...getBranchRelations(targetBranch, chartBranches).map(r => r.type),
+      ...getBranchRelations(monthBranch, chartBranches).map(r => r.type),
+    ];
 
     const keys = Object.keys(scores) as (keyof ScoreMap)[];
     keys.forEach(k => { scores[k] = Math.max(0, Math.min(100, scores[k])); });
@@ -618,6 +622,9 @@ export class SajuEngine {
         ten_god_of_day:           this.getTenGod(targetStem),
         active_stars:             this.special_stars,
         natal_fixed_penalty:      this.natal_fixed_penalty.overall,
+        branch_relation_types:    branchRelTypes,
+        ohaeng_clash_stem:        ohaengClashStem,
+        ohaeng_clash_branch:      ohaengClashBranch,
       },
       contributions: [_cDayTg, _cMonthTg, _cBranch].filter(c => c.key !== ""),
     };

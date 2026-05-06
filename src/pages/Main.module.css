@@ -115,6 +115,12 @@
   transition: background 0.15s;
 }
 .todayBtn:hover { background: var(--accent-mint-light); }
+.todayBtn:disabled {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-muted);
+  cursor: default;
+}
 
 .tabBtns {
   display: flex;
@@ -290,6 +296,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
+  cursor: pointer;
 }
 
 .previewLeft {
@@ -410,11 +417,16 @@
 .dayNavBtn {
   background: none;
   border: none;
-  padding: 0 0.2rem;
+  padding: 0.6rem 0.55rem;
   font-size: 1.1rem;
   color: var(--text-muted);
   cursor: pointer;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
 }
 
 .heroDate {
@@ -426,6 +438,12 @@
 .heroLunar {
   font-size: 0.72rem;
   color: var(--text-muted);
+}
+
+.heroScoreMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .heroScoreRow {
@@ -441,18 +459,27 @@
   letter-spacing: -0.02em;
 }
 
+.heroScoreDivider {
+  height: 2px;
+  width: 100%;
+  margin-top: 0.5rem;
+  border-radius: 1px;
+  opacity: 0.35;
+}
+
 .heroSummary {
   font-size: 0.74rem;
   color: var(--text-sub);
   line-height: 1.4;
-  margin-top: 0.75rem;
+  margin-top: 0.6rem;
   border-left: 3px solid var(--accent-mint);
   padding-left: 0.75rem;
 }
 
 .heroFlowState {
-  font-size: 0.78rem;
-  color: var(--accent-mint);
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  opacity: 0.85;
   margin-top: 0.5rem;
   padding-left: 0.75rem;
 }
@@ -832,10 +859,8 @@
 .segmentRowNow {
   background: var(--accent-mint-bg);
   border-radius: 8px;
-  box-shadow: inset 2px 0 0 var(--accent-mint);
   border-left: 3px solid var(--accent-mint);
   padding-left: 9px;
-
 }
 .segmentRowOpen {
   background: var(--bg);
@@ -992,7 +1017,7 @@
   font-weight: 600;
   margin-bottom: 0.2rem;
 }
-.todoTitleDanger { color: var(--danger); }
+.todoTitleCaution { color: var(--accent-gold); }
 
 .todoList {
   list-style: none;
@@ -1021,7 +1046,7 @@
   line-height: 1.1;
   flex-shrink: 0;
 }
-.dontItem::before { color: var(--danger); }
+.dontItem::before { color: var(--accent-gold); }
 
 /* ── Notification Hints (simplified) ── */
 .hintRow {

@@ -2,8 +2,8 @@
  * 운세 통합 집계기 (Fortune Aggregator)
  */
 import type { ScoreMap } from "./sajuEngine";
-import { buildSajuEngineFromProfile, type SajuEngineProfile } from "./sajuEngine";
-import { applySajuBalanceAdjustment, type SajuBalanceDebug } from "./sajuBalanceLayer";
+import { buildSajuEngineFromProfile, type SajuEngineProfile, STEM_ELEMENT } from "./sajuEngine";
+import { applySajuBalanceAdjustment, computeElementDistribution, type SajuBalanceDebug } from "./sajuBalanceLayer";
 import { buildZiweiEngineFromProfile, type ZiweiProfile } from "./ziweiEngine";
 import { buildAstroEngineFromProfile, type AstroProfile } from "./astroEngine";
 import { getLunarDate } from "../utils/lunarConverter";
@@ -11,6 +11,7 @@ import { generateTodos, generateSummary } from "./todoGenerator";
 import { generateTimeSegments } from "./timeSegmentLayer";
 import { generateNotificationHints } from "./notificationHintLayer";
 import { buildReasonSources, type ReasonSources } from "./reasonLayer";
+import { computeStateAtoms, type StateAtomDebug } from "./stateAtomLayer";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 
 /**
@@ -29,7 +30,7 @@ const DOMAIN_WEIGHTS: Partial<Record<keyof ScoreMap, DomainWeight>> = {
 
 /** Task 2: 카테고리별 일별 민감도 배수 */
 const DAILY_SENSITIVITY: Partial<Record<keyof ScoreMap, number>> = {
-  love: 1.25, relations: 1.10, health: 1.15, wealth: 1.10, study: 1.08, career: 0.90,
+  love: 1.25, relations: 1.10, health: 1.15, wealth: 1.10, study: 1.08, career: 1.00,
 };
 
 /** FIX 5: 극단 구간 소프트 압축 */
@@ -72,6 +73,7 @@ export interface DailyFortune {
     label: string;
   }>;
   reasonSources?: ReasonSources;
+  stateAtomDebug?: StateAtomDebug;
 }
 
 export interface MonthlyFortuneResult {
@@ -92,6 +94,7 @@ export class FortuneAggregator {
   private birthDate:       Date;
   private sajuProfile:     SajuEngineProfile;
   private enableBalanceAdj: boolean;
+  private userElements:    { strong: string[]; weak: string[] };
 
   constructor(
     sajuProfile:              SajuEngineProfile,
@@ -108,6 +111,11 @@ export class FortuneAggregator {
     this.birthDate       = birthDate;
     this.sajuProfile     = sajuProfile;
     this.enableBalanceAdj = enableSajuBalanceAdjustment;
+    const dist = computeElementDistribution(sajuProfile);
+    this.userElements = {
+      strong: Object.entries(dist).filter(([, v]) => v > 0.3).map(([k]) => k),
+      weak:   Object.entries(dist).filter(([, v]) => v < 0.1).map(([k]) => k),
+    };
   }
 
   private mergeScores(sajuScores: ScoreMap, ziweiScores: ScoreMap, astroScores: ScoreMap): ScoreMap {
@@ -208,6 +216,26 @@ export class FortuneAggregator {
       }
     }
 
+    // State atom layer — additive adjustment after stabilizers, before rounding
+    const stateResult = computeStateAtoms({
+      ten_god_of_day:         sajuResult.factors.ten_god_of_day as string | undefined,
+      active_stars:           [],  // natal stars excluded — already scored by sajuEngine.applySpecialStars()
+      branch_relation_types:  (sajuResult.factors.branch_relation_types as string[]) ?? [],
+      ohaeng_clash_stem:      (sajuResult.factors.ohaeng_clash_stem  as boolean)     ?? false,
+      ohaeng_clash_branch:    (sajuResult.factors.ohaeng_clash_branch as boolean)    ?? false,
+      active_transit_aspects: (astroResult.factors.active_transit_aspects as string[]) ?? [],
+    });
+    {
+      const _dc: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
+      for (const cat of _dc) {
+        const d = stateResult.categoryDeltas[cat] ?? 0;
+        if (d !== 0) merged[cat] = Math.max(0, Math.min(100, merged[cat] + d));
+      }
+      merged.overall = Math.max(0, Math.min(100,
+        _dc.reduce((s, c) => s + merged[c], 0) / _dc.length
+      ));
+    }
+
     // 최종 반올림 — 모든 중간 연산 완료 후 1회만 적용
     const allCats: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study", "overall"];
     for (const c of allCats) {
@@ -230,9 +258,16 @@ export class FortuneAggregator {
         sajuResult.factors,  ziweiResult.factors,  astroResult.factors,
         sajuResult.contributions, ziweiResult.contributions, astroResult.contributions,
       ),
-      balance_debug: balanceDebug,
+      balance_debug:   balanceDebug,
+      stateAtomDebug:  stateResult.debug,
     };
-    fortune.timeSegments = generateTimeSegments(fortune);
+    fortune.timeSegments = generateTimeSegments(
+      fortune,
+      this.userElements,
+      STEM_ELEMENT[this.sajuProfile.day_stem],
+      sajuResult.factors.target_branch as string,
+      sajuResult.factors.month_branch as string,
+    );
     fortune.notificationHints = generateNotificationHints(fortune);
     return fortune;
   }

@@ -140,7 +140,9 @@ export default function Main({ onBack }: Props) {
   const [reasonOpen, setReasonOpen] = useState<boolean>(
       () => localStorage.getItem("daily_reason_open") === "true"
   );
-  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState<boolean>(
+      () => localStorage.getItem("daily_compare_open") === "true"
+  );
   const [adjPrevScore, setAdjPrevScore] = useState<number | null>(null);
   const [adjNextScore, setAdjNextScore] = useState<number | null>(null);
   dataRef.current = data;
@@ -634,7 +636,13 @@ export default function Main({ onBack }: Props) {
                   <button className={styles.navBtn} onClick={nextMonth}>›</button>
                 </>
             ) : (
-                <span />
+                <>
+                  <button className={styles.navBtn} onClick={() => navigateDay(-1)} disabled={!selected}>‹</button>
+                  <span className={styles.headerTitle}>
+                    {selectedDayStr || `${year}년 ${month}월`}
+                  </span>
+                  <button className={styles.navBtn} onClick={() => navigateDay(1)} disabled={!selected}>›</button>
+                </>
             )}
           </div>
           <button className={styles.settingsBtn} onClick={openSettings} title="설정">⋮</button>
@@ -642,7 +650,11 @@ export default function Main({ onBack }: Props) {
 
         {/* ── Tab Bar ── */}
         <div className={styles.tabBar}>
-          <button className={styles.todayBtn} onClick={goToToday}>오늘</button>
+          <button
+              className={styles.todayBtn}
+              onClick={goToToday}
+              disabled={isSelectedToday}
+          >오늘</button>
           <div className={styles.tabBtns}>
             <button
                 className={`${styles.tabBtn} ${tab === "calendar" ? styles.tabBtnActive : ""}`}
@@ -713,7 +725,7 @@ export default function Main({ onBack }: Props) {
 
               {/* ── Selected date preview card ── */}
               {selected && !loading && (
-                  <div className={styles.previewCard}>
+                  <div className={styles.previewCard} onClick={() => setTab("detail")}>
                     <div className={styles.previewLeft}>
                       <div className={styles.previewDate}>{selectedDayStr}</div>
                       <div className={styles.previewLunar}>음력 {selected.lunar_date}</div>
@@ -724,7 +736,7 @@ export default function Main({ onBack }: Props) {
                   {selected.scores.overall}
                 </span>
                       <span className={getBadgeClass(selected.badge)}>{getBadgeLabel(selected.badge)}</span>
-                      <button className={styles.previewBtn} onClick={() => setTab("detail")}>
+                      <button className={styles.previewBtn} onClick={e => { e.stopPropagation(); setTab("detail"); }}>
                         자세히 보기
                       </button>
                     </div>
@@ -1071,20 +1083,17 @@ export default function Main({ onBack }: Props) {
                   <>
                     {/* ── Hero: date + score + badge ── */}
                     <div className={styles.heroCard}>
-                      <div className={styles.heroMeta}>
-                        <div className={styles.heroDateNav}>
-                          <button className={styles.dayNavBtn} onClick={() => navigateDay(-1)}>‹</button>
-                          <span className={styles.heroDate}>{selectedDayStr}</span>
-                          <button className={styles.dayNavBtn} onClick={() => navigateDay(1)}>›</button>
-                        </div>
-                        <span className={styles.heroLunar}>음력 {selected.lunar_date}</span>
-                      </div>
                       <div className={styles.heroScoreRow}>
                   <span className={`${styles.heroScoreNum} ${getScoreClass(selected.scores.overall)}`}>
                     {selected.scores.overall}
                   </span>
-                        <span className={getBadgeClass(selected.badge)}>{getBadgeLabel(selected.badge)}</span>
+                        <div className={styles.heroScoreMeta}>
+                          <span className={getBadgeClass(selected.badge)}>{getBadgeLabel(selected.badge)}</span>
+                          <span className={styles.heroLunar}>음력 {selected.lunar_date}</span>
+                        </div>
                       </div>
+                      <div className={styles.heroScoreDivider}
+                           style={{ background: scoreColor(selected.scores.overall as number) }} />
                       <p className={styles.heroSummary}>{dailySummary}</p>
                       {nowFlowSentence && (
                           <p className={styles.heroFlowState}>{nowFlowSentence}</p>
@@ -1107,7 +1116,7 @@ export default function Main({ onBack }: Props) {
                       const rings      = [0.25, 0.5, 0.75, 1.0];
                       const radarColor = scoreColor(selected.scores.overall as number);
                       return (
-                          <div className={styles.radarSection}>
+                          <div className={styles.radarSection} style={{ borderTop: `3px solid ${radarColor}` }}>
                             <svg viewBox="0 0 160 160" className={styles.radarSvg}>
                               {rings.map(f => (
                                   <polygon key={f}
@@ -1306,7 +1315,11 @@ export default function Main({ onBack }: Props) {
                           <div className={styles.reasonCard}>
                             <div
                                 className={styles.reasonCardHeader}
-                                onClick={() => setCompareOpen(o => !o)}
+                                onClick={() => {
+                                  const next = !compareOpen;
+                                  setCompareOpen(next);
+                                  localStorage.setItem("daily_compare_open", String(next));
+                                }}
                             >
                               <div className={styles.reasonCardTitleWrap}>
                                 <span className={styles.reasonCardTitle}>간단 비교</span>
@@ -1403,7 +1416,7 @@ export default function Main({ onBack }: Props) {
                           </ul>
                         </div>
                         <div className={styles.todoCol}>
-                          <div className={`${styles.todoTitle} ${styles.todoTitleDanger}`}>🟡</div>
+                          <div className={`${styles.todoTitle} ${styles.todoTitleCaution}`}>🟡</div>
                           <ul className={styles.todoList}>
                             {selected.todos.dont_list.map((item, i) => (
                                 <li key={i} className={`${styles.todoItem} ${styles.dontItem}`}>{item}</li>
