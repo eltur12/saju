@@ -237,14 +237,14 @@ export class ZiweiEngine {
     const dahanScores = this.palaceScore(this.current_dahan);
     const keys = Object.keys(scores) as (keyof ScoreMap)[];
     let result = { ...scores };
-    keys.forEach(k => { result[k] += Math.trunc((dahanScores[k] ?? 0) * 0.7); });
+    keys.forEach(k => { result[k] += Math.trunc((dahanScores[k] ?? 0) * 0.45); });
 
     // 대한 궁별 도메인 직접 보정
     switch (this.current_dahan) {
       case "財帛": result.wealth += 5; break;
-      case "官祿": result.career += 5; break;
+      case "官祿": result.career += 3; break;
       case "命宮": result = addUniform(result, 5); break;
-      case "疾厄": result.health -= 5; break;
+      case "疾厄": result.health -= 3; break;
       case "夫妻": {
         result.love += 5;
         // 부처궁 살성 있으면 연애 추가 -6

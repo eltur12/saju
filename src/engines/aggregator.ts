@@ -30,7 +30,7 @@ const DOMAIN_WEIGHTS: Partial<Record<keyof ScoreMap, DomainWeight>> = {
 
 /** Task 2: 카테고리별 일별 민감도 배수 */
 const DAILY_SENSITIVITY: Partial<Record<keyof ScoreMap, number>> = {
-  love: 1.25, relations: 1.10, health: 1.15, wealth: 1.10, study: 1.08, career: 1.00,
+  love: 1.25, relations: 1.10, health: 1.00, wealth: 1.10, study: 1.08, career: 1.00,
 };
 
 /** FIX 5: 극단 구간 소프트 압축 */
@@ -163,10 +163,10 @@ export class FortuneAggregator {
 
     const domainCats: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
 
-    // Task 1: Base 스프레드 압축 — 카테고리 평균 기준 편차를 0.65 배율로 압축
+    // Task 1: Base 스프레드 압축 — 카테고리 평균 기준 편차를 0.75 배율로 압축
     const catAvg = domainCats.reduce((s, c) => s + (merged[c] as number), 0) / domainCats.length;
     for (const c of domainCats) {
-      merged[c] = Math.max(0, Math.min(100, catAvg + (merged[c] - catAvg) * 0.65));
+      merged[c] = Math.max(0, Math.min(100, catAvg + (merged[c] - catAvg) * 0.75));
     }
 
     // FIX 7: overall = 6개 영역 단순 평균 후 클램프 (float 유지)
@@ -220,7 +220,8 @@ export class FortuneAggregator {
     const stateResult = computeStateAtoms({
       ten_god_of_day:         sajuResult.factors.ten_god_of_day as string | undefined,
       active_stars:           [],  // natal stars excluded — already scored by sajuEngine.applySpecialStars()
-      branch_relation_types:  (sajuResult.factors.branch_relation_types as string[]) ?? [],
+      day_branch_relation_types:   (sajuResult.factors.day_branch_relation_types   as string[]) ?? [],
+      month_branch_relation_types: (sajuResult.factors.month_branch_relation_types as string[]) ?? [],
       ohaeng_clash_stem:      (sajuResult.factors.ohaeng_clash_stem  as boolean)     ?? false,
       ohaeng_clash_branch:    (sajuResult.factors.ohaeng_clash_branch as boolean)    ?? false,
       active_transit_aspects: (astroResult.factors.active_transit_aspects as string[]) ?? [],

@@ -55,10 +55,10 @@ type DomainInfluence = Omit<ScoreMap, 'overall'>;
 
 // 십성별 영역 차등 보정값 (규칙서 STEP 6 기반)
 const TEN_GOD_INFLUENCE: Record<string, DomainInfluence> = {
-  "比肩": { wealth:0,   love:0,   health:0,  career:0,   relations:0,  study:0  },
-  "劫財": { wealth:-8,  love:-4,  health:-2, career:-3,  relations:-5, study:-2 },
+  "比肩": { wealth:0,   love:0,   health:2,  career:0,   relations:0,  study:0  },
+  "劫財": { wealth:-8,  love:-4,  health:0,  career:-3,  relations:-5, study:-2 },
   "食神": { wealth:10,  love:5,   health:10, career:6,   relations:11, study:8  },
-  "傷官": { wealth:-3,  love:-4,  health:-2, career:3,   relations:-1, study:6  },
+  "傷官": { wealth:-3,  love:-4,  health:0,  career:3,   relations:-1, study:6  },
   "偏財": { wealth:8,   love:3,   health:2,  career:6,   relations:5,  study:3  },
   "正財": { wealth:12,  love:3,   health:4,  career:8,   relations:5,  study:3  },
   "偏官": { wealth:-5,  love:-5,  health:-8, career:-5,  relations:-7, study:-3 },
@@ -74,7 +74,7 @@ const SPECIAL_STARS: Record<string, ScoreMap> = {
   "역마살":   { overall:3,  wealth:5,  love:-3, health:-3, career:8,  relations:3,  study:2  },
   "화개살":   { overall:0,  wealth:-3, love:-5, health:5,  career:3,  relations:-3, study:5  },
   "겁살":     { overall:-5, wealth:-8, love:-5, health:-5, career:-5, relations:-5, study:-3 },
-  "백호살":   { overall:-5, wealth:0,  love:-3, health:-8, career:-3, relations:-5, study:-2 },
+  "백호살":   { overall:-5, wealth:0,  love:-3, health:-5, career:-3, relations:-5, study:-2 },
 };
 
 // ──────────────────────────────────────────────
@@ -243,7 +243,7 @@ function getBranchRelations(targetBranch: string, chartBranches: string[]): Bran
 
 /** Task 3: 지지 관계 카테고리별 가중치 */
 const BRANCH_REL_CAT_W: Record<string, number> = {
-  love: 1.2, relations: 1.2, health: 1.1, wealth: 1.0, study: 0.9, career: 0.8,
+  love: 1.2, relations: 1.2, health: 0.85, wealth: 1.0, study: 0.9, career: 0.8,
 };
 
 function applyBranchRelationsToScore(scores: ScoreMap, targetBranch: string, chartBranches: string[]): ScoreMap {
@@ -600,10 +600,9 @@ export class SajuEngine {
     if (ohaengClashBranch) scores.health -= 3;
 
     // 지지 관계 타입 목록 (state atom layer에서 사용)
-    const branchRelTypes = [
-      ...getBranchRelations(targetBranch, chartBranches).map(r => r.type),
-      ...getBranchRelations(monthBranch, chartBranches).map(r => r.type),
-    ];
+    const dayBranchRelTypes   = getBranchRelations(targetBranch, chartBranches).map(r => r.type);
+    const monthBranchRelTypes = getBranchRelations(monthBranch,  chartBranches).map(r => r.type);
+    const branchRelTypes      = [...dayBranchRelTypes, ...monthBranchRelTypes];
 
     const keys = Object.keys(scores) as (keyof ScoreMap)[];
     keys.forEach(k => { scores[k] = Math.max(0, Math.min(100, scores[k])); });
@@ -622,7 +621,9 @@ export class SajuEngine {
         ten_god_of_day:           this.getTenGod(targetStem),
         active_stars:             this.special_stars,
         natal_fixed_penalty:      this.natal_fixed_penalty.overall,
-        branch_relation_types:    branchRelTypes,
+        branch_relation_types:        branchRelTypes,
+        day_branch_relation_types:    dayBranchRelTypes,
+        month_branch_relation_types:  monthBranchRelTypes,
         ohaeng_clash_stem:        ohaengClashStem,
         ohaeng_clash_branch:      ohaengClashBranch,
       },

@@ -42,12 +42,15 @@ export interface StateAtomResult {
 }
 
 export interface StateAtomInput {
-  ten_god_of_day?:        string;
-  active_stars:           string[];
-  branch_relation_types:  string[];
-  ohaeng_clash_stem:      boolean;
-  ohaeng_clash_branch:    boolean;
-  active_transit_aspects: string[];
+  ten_god_of_day?:             string;
+  active_stars:                string[];
+  /** Acute daily signal — processed at full weight. */
+  day_branch_relation_types:   string[];
+  /** Ambient monthly context — processed at 0.5× weight. */
+  month_branch_relation_types: string[];
+  ohaeng_clash_stem:           boolean;
+  ohaeng_clash_branch:         boolean;
+  active_transit_aspects:      string[];
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -94,7 +97,7 @@ type AtomDelta = Partial<Record<StateAtomKey, number>>;
 /** 십신(十神) → state atoms */
 const TEN_GOD_TO_STATE: Record<string, AtomDelta> = {
   "食神": { recovery: 2, energySustain: 2, stability: 1 },
-  "正印": { recovery: 2, stability: 2, focus: 1 },
+  "正印": { recovery: 2, stability: 2, focus: 1, energySustain: 1 },
   "傷官": { focus: 2, emotionalAmplitude: 1, impulsiveness: 1, stability: -1 },
   "正官": { stability: 2, organization: 1, focus: 1 },
   "偏官": { tension: 2, executionFlow: 2 },
@@ -119,8 +122,8 @@ const STAR_TO_STATE: Record<string, AtomDelta> = {
 /** 지지관계(地支關係) → state atoms */
 const BRANCH_REL_TO_STATE: Record<string, AtomDelta> = {
   "충":  { tension: 3, stability: -2, recovery: -1, socialFatigue: 1 },
-  "육합": { stability: 2, recovery: 1, emotionalAmplitude: -1 },
-  "삼합": { stability: 3, recovery: 1, executionFlow: 1, emotionalAmplitude: -1 },
+  "육합": { stability: 2, recovery: 1, emotionalAmplitude: -1, socialFatigue: -1 },
+  "삼합": { stability: 3, recovery: 1, executionFlow: 1, emotionalAmplitude: -1, socialFatigue: -1, energySustain: 1 },
   "방합": { stability: 2, executionFlow: 1 },
   "반합": { stability: 1, recovery: 1 },
   "형":  { tension: 2, stability: -2 },
@@ -133,7 +136,7 @@ const BRANCH_REL_TO_STATE: Record<string, AtomDelta> = {
 
 /** 오행극(五行剋) → state atoms */
 const OHAENG_CLASH_STATE: AtomDelta = {
-  tension: 2, recovery: -2, energySustain: -1,
+  tension: 2, energySustain: -1,
 };
 
 /** 행성 어스펙트 → state atoms */
@@ -223,11 +226,25 @@ export function computeStateAtoms(input: StateAtomInput): StateAtomResult {
     }
   }
 
-  // 3. Branch relations (day + month, accumulated freely — clamp handles extremes)
-  for (const relType of input.branch_relation_types) {
+  // 3a. Day branch relations — acute daily signal, full weight
+  for (const relType of input.day_branch_relation_types) {
     const delta = BRANCH_REL_TO_STATE[relType];
     if (delta) {
       applyDelta(atoms, delta, `지지:${relType}`);
+      events.push(relType);
+    }
+  }
+
+  // 3b. Month branch relations — ambient monthly context, 0.5× weight
+  const MONTH_BRANCH_SCALE = 0.5;
+  for (const relType of input.month_branch_relation_types) {
+    const delta = BRANCH_REL_TO_STATE[relType];
+    if (delta) {
+      const scaledDelta: AtomDelta = {};
+      for (const [k, v] of Object.entries(delta) as [StateAtomKey, number][]) {
+        scaledDelta[k] = v * MONTH_BRANCH_SCALE;
+      }
+      applyDelta(atoms, scaledDelta, `월지지:${relType}`);
       events.push(relType);
     }
   }
