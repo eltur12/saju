@@ -12,6 +12,7 @@ import { generateTimeSegments } from "./timeSegmentLayer";
 import { generateNotificationHints } from "./notificationHintLayer";
 import { buildReasonSources, type ReasonSources } from "./reasonLayer";
 import { computeStateAtoms, type StateAtomDebug } from "./stateAtomLayer";
+import { buildPersistedDailyModel, type PersistedDailyModel } from "./persistedDailyMapper";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 
 /**
@@ -74,6 +75,7 @@ export interface DailyFortune {
   }>;
   reasonSources?: ReasonSources;
   stateAtomDebug?: StateAtomDebug;
+  persisted?: PersistedDailyModel;
 }
 
 export interface MonthlyFortuneResult {
@@ -202,7 +204,7 @@ export class FortuneAggregator {
         const tenGodDay = sajuResult.factors.ten_god_of_day as string | undefined;
         const exprBoost = (tenGodDay === "食神" || tenGodDay === "傷官") ? 30 * 0.15 : 0;
         const boost = merged.relations * 0.20 + exprBoost;
-        merged.love = Math.min(100, merged.love + Math.min(8, boost));
+        merged.love = Math.min(100, merged.love + Math.min(4, boost));
         merged.overall = Math.max(0, Math.min(100,
           dc.reduce((s, c) => s + merged[c], 0) / dc.length));
       }
@@ -270,6 +272,7 @@ export class FortuneAggregator {
       sajuResult.factors.month_branch as string,
     );
     fortune.notificationHints = generateNotificationHints(fortune);
+    fortune.persisted = buildPersistedDailyModel(fortune);
     return fortune;
   }
 
