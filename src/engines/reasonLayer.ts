@@ -12,6 +12,7 @@ export interface ScoreContribution {
 export interface ReasonChip {
   key:      string;
   polarity: "positive" | "negative" | "neutral";
+  canonKey?: string;
 }
 
 export interface ReasonSource {
@@ -328,12 +329,33 @@ export function buildReasonSources(
   }
 
   {
+    const ACANON_PLANET: Record<string, string> = {
+      "Sun": "sun", "Moon": "moon", "Mercury": "mercury",
+      "Venus": "venus", "Mars": "mars", "Jupiter": "jupiter",
+      "Saturn": "saturn", "Chiron": "chiron",
+    };
+    const ACANON_ASPECT: Record<string, string> = {
+      "△": "trine", "□": "square", "☌": "conjunction",
+      "☍": "opposition", "⚹": "sextile", "⚻": "quincunx", "∠": "semisquare",
+    };
     const chips = contribsToChips(astroContribs ?? [], k => {
       if (k === "venus_retrograde_transit") return "금성 역행";
       const planet = k.split(" ")[0];
       const kr = PLANET_KR[planet];
       return kr ?? null;
     });
+    // Attach canonical key to each chip using the highest-impact contrib for that planet
+    for (const chip of chips) {
+      const best = (astroContribs ?? [])
+        .filter(c => PLANET_KR[c.key.split(" ")[0]] === chip.key)
+        .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0];
+      if (best) {
+        const parts = best.key.split(" ");
+        const p = ACANON_PLANET[parts[0]];
+        const a = ACANON_ASPECT[parts[1]];
+        if (p && a) chip.canonKey = `astro.aspect.${p}.${a}`;
+      }
+    }
     astroSource.chips = chips.length > 0
       ? chips
       : [{ key: astroSource.key, polarity: astroSource.polarity ?? "neutral" }];

@@ -19,6 +19,11 @@ import {
 import { addDayRolloverListener, scheduleTodayNotifications, canScheduleExactAlarms, openExactAlarmSettings, getNotificationRegistrationStatus } from "../plugins/widgetPlugin";
 import styles from "./Main.module.css";
 import {
+  safeResolveInfo,
+  STATE_LABELS,
+  FLOW_LABELS,
+} from "../constants/fortuneDictionary";
+import {
   planNotifications,
   applyNotificationSettings,
   generateNotificationMessage,
@@ -97,6 +102,22 @@ function getBadgeLabel(badge: string): string {
   return BADGE_LABELS[badge] ?? badge;
 }
 
+// reasonSources chip key (Korean display string) → canonical persisted key
+const REASON_CHIP_CANONICAL: Record<string, string> = {
+  "식신": "saju.tenGod.siksin",    "정인": "saju.tenGod.jeongin",
+  "상관": "saju.tenGod.sanggwan",  "정관": "saju.tenGod.jeonggwan",
+  "편관": "saju.tenGod.pyeonggwan","편재": "saju.tenGod.pyeongjae",
+  "정재": "saju.tenGod.jeongjae", "비견": "saju.tenGod.bigyeon",
+  "겁재": "saju.tenGod.geobjae",  "편인": "saju.tenGod.pyeongin",
+  "명궁":  "ziwei.palace.life",    "형제궁": "ziwei.palace.siblings",
+  "부처궁": "ziwei.palace.spouse", "자녀궁": "ziwei.palace.children",
+  "재백궁": "ziwei.palace.wealth", "질액궁": "ziwei.palace.health",
+  "천이궁": "ziwei.palace.travel", "교우궁": "ziwei.palace.friends",
+  "관록궁": "ziwei.palace.career", "전택궁": "ziwei.palace.property",
+  "복덕궁": "ziwei.palace.spirit", "부모궁": "ziwei.palace.parents",
+};
+
+
 interface Props { onBack: () => void }
 
 export default function Main({ onBack }: Props) {
@@ -143,6 +164,7 @@ export default function Main({ onBack }: Props) {
   const [compareOpen, setCompareOpen] = useState<boolean>(
       () => localStorage.getItem("daily_compare_open") === "true"
   );
+  const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   const [adjPrevScore, setAdjPrevScore] = useState<number | null>(null);
   const [adjNextScore, setAdjNextScore] = useState<number | null>(null);
   dataRef.current = data;
@@ -298,6 +320,22 @@ export default function Main({ onBack }: Props) {
     });
     return () => { listenerPromise.then(h => h.remove()); };
   }, []);
+
+  // Android back button: close eventInfo sheet before navigating away
+  useEffect(() => {
+    const listenerPromise = App.addListener("backButton", () => {
+      if (eventInfoKey !== null) setEventInfoKey(null);
+    });
+    return () => { listenerPromise.then(h => h.remove()); };
+  }, [eventInfoKey]);
+
+  // Body scroll lock while event info sheet is open
+  useEffect(() => {
+    if (eventInfoKey !== null) {
+      document.body.style.overflow = "hidden";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [eventInfoKey]);
 
   useEffect(() => {
     const handle = addDayRolloverListener(async () => {
@@ -1196,12 +1234,12 @@ export default function Main({ onBack }: Props) {
                               }
 
                               const sections = [
-                                { label: "사주", src: rs.saju },
-                                { label: "자미두수", src: rs.ziwei },
-                                { label: "별자리", src: rs.astro },
+                                { label: "사주",    src: rs.saju,  srcType: "saju"  as const },
+                                { label: "자미두수", src: rs.ziwei, srcType: "ziwei" as const },
+                                { label: "별자리",  src: rs.astro, srcType: "astro" as const },
                               ];
 
-                              return sections.map(({ label, src }) => {
+                              return sections.map(({ label, src, srcType }) => {
                                 if (!src) return null;
 
                                 const chips =
@@ -1226,6 +1264,11 @@ export default function Main({ onBack }: Props) {
 
                                         <div className={styles.reasonChips}>
                                           {chips.map((chip, i) => {
+                                            const canonKey = srcType === "astro"
+                                              ? (chip.canonKey ?? null)
+                                              : REASON_CHIP_CANONICAL[chip.key] ?? null;
+                                            const hasInfo = canonKey !== null && safeResolveInfo(canonKey) !== null;
+
                                             const chipClass = [
                                               styles.reasonChip,
                                               chip.polarity === "positive"
@@ -1233,14 +1276,19 @@ export default function Main({ onBack }: Props) {
                                                   : chip.polarity === "negative"
                                                       ? styles.reasonChipNeg
                                                       : "",
+                                              hasInfo ? styles.reasonChipClickable : "",
                                             ]
                                                 .filter(Boolean)
                                                 .join(" ");
 
                                             return (
-                                                <span key={`${chip.key}-${i}`} className={chipClass}>
-                                                {chip.key}
-                                              </span>
+                                                <span
+                                                  key={`${chip.key}-${i}`}
+                                                  className={chipClass}
+                                                  onClick={hasInfo ? () => setEventInfoKey(canonKey!) : undefined}
+                                                >
+                                                  {chip.key}
+                                                </span>
                                             );
                                           })}
                                         </div>
@@ -1593,6 +1641,58 @@ export default function Main({ onBack }: Props) {
             onClose={() => setNotiModalOpen(false)}
             onConfirm={() => { setNotiStart(draftNotiStart); setNotiModalOpen(false); }}
         />
+
+        {/* ── EventInfo Bottom Sheet ── */}
+        {eventInfoKey !== null && (() => {
+          const info = safeResolveInfo(eventInfoKey);
+          if (!info) return null;
+          return (
+            <>
+              <div className={styles.overlay} onClick={() => setEventInfoKey(null)} />
+              <div className={`${styles.bottomSheet} ${styles.eventInfoSheet}`}>
+                <div className={styles.sheetHandle} />
+                <div className={styles.eventInfoTitle}>{info.title}</div>
+                <div className={styles.eventInfoShort}>{info.shortDescription}</div>
+                {info.detailedDescription && (
+                  <p className={styles.eventInfoDetail}>{info.detailedDescription}</p>
+                )}
+                {info.commonPatterns && info.commonPatterns.length > 0 && (
+                  <div className={styles.eventInfoSection}>
+                    <div className={styles.eventInfoSectionLabel}>자주 나타나는 흐름</div>
+                    <ul className={styles.eventInfoList}>
+                      {info.commonPatterns.map((p, i) => <li key={i}>{p}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {info.relatedStates && info.relatedStates.length > 0 && (
+                  <div className={styles.eventInfoSection}>
+                    <div className={styles.eventInfoSectionLabel}>연결되는 상태</div>
+                    <div className={styles.eventInfoStateList}>
+                      {info.relatedStates.map((s, i) => (
+                        <div key={i} className={styles.eventInfoStateItem}>
+                          <span className={s.polarity === "positive" ? styles.polarityPos : styles.polarityNeg}>
+                            {s.polarity === "positive" ? "+" : "−"}
+                          </span>
+                          <span>{STATE_LABELS[s.key] ?? s.key}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {info.relatedFlows && info.relatedFlows.length > 0 && (
+                  <div className={styles.eventInfoSection}>
+                    <div className={styles.eventInfoSectionLabel}>연결되는 흐름</div>
+                    <div className={styles.eventInfoFlowList}>
+                      {info.relatedFlows.map((f, i) => (
+                        <div key={i} className={styles.eventInfoFlowItem}>{FLOW_LABELS[f] ?? f}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        })()}
 
         {showExactAlarmGuide && (
             <>

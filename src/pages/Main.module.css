@@ -786,6 +786,126 @@
   color: rgba(185, 90, 70, 0.9);
 }
 
+.reasonChipClickable {
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.reasonChipClickable:active {
+  opacity: 0.55;
+}
+
+/* ── EventInfo Bottom Sheet ── */
+.eventInfoSheet {
+  max-height: 72vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.eventInfoTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.eventInfoShort {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 0.75rem;
+}
+
+.eventInfoDetail {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.75;
+  margin: 0 0 0;
+}
+
+.eventInfoSection {
+  border-top: 1px solid var(--border);
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+}
+
+.eventInfoSectionLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.45rem;
+}
+
+.eventInfoList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.eventInfoList li {
+  font-size: 0.79rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-left: 0.8rem;
+  position: relative;
+}
+
+.eventInfoList li::before {
+  content: "·";
+  position: absolute;
+  left: 0;
+  color: var(--border);
+}
+
+.eventInfoStateList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.eventInfoStateItem {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.79rem;
+  color: var(--text-muted);
+}
+
+.polarityPos {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(60, 145, 110, 0.9);
+  min-width: 0.7rem;
+  line-height: 1;
+}
+
+.polarityNeg {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(185, 90, 70, 0.9);
+  min-width: 0.7rem;
+  line-height: 1;
+}
+
+.eventInfoFlowList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.eventInfoFlowItem {
+  font-size: 0.7rem;
+  padding: 0.14rem 0.48rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: transparent;
+}
+
 
 
 
