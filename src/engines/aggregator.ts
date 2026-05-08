@@ -221,7 +221,7 @@ export class FortuneAggregator {
     // State atom layer — additive adjustment after stabilizers, before rounding
     const stateResult = computeStateAtoms({
       ten_god_of_day:         sajuResult.factors.ten_god_of_day as string | undefined,
-      active_stars:           [],  // natal stars excluded — already scored by sajuEngine.applySpecialStars()
+      active_stars:           (sajuResult.factors.active_stars as string[]) ?? [],  // NATAL_STAR_SCALE=0.3 applied inside stateAtomLayer
       day_branch_relation_types:   (sajuResult.factors.day_branch_relation_types   as string[]) ?? [],
       month_branch_relation_types: (sajuResult.factors.month_branch_relation_types as string[]) ?? [],
       ohaeng_clash_stem:      (sajuResult.factors.ohaeng_clash_stem  as boolean)     ?? false,

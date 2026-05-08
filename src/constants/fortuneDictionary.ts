@@ -85,6 +85,12 @@ export const EVENT_LABELS: Record<string, string> = {
   "ziwei.palace.spirit":   "복덕궁 활성",
   "ziwei.palace.parents":  "부모궁 활성",
 
+  // ── ziwei · transform (사화 四化) ────────────────────────────────────────────
+  "ziwei.transform.huaLu":   "화록",
+  "ziwei.transform.huaQuan": "화권",
+  "ziwei.transform.huaKe":   "화과",
+  "ziwei.transform.huaJi":   "화기",
+
   // astro.aspect.* → resolved dynamically by resolveAstroLabel()
 };
 
@@ -586,9 +592,8 @@ export const EVENT_INFO: Record<string, EventInfo> = {
     relatedFlows: ["flow.highExecution", "flow.focusBoost"],
   },
 
-  // ── ziwei · star ─────────────────────────────────────────────────────────────
-  // Note: ziwei.star.* is a new namespace — add matching entries to EVENT_LABELS / EVENT_META when wiring up ziwei star engine.
-  "ziwei.star.huaquan": {
+  // ── ziwei · transform (사화 四化) ────────────────────────────────────────────
+  "ziwei.transform.huaQuan": {
     title:               "화권",
     shortDescription:    "권위·주도성 흐름을 강화하는 변화성 요소예요.",
     detailedDescription: "자미두수의 사화 중 하나로, 권위·자기주도·결정력과 관련된 에너지를 끌어올리는 경향이 있어요. 주도적으로 움직이는 흐름이 활성화될 때 함께 나타나기도 해요.",

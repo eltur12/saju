@@ -654,6 +654,113 @@
   flex-shrink: 0;
 }
 
+/* ── Category Bars (expandable) ── */
+.catBarsSectionHeader {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.6rem 1rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+
+.catBarsHint {
+  padding: 0.4rem 1rem 0.1rem;
+  font-size: 0.67rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  opacity: 0.72;
+  margin: 0;
+}
+
+.catBarsSection {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.catBarRow {
+  border-bottom: 1px solid var(--border);
+}
+.catBarRow:last-child {
+  border-bottom: none;
+}
+
+.catBarHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.catBarLabel {
+  font-size: 0.73rem;
+  font-weight: 500;
+  color: var(--text);
+  width: 2rem;
+  flex-shrink: 0;
+}
+
+.catBarVal {
+  font-size: 0.78rem;
+  font-weight: 700;
+  width: 1.8rem;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.catBarTrack {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.catBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.35s ease;
+  animation: barGrow 0.4s ease both;
+}
+
+@keyframes barGrow {
+  from { width: 0 !important; }
+}
+
+.catBarChevron {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 0.8rem;
+  text-align: center;
+}
+
+.catBarExpanded {
+  padding: 0.5rem 1rem 0.65rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface, var(--bg));
+}
+
+
+.catBarChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.catBarNoData {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 /* ── Reason Card ── */
 .reasonCard {
   background: var(--card);
@@ -724,47 +831,6 @@
   margin: 0;
 }
 
-.reasonItem {
-  border-top: 1px solid var(--border);
-  padding: 0.65rem 0 0.6rem;
-}
-
-.reasonItemLabel {
-  display: block;
-  font-size: 0.62rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  margin-bottom: 0.3rem;
-}
-
-.reasonItemText {
-  font-size: 0.78rem;
-  color: var(--text-sub, var(--text-muted));
-  line-height: 1.55;
-}
-
-.reasonLine {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.3rem;
-}
-
-.reasonKeywords {
-  font-size: 0.74rem;
-  color: var(--text-sub);
-  line-height: 1.4;
-}
-
-.reasonChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0;
-}
 
 .reasonChip {
   font-size: 0.62rem;

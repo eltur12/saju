@@ -20,6 +20,7 @@ import { addDayRolloverListener, scheduleTodayNotifications, canScheduleExactAla
 import styles from "./Main.module.css";
 import {
   safeResolveInfo,
+  safeResolveLabel,
   STATE_LABELS,
   FLOW_LABELS,
 } from "../constants/fortuneDictionary";
@@ -102,21 +103,6 @@ function getBadgeLabel(badge: string): string {
   return BADGE_LABELS[badge] ?? badge;
 }
 
-// reasonSources chip key (Korean display string) → canonical persisted key
-const REASON_CHIP_CANONICAL: Record<string, string> = {
-  "식신": "saju.tenGod.siksin",    "정인": "saju.tenGod.jeongin",
-  "상관": "saju.tenGod.sanggwan",  "정관": "saju.tenGod.jeonggwan",
-  "편관": "saju.tenGod.pyeonggwan","편재": "saju.tenGod.pyeongjae",
-  "정재": "saju.tenGod.jeongjae", "비견": "saju.tenGod.bigyeon",
-  "겁재": "saju.tenGod.geobjae",  "편인": "saju.tenGod.pyeongin",
-  "명궁":  "ziwei.palace.life",    "형제궁": "ziwei.palace.siblings",
-  "부처궁": "ziwei.palace.spouse", "자녀궁": "ziwei.palace.children",
-  "재백궁": "ziwei.palace.wealth", "질액궁": "ziwei.palace.health",
-  "천이궁": "ziwei.palace.travel", "교우궁": "ziwei.palace.friends",
-  "관록궁": "ziwei.palace.career", "전택궁": "ziwei.palace.property",
-  "복덕궁": "ziwei.palace.spirit", "부모궁": "ziwei.palace.parents",
-};
-
 
 interface Props { onBack: () => void }
 
@@ -158,13 +144,11 @@ export default function Main({ onBack }: Props) {
   const [profile, setProfile] = useState<ProfileInsight | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [infoTooltip, setInfoTooltip] = useState<"region" | "saju" | null>(null);
-  const [reasonOpen, setReasonOpen] = useState<boolean>(
-      () => localStorage.getItem("daily_reason_open") === "true"
-  );
   const [compareOpen, setCompareOpen] = useState<boolean>(
       () => localStorage.getItem("daily_compare_open") === "true"
   );
   const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
+  const [expandedCat, setExpandedCat] = useState<keyof DailyFortune["scores"] | null>(null);
   const [adjPrevScore, setAdjPrevScore] = useState<number | null>(null);
   const [adjNextScore, setAdjNextScore] = useState<number | null>(null);
   dataRef.current = data;
@@ -283,6 +267,15 @@ export default function Main({ onBack }: Props) {
     }
   }, [selected, data, user, month, year, adjPrevScore, adjNextScore]);
 
+  // 날짜 변경 시 최고점 카테고리 자동 expand
+  useEffect(() => {
+    if (!selected) { setExpandedCat(null); return; }
+    const best = RADAR_CATS.reduce((b, c) =>
+      (selected.scores[c.key] as number) > (selected.scores[b.key] as number) ? c : b
+    );
+    setExpandedCat(best.key);
+  }, [selected]);
+
   const handleDeepLink = useCallback((url: string) => {
     try {
       const u = new URL(url);
@@ -321,13 +314,19 @@ export default function Main({ onBack }: Props) {
     return () => { listenerPromise.then(h => h.remove()); };
   }, []);
 
-  // Android back button: close eventInfo sheet before navigating away
+  // Android back button priority: eventInfo sheet → settings subview → settings → detail tab → exit
   useEffect(() => {
     const listenerPromise = App.addListener("backButton", () => {
-      if (eventInfoKey !== null) setEventInfoKey(null);
+      if (eventInfoKey !== null)   { setEventInfoKey(null); return; }
+      if (settingsOpen) {
+        if (settingsView === "noti") { setSettingsView("main"); return; }
+        setSettingsOpen(false); return;
+      }
+      if (tab === "detail")        { setTab("calendar"); return; }
+      App.exitApp();
     });
     return () => { listenerPromise.then(h => h.remove()); };
-  }, [eventInfoKey]);
+  }, [eventInfoKey, settingsOpen, settingsView, tab]);
 
   // Body scroll lock while event info sheet is open
   useEffect(() => {
@@ -1138,167 +1137,62 @@ export default function Main({ onBack }: Props) {
                       )}
                     </div>
 
-                    {/* ── 레이더 차트 + 전체 바 ── */}
-                    {(() => {
-                      const CX = 80, CY = 80, R = 55;
-                      const axisPts = RADAR_CATS.map((_, i) => {
-                        const a = (i / 6) * 2 * Math.PI - Math.PI / 2;
-                        return [CX + R * Math.cos(a), CY + R * Math.sin(a)] as [number, number];
-                      });
-                      const dataPts = RADAR_CATS.map(({ key }, i) => {
-                        const a = (i / 6) * 2 * Math.PI - Math.PI / 2;
-                        const v = (selected.scores[key] as number) / 100;
-                        return [CX + v * R * Math.cos(a), CY + v * R * Math.sin(a)] as [number, number];
-                      });
-                      const polyPts    = dataPts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-                      const rings      = [0.25, 0.5, 0.75, 1.0];
-                      const radarColor = scoreColor(selected.scores.overall as number);
-                      return (
-                          <div className={styles.radarSection} style={{ borderTop: `3px solid ${radarColor}` }}>
-                            <svg viewBox="0 0 160 160" className={styles.radarSvg}>
-                              {rings.map(f => (
-                                  <polygon key={f}
-                                           points={axisPts.map(([x, y]) => `${(CX+(x-CX)*f).toFixed(1)},${(CY+(y-CY)*f).toFixed(1)}`).join(" ")}
-                                           fill="none" stroke="var(--border)" strokeWidth="0.7" />
-                              ))}
-                              {axisPts.map(([x, y], i) => (
-                                  <line key={i} x1={CX} y1={CY} x2={x.toFixed(1)} y2={y.toFixed(1)}
-                                        stroke="var(--border)" strokeWidth="0.7" />
-                              ))}
-                              <polygon points={polyPts} fill={radarColor} fillOpacity="0" stroke="none"
-                                       className={styles.radarFill} />
-                              <polygon points={polyPts} fill="none" stroke={radarColor} strokeWidth="1.5"
-                                       className={styles.radarStroke} />
-                              {RADAR_CATS.map(({ label }, i) => {
-                                const a  = (i / 6) * 2 * Math.PI - Math.PI / 2;
-                                const LR = R + 14;
-                                return (
-                                    <text key={i}
-                                          x={(CX + LR * Math.cos(a)).toFixed(1)}
-                                          y={(CY + LR * Math.sin(a)).toFixed(1)}
-                                          textAnchor="middle" dominantBaseline="middle"
-                                          fontSize="7.5" fill="var(--text-muted)">{label}</text>
-                                );
-                              })}
-                            </svg>
-                            <div className={styles.radarBars}>
-                              {RADAR_CATS.map(({ key, label }, i) => {
-                                const v = selected.scores[key] as number;
-                                return (
-                                    <div key={key} className={styles.radarBarRow}>
-                                      <span className={styles.radarBarLabel}>{label}</span>
-                                      <div className={styles.radarBarTrack}>
-                                        <div className={styles.radarBarFill}
-                                             style={{ width: `${v}%`, animationDelay: `${i * 60}ms`, background: scoreColor(v) }} />
-                                      </div>
-                                      <span className={styles.radarBarVal}>{v}</span>
-                                    </div>
-                                );
-                              })}
+                    {/* ── 카테고리 바 (expandable) ── */}
+                    <div className={styles.catBarsSection}>
+                      <p className={styles.catBarsSectionHeader}>카테고리별 점수</p>
+                      <p className={styles.catBarsHint}>흐름을 만든 요소들 중,{" "}눈여겨볼 만한 내용들만 정리해봤어요.</p>
+                      {RADAR_CATS.map(({ key, label }, i) => {
+                        const v          = selected.scores[key] as number;
+                        const isExpanded = expandedCat === key;
+                        const catEvents  = selected.persisted?.categoryHighlights?.[key]?.topEvents ?? [];
+                        return (
+                          <div key={key} className={styles.catBarRow}>
+                            <div
+                              className={styles.catBarHeader}
+                              onClick={() => setExpandedCat(isExpanded ? null : key)}
+                            >
+                              <span className={styles.catBarLabel}>{label}</span>
+                              <span className={styles.catBarVal} style={{ color: scoreColor(v) }}>{v}</span>
+                              <div className={styles.catBarTrack}>
+                                <div
+                                  className={styles.catBarFill}
+                                  style={{ width: `${v}%`, animationDelay: `${i * 50}ms`, background: scoreColor(v) }}
+                                />
+                              </div>
+                              <span className={styles.catBarChevron}>{isExpanded ? "▾" : "▸"}</span>
                             </div>
+                            {isExpanded && (
+                              <div className={styles.catBarExpanded}>
+                                {catEvents.length > 0 ? (
+                                  <div className={styles.catBarChips}>
+                                    {catEvents.map((evKey, j) => {
+                                      const dispLabel = safeResolveLabel(evKey);
+                                      const hasInfo   = safeResolveInfo(evKey) !== null;
+                                      const topEv     = selected.persisted?.topEvents?.find(e => e.key === evKey);
+                                      const polarity  = topEv?.polarity ?? "neutral";
+                                      return (
+                                        <span
+                                          key={`${evKey}-${j}`}
+                                          className={[
+                                            styles.reasonChip,
+                                            polarity === "positive" ? styles.reasonChipPos : polarity === "negative" ? styles.reasonChipNeg : "",
+                                            hasInfo ? styles.reasonChipClickable : "",
+                                          ].filter(Boolean).join(" ")}
+                                          onClick={hasInfo ? () => setEventInfoKey(evKey) : undefined}
+                                        >
+                                          {dispLabel}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <span className={styles.catBarNoData}>눈에 띄게 크게 작용한 요소는 잘 보이지 않아요.</span>
+                                )}
+                              </div>
+                            )}
                           </div>
-                      );
-                    })()}
-
-                    {/* ── 흐름을 만든 요소 ── */}
-                    <div className={styles.reasonCard}>
-                      <div
-                          className={styles.reasonCardHeader}
-                          onClick={() => {
-                            const next = !reasonOpen;
-                            setReasonOpen(next);
-                            localStorage.setItem("daily_reason_open", String(next));
-                          }}
-                      >
-                        <div className={styles.reasonCardTitleWrap}>
-                          <span className={styles.reasonCardTitle}>
-                            흐름을 만든 요소
-                          </span>
-                          <span className={styles.reasonCardSubtitle}>
-                            가장 영향이 큰 요소
-                          </span>
-                        </div>
-                        <span className={styles.reasonCardToggle}>{reasonOpen ? "−" : "+"}</span>
-                      </div>
-                      {reasonOpen && (
-                          <div className={styles.reasonCardBody}>
-                            {(() => {
-                              const rs = selected.reasonSources;
-
-                              if (!rs) {
-                                return (
-                                    <div className={styles.reasonItemText} style={{ paddingTop: "0.5rem" }}>
-                                      흐름 데이터를 불러오는 중이에요.
-                                    </div>
-                                );
-                              }
-
-                              const sections = [
-                                { label: "사주",    src: rs.saju,  srcType: "saju"  as const },
-                                { label: "자미두수", src: rs.ziwei, srcType: "ziwei" as const },
-                                { label: "별자리",  src: rs.astro, srcType: "astro" as const },
-                              ];
-
-                              return sections.map(({ label, src, srcType }) => {
-                                if (!src) return null;
-
-                                const chips =
-                                    src.chips && src.chips.length > 0
-                                        ? src.chips
-                                        : [
-                                          {
-                                            key: src.key,
-                                            polarity: (src.polarity ?? "neutral") as
-                                                | "positive"
-                                                | "negative"
-                                                | "neutral",
-                                          },
-                                        ];
-
-                                return (
-                                    <div key={label} className={styles.reasonItem}>
-                                      <span className={styles.reasonItemLabel}>{label}</span>
-
-                                      <div className={styles.reasonLine}>
-                                        <span className={styles.reasonKeywords}>{src.text}</span>
-
-                                        <div className={styles.reasonChips}>
-                                          {chips.map((chip, i) => {
-                                            const canonKey = srcType === "astro"
-                                              ? (chip.canonKey ?? null)
-                                              : REASON_CHIP_CANONICAL[chip.key] ?? null;
-                                            const hasInfo = canonKey !== null && safeResolveInfo(canonKey) !== null;
-
-                                            const chipClass = [
-                                              styles.reasonChip,
-                                              chip.polarity === "positive"
-                                                  ? styles.reasonChipPos
-                                                  : chip.polarity === "negative"
-                                                      ? styles.reasonChipNeg
-                                                      : "",
-                                              hasInfo ? styles.reasonChipClickable : "",
-                                            ]
-                                                .filter(Boolean)
-                                                .join(" ");
-
-                                            return (
-                                                <span
-                                                  key={`${chip.key}-${i}`}
-                                                  className={chipClass}
-                                                  onClick={hasInfo ? () => setEventInfoKey(canonKey!) : undefined}
-                                                >
-                                                  {chip.key}
-                                                </span>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    </div>
-                                );
-                              });
-                            })()}
-                          </div>
-                      )}
+                        );
+                      })}
                     </div>
 
                     {/* ── 간단 비교 ── */}

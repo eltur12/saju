@@ -110,6 +110,19 @@ const PALACE_KR_EN: Record<string, string> = {
   "부모궁": "parents",
 };
 
+/** Category → whitelisted palace keys (subset of ziwei.palace.*) */
+const ZIWEI_CAT_WHITELIST: Partial<Record<string, string[]>> = {
+  wealth:    ["ziwei.palace.wealth",  "ziwei.palace.property"],
+  love:      ["ziwei.palace.spouse"],
+  health:    ["ziwei.palace.health"],
+  career:    ["ziwei.palace.career",  "ziwei.palace.life"],
+  relations: ["ziwei.palace.friends", "ziwei.palace.siblings"],
+  study:     ["ziwei.palace.spirit",  "ziwei.palace.parents"],
+};
+
+/** Capped signed catImpact injected for whitelisted palace candidates. */
+const PALACE_CAT_IMPACT = 1.5;
+
 /** Planet English name → lowercase slug */
 const PLANET_SLUG: Record<string, string> = {
   "Sun":      "sun",
@@ -393,6 +406,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
   const categoryHighlights: Partial<Record<keyof ScoreMap, CategoryHighlight>> = {};
 
   for (const cat of DOM_CATS) {
+    // ── 4a: topStates (unchanged) ─────────────────────────────────────────
     const catStateEntries: Array<{ stateKey: string; atomKey: string; contribution: number }> = [];
 
     for (const atomKey of atomKeys) {
@@ -411,16 +425,105 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     const topCatStates = catStateEntries.slice(0, MAX_CAT_STATES);
     if (topCatStates.length === 0) continue;
 
-    const catEventSet = new Set<string>();
-    for (const { atomKey } of topCatStates) {
-      for (const src of atomDebug.atoms[atomKey as StateAtomKey].sources) {
-        catEventSet.add(sourceToCanonical(src));
+    // ── 4b: topEvents — score-direction-aware selection ───────────────────
+    // Use |catImpact| for magnitude (how much does this event affect this category)
+    // Use global chip polarity (from topEvents / evSigned) for directional sorting.
+    // This avoids double-negation artifacts where e.g. a clash contributes positively
+    // to tension (negative atom) which then flips catImpact sign for health.
+    const catEventImpact = new Map<string, number>();
+
+    for (const atomKey of atomKeys) {
+      const entry = atomDebug.atoms[atomKey];
+      if (entry.value === 0 || entry.sources.length === 0) continue;
+      const coeff = STATE_CAT_COEFF[atomKey]?.[cat] ?? 0;
+      if (coeff === 0) continue;
+
+      const perSrc = (entry.value * coeff) / entry.sources.length;
+      for (const src of entry.sources) {
+        const evKey = sourceToCanonical(src);
+        catEventImpact.set(evKey, (catEventImpact.get(evKey) ?? 0) + perSrc);
       }
     }
 
+    // ── 4b-ziwei: inject whitelisted palace chips as additional candidates ──
+    const palaceWhitelist = ZIWEI_CAT_WHITELIST[cat];
+    if (palaceWhitelist && reasons?.ziwei.chips) {
+      for (const chip of reasons.ziwei.chips) {
+        if (FALLBACK_CHIP_KEYS.has(chip.key)) continue;
+        const palaceSlug = PALACE_KR_EN[chip.key];
+        if (!palaceSlug) continue;
+        const palaceKey = `ziwei.palace.${palaceSlug}`;
+        if (!palaceWhitelist.includes(palaceKey)) continue;
+        const signed = chip.polarity === "negative"
+          ? -PALACE_CAT_IMPACT
+          : chip.polarity === "positive"
+            ? PALACE_CAT_IMPACT
+            : PALACE_CAT_IMPACT * 0.3;
+        catEventImpact.set(palaceKey, (catEventImpact.get(palaceKey) ?? 0) + signed);
+      }
+    }
+
+    // Build global polarity lookup from already-computed topEvents
+    const globalPolarityMap = new Map<string, "positive" | "negative" | "neutral">();
+    for (const ev of topEvents) globalPolarityMap.set(ev.key, ev.polarity);
+
+    type Cand = { key: string; absImpact: number; polarity: "positive" | "negative" | "neutral" };
+
+    const allCandidates: Cand[] = [...catEventImpact.entries()]
+      .map(([key, catImpact]) => ({
+        key,
+        absImpact: Math.abs(catImpact),
+        polarity: globalPolarityMap.get(key)
+          ?? (catImpact > 0.01 ? "positive" : catImpact < -0.01 ? "negative" : "neutral"),
+      }))
+      .filter(e => e.absImpact >= 0.3);
+
+    // Separate atom-sourced events from palace chips.
+    // Palace chips always fill at most 1 trailing slot so atom chips are never crowded out.
+    const atomCands   = allCandidates.filter(e => !e.key.startsWith("ziwei."));
+    const palaceCands = allCandidates.filter(e => e.key.startsWith("ziwei."));
+
+    const pickDirectionAware = (pool: Cand[], score: number, n: number): string[] => {
+      if (n <= 0 || pool.length === 0) return [];
+      if (score >= 65) {
+        const pos  = pool.filter(e => e.polarity !== "negative").sort((a, b) => b.absImpact - a.absImpact);
+        const rest = pool.filter(e => e.polarity === "negative").sort((a, b) => b.absImpact - a.absImpact);
+        return [...pos, ...rest].slice(0, n).map(e => e.key);
+      } else if (score <= 55) {
+        const neg  = pool.filter(e => e.polarity !== "positive").sort((a, b) => b.absImpact - a.absImpact);
+        const rest = pool.filter(e => e.polarity === "positive").sort((a, b) => b.absImpact - a.absImpact);
+        return [...neg, ...rest].slice(0, n).map(e => e.key);
+      }
+      return pool.sort((a, b) => b.absImpact - a.absImpact).slice(0, n).map(e => e.key);
+    };
+
+    const catScore = fortune.scores[cat] as number;
+
+    // Filter palace candidates by score direction before slot allocation.
+    // High score (>=65): negative palace excluded.
+    // Low score (<=55):  positive palace excluded.
+    // Middle (56~64):    all palaces allowed.
+    const directedPalaceCands = palaceCands.filter(e => {
+      if (catScore >= 65) return e.polarity !== "negative";
+      if (catScore <= 55) return e.polarity !== "positive";
+      return true;
+    });
+
+    // Atoms take priority (up to 2 slots).
+    // Palace fills 1 trailing slot only when:
+    //   (a) direction-filtered palace candidates exist, AND
+    //   (b) at least 1 atom chip was selected (palace-only prevention).
+    const hasPalace  = directedPalaceCands.length > 0;
+    const atomSlots  = hasPalace ? MAX_CAT_EVENTS - 1 : MAX_CAT_EVENTS;
+    const atomSelected   = pickDirectionAware(atomCands, catScore, atomSlots);
+    const palaceSelected = hasPalace && atomSelected.length > 0
+      ? pickDirectionAware(directedPalaceCands, catScore, 1)
+      : [];
+    const selected = [...atomSelected, ...palaceSelected];
+
     categoryHighlights[cat] = {
       topStates: topCatStates.map(s => s.stateKey),
-      topEvents: [...catEventSet].slice(0, MAX_CAT_EVENTS),
+      topEvents: selected,
     };
   }
 

@@ -288,7 +288,30 @@ export function buildReasonSources(
     }
   }
   {
+    const SIHUA_KR: Record<string, string> = {
+      "化祿": "화록", "化權": "화권", "化科": "화과", "化忌": "화기",
+    };
+    const SIHUA_CANON: Record<string, string> = {
+      "化祿": "ziwei.transform.huaLu",
+      "化權": "ziwei.transform.huaQuan",
+      "化科": "ziwei.transform.huaKe",
+      "化忌": "ziwei.transform.huaJi",
+    };
     const chips = contribsToChips(ziweiContribs ?? [], k => PALACE_KR[k] ?? null);
+    // 활성 궁에 사화(四化)가 있으면 해당 사화 칩 추가
+    const activePalace  = ziweiFactors.active_palace as string | null;
+    const sihuaSummary  = ziweiFactors.sihua_summary as Record<string, string> | undefined;
+    if (activePalace && sihuaSummary) {
+      for (const [sihuaType, palace] of Object.entries(sihuaSummary)) {
+        if (palace === activePalace) {
+          const kr       = SIHUA_KR[sihuaType];
+          const canonKey = SIHUA_CANON[sihuaType];
+          if (kr && !chips.some(c => c.key === kr)) {
+            chips.push({ key: kr, polarity: sihuaType === "化忌" ? "negative" : "positive", canonKey });
+          }
+        }
+      }
+    }
     ziweiSource.chips = chips.length > 0
       ? chips
       : [{ key: ziweiSource.key, polarity: ziweiSource.polarity ?? "neutral" }];
