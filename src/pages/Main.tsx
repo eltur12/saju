@@ -30,7 +30,6 @@ import {
   generateNotificationMessage,
 } from "../engines/notificationPlanner";
 import type { PlannedNotification } from "../engines/notificationPlanner";
-import { getFlowState, getFlowSentence } from "../utils/flowState";
 import { normalizeBirthDateTimeByRegion } from "../utils/sajuTime";
 import { getBirthRegionById } from "../constants/cities";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
@@ -144,14 +143,18 @@ export default function Main({ onBack }: Props) {
   const [profile, setProfile] = useState<ProfileInsight | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [infoTooltip, setInfoTooltip] = useState<"region" | "saju" | null>(null);
-  const [compareOpen, setCompareOpen] = useState<boolean>(
-      () => localStorage.getItem("daily_compare_open") === "true"
-  );
-  const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
+const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<keyof DailyFortune["scores"] | null>(null);
+  const [expandedSegs, setExpandedSegs] = useState<number | null>(null);
   const [adjPrevScore, setAdjPrevScore] = useState<number | null>(null);
   const [adjNextScore, setAdjNextScore] = useState<number | null>(null);
   dataRef.current = data;
+
+  useEffect(() => {
+    const h = new Date().getHours();
+    const initSeg = selected?.timeSegments?.find(s => h >= s.startHour && h < s.endHour);
+    setExpandedSegs(initSeg ? initSeg.startHour : null);
+  }, [selected?.date]);
 
   useEffect(() => {
     loadNotificationSettings().then(s => {
@@ -603,16 +606,6 @@ export default function Main({ onBack }: Props) {
     notiStart,
   ]);
 
-  const segmentDetailMap = useMemo(() => {
-    const map = new Map<number, PlannedNotification>();
-    for (const n of plannedNotifications) {
-      if (n.type !== "DAILY") {
-        map.set(n.triggerTime.getHours(), n);
-      }
-    }
-    return map;
-  }, [plannedNotifications]);
-
   const segmentVisibleNotifMap = useMemo(() => {
     const map = new Map<number, PlannedNotification>();
     for (const n of visibleNotifications) {
@@ -634,19 +627,8 @@ export default function Main({ onBack }: Props) {
     return generateNotificationMessage(dailyNotif, "L2").body;
   }, [plannedNotifications, selected]);
 
-  const nowDelta = useMemo(() => {
-    if (!nowSegment || !selected?.timeSegments) return undefined;
-    const idx = selected.timeSegments.findIndex(s => s.startHour === nowSegment.startHour);
-    if (idx <= 0) return undefined;
-    return nowSegment.score - selected.timeSegments[idx - 1].score;
-  }, [nowSegment, selected]);
 
-  const nowFlowSentence = useMemo(() => {
-    if (!isSelectedToday || !nowSegment) return "";
-    return getFlowSentence(getFlowState(nowSegment.score, nowDelta));
-  }, [isSelectedToday, nowSegment, nowDelta]);
-
-  const normalizedBirthDisplay = useMemo(() => {
+const normalizedBirthDisplay = useMemo(() => {
     if (!user || user.birth_hour === undefined) return "시간 미입력";
     const nb = normalizeBirthDateTimeByRegion({
       year:     user.birth_year,
@@ -1131,16 +1113,86 @@ export default function Main({ onBack }: Props) {
                       </div>
                       <div className={styles.heroScoreDivider}
                            style={{ background: scoreColor(selected.scores.overall as number) }} />
-                      <p className={styles.heroSummary}>{dailySummary}</p>
-                      {nowFlowSentence && (
-                          <p className={styles.heroFlowState}>{nowFlowSentence}</p>
-                      )}
+                      {data && (() => {
+                        const fortunes = data.daily_fortunes;
+                        const idx      = fortunes.findIndex(f => f.date === selected.date);
+                        if (idx === -1) return null;
+
+                        const cur  = fortunes[idx].scores.overall as number;
+                        const prev = idx > 0
+                            ? fortunes[idx - 1].scores.overall as number
+                            : adjPrevScore;
+                        const next = idx < fortunes.length - 1
+                            ? fortunes[idx + 1].scores.overall as number
+                            : adjNextScore;
+
+                        const allScores = fortunes.map(f => f.scores.overall as number).sort((a, b) => b - a);
+                        const rank      = allScores.indexOf(cur);
+                        const total     = allScores.length;
+
+                        const prevDiff = prev !== null ? cur - prev : null;
+                        const nextDiff = next !== null ? cur - next : null;
+
+                        const fmtDiff = (d: number | null) =>
+                            d === null ? "—"
+                          : d > 0     ? `+${d}`
+                          : d === 0   ? "±0"
+                          : `${d}`;
+
+                        const navToPrev = () => {
+                          if (idx > 0) {
+                            setSelected(fortunes[idx - 1]);
+                          } else {
+                            const prevM = month === 1 ? 12 : month - 1;
+                            const prevY = month === 1 ? year - 1 : year;
+                            const lastDay = new Date(prevY, prevM, 0).getDate();
+                            setPendingDay({ year: prevY, month: prevM, day: lastDay });
+                          }
+                        };
+
+                        const navToNext = () => {
+                          if (idx < fortunes.length - 1) {
+                            setSelected(fortunes[idx + 1]);
+                          } else {
+                            const nextM = month === 12 ? 1 : month + 1;
+                            const nextY = month === 12 ? year + 1 : year;
+                            setPendingDay({ year: nextY, month: nextM, day: 1 });
+                          }
+                        };
+
+                        return (
+                          <div className={styles.daySummaryRow}>
+                            <div className={`${styles.daySummaryCell} ${styles.daySummaryCellNav}`} onClick={navToPrev}>
+                              <span className={styles.daySummaryCellLabel}>전날 대비</span>
+                              <span className={`${styles.daySummaryCellVal} ${prevDiff !== null && prevDiff > 0 ? styles.daySummaryPos : prevDiff !== null && prevDiff < 0 ? styles.daySummaryNeg : styles.daySummaryNeutral}`}>
+                                {fmtDiff(prevDiff)}
+                              </span>
+                            </div>
+                            <div className={styles.daySummarySep} />
+                            <div className={styles.daySummaryCell}>
+                              <span className={styles.daySummaryCellLabel}>이번 달</span>
+                              <span className={`${styles.daySummaryCellVal} ${rank + 1 <= Math.ceil(total / 3) ? styles.daySummaryPos : rank + 1 >= Math.ceil(total * 2 / 3) ? styles.daySummaryNeg : styles.daySummaryNeutral}`}>
+                                {total}일 중 {rank + 1}등
+                              </span>
+                            </div>
+                            <div className={styles.daySummarySep} />
+                            <div className={`${styles.daySummaryCell} ${styles.daySummaryCellNav}`} onClick={navToNext}>
+                              <span className={styles.daySummaryCellLabel}>다음날 대비</span>
+                              <span className={`${styles.daySummaryCellVal} ${nextDiff !== null && nextDiff > 0 ? styles.daySummaryPos : nextDiff !== null && nextDiff < 0 ? styles.daySummaryNeg : styles.daySummaryNeutral}`}>
+                                {fmtDiff(nextDiff)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
+                    {/* ── 분석 영역 공통 안내 ── */}
+                    <p className={styles.analysisHint}>흐름을 만든 요소들 중,{" "}눈여겨볼 만한 내용들만 정리해봤어요.</p>
+
 
                     {/* ── 카테고리 바 (expandable) ── */}
                     <div className={styles.catBarsSection}>
                       <p className={styles.catBarsSectionHeader}>카테고리별 점수</p>
-                      <p className={styles.catBarsHint}>흐름을 만든 요소들 중,{" "}눈여겨볼 만한 내용들만 정리해봤어요.</p>
                       {RADAR_CATS.map(({ key, label }, i) => {
                         const v          = selected.scores[key] as number;
                         const isExpanded = expandedCat === key;
@@ -1195,153 +1247,89 @@ export default function Main({ onBack }: Props) {
                       })}
                     </div>
 
-                    {/* ── 간단 비교 ── */}
-                    {data && (() => {
-                      const fortunes = data.daily_fortunes;
-                      const idx      = fortunes.findIndex(f => f.date === selected.date);
-                      if (idx === -1) return null;
-
-                      const cur      = fortunes[idx].scores.overall as number;
-                      const prev     = idx > 0
-                          ? fortunes[idx - 1].scores.overall as number
-                          : adjPrevScore;
-                      const next     = idx < fortunes.length - 1
-                          ? fortunes[idx + 1].scores.overall as number
-                          : adjNextScore;
-
-                      const allScores   = [...fortunes.map(f => f.scores.overall as number)].sort((a, b) => b - a);
-                      const rank        = allScores.indexOf(cur);
-                      const ratio       = rank / allScores.length;
-                      const monthlyText = ratio <= 0.33
-                          ? "이번 달 안에서는 흐름이 좋은 편이에요"
-                          : ratio <= 0.66
-                              ? "이번 달 기준으로 무난한 흐름이에요"
-                              : "이번 달 안에서는 조금 가벼운 흐름이에요";
-
-                      const prevDiff = prev !== null ? cur - prev : 0;
-                      const nextDiff = next !== null ? next - cur : 0;
-
-                      type CompareLine = { text: string; diff: number | null };
-
-                      let prevLine: CompareLine | null = null;
-                      if (prev !== null && prevDiff !== 0) {
-                        const abs = Math.abs(prevDiff);
-                        const label = prevDiff > 0
-                          ? abs <= 5  ? "이전 날보다 살짝 따뜻해졌어요"
-                          : abs <= 10 ? "이전 날보다 조금 따뜻해졌어요"
-                                      : "이전 날보다 눈에 띄게 따뜻해졌어요"
-                          : abs <= 5  ? "이전 날보다 살짝 식었어요"
-                          : abs <= 10 ? "이전 날보다 조금 식었어요"
-                                      : "이전 날보다 눈에 띄게 식었어요";
-                        prevLine = { text: label, diff: prevDiff };
-                      }
-                      let nextLine: CompareLine | null = null;
-                      if (next !== null && nextDiff !== 0) {
-                        const abs = Math.abs(nextDiff);
-                        const label = nextDiff > 0
-                          ? abs <= 5  ? "다음 날은 살짝 따뜻해질 수 있어요"
-                          : abs <= 10 ? "다음 날은 조금 따뜻해질 수 있어요"
-                                      : "다음 날은 눈에 띄게 따뜻해질 수 있어요"
-                          : abs <= 5  ? "다음 날은 살짝 식을 수 있어요"
-                          : abs <= 10 ? "다음 날은 조금 식을 수 있어요"
-                                      : "다음 날은 눈에 띄게 식을 수 있어요";
-                        nextLine = { text: label, diff: nextDiff };
-                      }
-
-                      const lines: CompareLine[] = (
-                        [prevLine, nextLine, { text: monthlyText, diff: null }] as (CompareLine | null)[]
-                      ).filter(Boolean) as CompareLine[];
-                      if (lines.length === 0) return null;
-
-                      return (
-                          <div className={styles.reasonCard}>
-                            <div
-                                className={styles.reasonCardHeader}
-                                onClick={() => {
-                                  const next = !compareOpen;
-                                  setCompareOpen(next);
-                                  localStorage.setItem("daily_compare_open", String(next));
-                                }}
-                            >
-                              <div className={styles.reasonCardTitleWrap}>
-                                <span className={styles.reasonCardTitle}>간단 비교</span>
-                                <span className={styles.reasonCardSubtitle}>이번 달 흐름 속 오늘의 위치</span>
-                              </div>
-                              <span className={styles.reasonCardToggle}>{compareOpen ? "−" : "+"}</span>
-                            </div>
-                            {compareOpen && (
-                                <div className={styles.compareBody}>
-                                  {lines.map((line, i) => (
-                                      <p key={i} className={styles.compareLine}>
-                                        {line.text}
-                                        {line.diff !== null && (
-                                          <span className={line.diff > 0 ? styles.comparePos : styles.compareNeg}>
-                                            {line.diff > 0 ? ` +${line.diff}` : ` -${Math.abs(line.diff)}`}
-                                          </span>
-                                        )}
-                                      </p>
-                                  ))}
-                                </div>
-                            )}
-                          </div>
-                      );
-                    })()}
-
                     {/* ── 시간대 흐름 (accordion) ── */}
                     {selected.timeSegments && selected.timeSegments.length > 0 && (
-                        <div className={styles.detailSection}>
-                          <div className={styles.sectionTitle}>시간대 흐름</div>
-                          <div className={styles.segmentList}>
-                            {selected.timeSegments.map((seg) => {
-                              const isNow      = isSelectedToday && nowSegment?.startHour === seg.startHour;
-                              const isBest     = bestSegment?.startHour === seg.startHour;
-                              const isWorst    = worstSegment?.startHour === seg.startHour
-                                  && worstSegment?.startHour !== bestSegment?.startHour;
-                              const detailNotif = segmentDetailMap.get(seg.startHour);
-                              const visibleNotif = segmentVisibleNotifMap.get(seg.startHour);
-                              const isHighlighted = !!detailNotif;
+                        <div className={styles.segmentCard}>
+                          <p className={styles.segmentCardHeader}>시간대 흐름</p>
+                          {selected.timeSegments.map((seg) => {
+                            const isNow        = isSelectedToday && nowSegment?.startHour === seg.startHour;
+                            const isBest       = bestSegment?.startHour === seg.startHour;
+                            const isWorst      = worstSegment?.startHour === seg.startHour
+                                && worstSegment?.startHour !== bestSegment?.startHour;
+                            const visibleNotif = segmentVisibleNotifMap.get(seg.startHour);
+                            const hasTopEvents = (seg.topEvents?.length ?? 0) > 0;
+                            const isOpen       = expandedSegs === seg.startHour;
+                            const segSummary   = selected.timeSegmentSummary;
+                            const isRise = !isBest && !isWorst && segSummary?.rise?.toHour === seg.startHour;
+                            const isDrop = !isBest && !isWorst && segSummary?.drop?.toHour === seg.startHour;
 
-                              const bodyText = detailNotif
-                                  ? generateNotificationMessage(detailNotif, "L3").body
-                                  : "";
+                            const toggleSeg = () =>
+                              setExpandedSegs(prev => prev === seg.startHour ? null : seg.startHour);
 
-                              return (
-                                  <div key={seg.startHour} className={`${styles.segmentAccordion} ${isHighlighted ? styles.segmentAccordionHighlight : ""}`}>
-                                    <div
-                                        className={`${styles.segmentRow} ${isNow ? styles.segmentRowNow : ""} ${isHighlighted ? styles.segmentRowOpen : ""}`}
-                                    >
-                            <span className={styles.segmentTime}>
-                              {fmtHour(seg.startHour)} – {fmtHour(seg.endHour)}
-                            </span>
-                                      <span className={styles.segmentScoreWrap}>
-                              <span className={`${styles.segmentScore} ${getScoreClass(seg.score)}`}>
-                                {seg.score}
-                              </span>
-                                        {isBest  && <span className={styles.scoreBadgeHigh}>▲</span>}
-                                        {isWorst && <span className={styles.scoreBadgeLow}>▽</span>}
-                            </span>
-                                      <span className={styles.segmentRight}>
-                              {visibleNotif?.type === "FLOW"  && (
-                                  <span className={`${styles.notiMarker} ${styles.notiMarkerFlow}`}>★</span>
-                              )}
-                                        {visibleNotif?.type === "LOW"   && (
-                                            <span className={`${styles.notiMarker} ${styles.notiMarkerLow}`}>↓</span>
-                                        )}
-                                        {visibleNotif?.type === "POINT" && (
-                                            <span className={`${styles.notiMarker} ${styles.notiMarkerPoint}`}>●</span>
-                                        )}
+                            return (
+                              <div key={seg.startHour} className={`${styles.segmentItem} ${isNow ? styles.segmentItemNow : ""}`}>
+                                <div className={styles.segmentRow} onClick={toggleSeg}>
+                                  {/* 1층: 시간 범위 + 상태/chevron */}
+                                  <div className={styles.segmentRowTop}>
+                                    <span className={styles.segmentTimeRange}>
+                                      {fmtHour(seg.startHour)} – {fmtHour(seg.endHour)}
+                                    </span>
+                                    <span className={styles.segmentRowActions}>
+                                      {isBest  && <span className={styles.segmentBadgeBest}>최고</span>}
+                                      {isWorst && <span className={styles.segmentBadgeWorst}>최저</span>}
+                                      <span className={styles.segmentSecondary}>
+                                        {isRise && <span className={styles.segmentDeltaRise}>▲ {segSummary!.rise!.delta}</span>}
+                                        {isDrop && <span className={styles.segmentDeltaDrop}>▼ {segSummary!.drop!.delta}</span>}
+                                        {visibleNotif?.type === "FLOW"  && <span className={`${styles.notiMarker} ${styles.notiMarkerFlow}`}>★</span>}
+                                        {visibleNotif?.type === "LOW"   && <span className={`${styles.notiMarker} ${styles.notiMarkerLow}`}>↓</span>}
+                                        {visibleNotif?.type === "POINT" && <span className={`${styles.notiMarker} ${styles.notiMarkerPoint}`}>●</span>}
                                         {isSelectedToday && scheduledHours.has(seg.startHour) && <span className={styles.notiClockIcon}>⏰</span>}
-                            </span>
-                                    </div>
-                                    {detailNotif && (
-                                        <div className={isNow ? styles.segmentBodyNow : styles.segmentBody}>
-                                          <p className={styles.segmentBodyText}>{bodyText}</p>
-                                        </div>
-                                    )}
+                                      </span>
+                                      <span className={styles.segmentChevron}>{isOpen ? "▾" : "▸"}</span>
+                                    </span>
                                   </div>
-                              );
-                            })}
-                          </div>
+                                  {/* 2층: 점수 + 바그래프 */}
+                                  <div className={styles.segmentRowBottom}>
+                                    <span className={styles.segmentScore} style={{ color: scoreColor(seg.score) }}>
+                                      {seg.score}
+                                    </span>
+                                    <div className={styles.segmentBarTrack}>
+                                      <div className={styles.segmentBarFill} style={{ width: `${seg.score}%`, background: scoreColor(seg.score) }} />
+                                    </div>
+                                  </div>
+                                </div>
+                                {isOpen && (
+                                  <div className={styles.segmentExpanded}>
+                                    <div className={styles.segmentTopChips}>
+                                      {hasTopEvents ? (
+                                        seg.topEvents!.map((evKey, j) => {
+                                          const dispLabel = safeResolveLabel(evKey);
+                                          const hasInfo   = safeResolveInfo(evKey) !== null;
+                                          const topEv     = selected.persisted?.topEvents?.find(e => e.key === evKey);
+                                          const polarity  = topEv?.polarity ?? "neutral";
+                                          return (
+                                            <span
+                                              key={`${evKey}-${j}`}
+                                              className={[
+                                                styles.reasonChip,
+                                                polarity === "positive" ? styles.reasonChipPos : polarity === "negative" ? styles.reasonChipNeg : "",
+                                                hasInfo ? styles.reasonChipClickable : "",
+                                              ].filter(Boolean).join(" ")}
+                                              onClick={hasInfo ? () => setEventInfoKey(evKey) : undefined}
+                                            >
+                                              {dispLabel}
+                                            </span>
+                                          );
+                                        })
+                                      ) : (
+                                        <span className={styles.segmentNoEvents}>눈에 띄게 크게 작용한 요소는 잘 보이지 않아요.</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                     )}
 

@@ -467,21 +467,49 @@
   opacity: 0.35;
 }
 
-.heroSummary {
-  font-size: 0.74rem;
-  color: var(--text-sub);
-  line-height: 1.4;
-  margin-top: 0.6rem;
-  border-left: 3px solid var(--accent-mint);
-  padding-left: 0.75rem;
-}
 
-.heroFlowState {
-  font-size: 0.72rem;
-  color: var(--text-sub);
-  opacity: 0.85;
-  margin-top: 0.5rem;
-  padding-left: 0.75rem;
+/* ── Day Summary Row (compact 3-col, lives inside heroCard) ── */
+.daySummaryRow {
+  display: flex;
+  align-items: stretch;
+  margin-top: 0.7rem;
+}
+.daySummaryCell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.42rem 0.3rem;
+  gap: 0.16rem;
+}
+.daySummarySep {
+  width: 1px;
+  background: var(--border);
+  margin: 0.38rem 0;
+}
+.daySummaryCellLabel {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  line-height: 1;
+}
+.daySummaryCellVal {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+}
+.daySummaryPos { color: var(--accent-mint); }
+.daySummaryNeg { color: var(--danger); }
+.daySummaryNeutral { color: var(--text-muted); }
+
+.daySummaryCellNav {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s;
+}
+.daySummaryCellNav:active {
+  opacity: 0.6;
 }
 
 /* Badge */
@@ -666,13 +694,14 @@
   margin: 0;
 }
 
-.catBarsHint {
-  padding: 0.4rem 1rem 0.1rem;
+.analysisHint {
+  padding: 0 0.2rem;
   font-size: 0.67rem;
   line-height: 1.45;
   color: var(--text-muted);
   opacity: 0.72;
-  margin: 0;
+  margin: -0.2rem 0 -0.1rem;
+  text-align: center;
 }
 
 .catBarsSection {
@@ -810,25 +839,6 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-}
-
-.compareBody {
-  padding-bottom: 0.9rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.comparePos { color: rgba(60, 145, 110, 0.9); }
-.compareNeg { color: rgba(185, 90, 70, 0.9); }
-
-.compareLine {
-  border-top: 1px solid var(--border);
-  padding: 0.65rem 0 0.6rem;
-  font-size: 0.74rem;
-  color: var(--text-sub);
-  line-height: 1.4;
-  margin: 0;
 }
 
 
@@ -1016,148 +1026,185 @@
 }
 
 /* ── Time Segments ── */
-.segmentList {
+
+/* Card wrapper — mirrors catBarsSection */
+.segmentCard {
+  background: var(--card);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.segmentCardHeader {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 1rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+
+/* Row item */
+.segmentItem {
+  border-bottom: 1px solid var(--border);
+}
+.segmentItem:last-child {
+  border-bottom: none;
+}
+.segmentItemNow {
+  background: rgba(58, 171, 140, 0.04);
+  border-left: 3px solid var(--accent-mint);
+}
+
+/* Row — 2층 column */
+.segmentRow {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.3rem;
+  padding: 0.62rem 1rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.segmentAccordion {
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.segmentAccordionHighlight {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(17,17,17,0.04);
-}
-
-.segmentRow {
-  display: grid;
-  grid-template-columns: 7rem 3.2rem 1fr;
+/* 1층: 시간 범위 ↔ 상태/chevron */
+.segmentRowTop {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.55rem 0.6rem;
-  border-radius: 8px;
-  cursor: default;
-  transition: background 0.1s;
 }
-.segmentRowNow {
-  background: var(--accent-mint-bg);
-  border-radius: 8px;
-  border-left: 3px solid var(--accent-mint);
-  padding-left: 9px;
-}
-.segmentRowOpen {
-  background: var(--bg);
-  border-radius: 8px 8px 0 0;
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-.segmentRowNow.segmentRowOpen { background: var(--accent-mint-bg); border-radius: 8px 8px 0 0; }
-
-.segmentTime {
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.segmentRowNow .segmentTime {
+.segmentTimeRange {
+  font-size: 0.72rem;
+  font-weight: 500;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.segmentItemNow .segmentTimeRange {
+  color: var(--accent-mint);
   font-weight: 600;
 }
-
-.segmentScoreWrap {
+.segmentRowActions {
   display: flex;
   align-items: center;
-  gap: 0.15rem;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
+/* 2층: 점수 + 바그래프 */
+.segmentRowBottom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .segmentScore {
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 700;
+  width: 1.8rem;
+  flex-shrink: 0;
   text-align: right;
 }
-.segmentRowNow .segmentScore {
-  font-weight: 800;
+.segmentBarTrack {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.segmentBarFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.35s ease;
+  animation: fillBar 0.45s ease both;
 }
 
-.scoreBadgeHigh {
-  font-size: 0.52rem;
-  color: var(--accent-gold);
-  line-height: 1;
-  opacity: 0.8;
-}
-.scoreBadgeLow {
-  font-size: 0.52rem;
-  color: var(--danger);
-  line-height: 1;
-  opacity: 0.8;
-}
-
-.segmentTags {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
-.segmentRight {
+/* Secondary group: delta + icons — dimmed, compact */
+.segmentSecondary {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.35rem;
-  justify-self: end;
+  gap: 0.1rem;
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+.segmentDeltaRise {
+  color: var(--accent-mint);
+  letter-spacing: 0.02em;
+}
+.segmentDeltaDrop {
+  color: var(--danger);
+  letter-spacing: 0.02em;
 }
 
-/* Notification type markers */
+/* Chevron */
+.segmentChevron {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 0.8rem;
+  text-align: center;
+}
+
+/* Expanded area */
+.segmentExpanded {
+  padding: 0.5rem 1rem 0.6rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface, var(--bg));
+}
+
+/* Notification markers — inside secondary group, plain colored icons */
 .notiMarker {
-  width: 1rem;
-  height: 1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  opacity: 0.9;
+  font-size: 0.68rem;
   line-height: 1;
-  border-radius: 999px;
   font-weight: 700;
 }
-.notiMarkerFlow  { color: var(--accent-gold); background: var(--accent-gold-bg); }
-.notiMarkerLow   { color: var(--danger); background: var(--danger-bg); }
-.notiMarkerPoint { color: var(--accent-mint); background: var(--accent-mint-bg); }
+.notiMarkerFlow  { color: var(--accent-gold); }
+.notiMarkerLow   { color: var(--danger); }
+.notiMarkerPoint { color: var(--accent-mint); }
 
-/* Clock icon (notification scheduled) */
+/* Clock icon */
 .notiClockIcon {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   line-height: 1;
-  opacity: 0.72;
 }
 
-/* Chevron toggle */
-.segmentChevron {
-  font-size: 0.82rem;
+/* Best/worst: outline chip — mint / neutral-gray */
+.segmentBadgeBest {
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: var(--accent-mint);
+  border: 1px solid rgba(58, 171, 140, 0.45);
+  padding: 0.05rem 0.44rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  line-height: 1.8;
+}
+.segmentBadgeWorst {
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: rgba(224, 92, 92, 0.8);
+  border: 1px solid rgba(224, 92, 92, 0.35);
+  padding: 0.05rem 0.44rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  line-height: 1.8;
+}
+
+/* Chips inside expanded area */
+.segmentTopChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.segmentNoEvents {
+  font-size: 0.63rem;
   color: var(--text-dim);
-  display: inline-block;
-  transition: transform 0.2s;
-  line-height: 1;
-}
-.segmentChevronOpen { transform: rotate(90deg); }
-
-/* Expanded body */
-.segmentBody {
-  background: var(--bg);
-  border-radius: 0 0 10px 10px;
-  padding: 0.68rem 0.9rem 0.85rem;
-}
-.segmentBodyNow {
-  background: var(--accent-mint-bg);
-  border-radius: 0 0 10px 10px;
-  padding: 0.68rem 0.9rem 0.85rem;
-}
-.segmentBodyText {
-  font-size: 0.74rem;
-  color: var(--text-sub);
   line-height: 1.4;
-  opacity: 0.92;
-  margin: 0;
 }
 
 /* Scheduled notification hint */

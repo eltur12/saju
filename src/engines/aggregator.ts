@@ -2,7 +2,7 @@
  * 운세 통합 집계기 (Fortune Aggregator)
  */
 import type { ScoreMap } from "./sajuEngine";
-import { buildSajuEngineFromProfile, type SajuEngineProfile, STEM_ELEMENT } from "./sajuEngine";
+import { buildSajuEngineFromProfile, type SajuEngineProfile } from "./sajuEngine";
 import { applySajuBalanceAdjustment, computeElementDistribution, type SajuBalanceDebug } from "./sajuBalanceLayer";
 import { buildZiweiEngineFromProfile, type ZiweiProfile } from "./ziweiEngine";
 import { buildAstroEngineFromProfile, type AstroProfile } from "./astroEngine";
@@ -54,6 +54,13 @@ export function scoreToBadge(score: number): string {
   return "주의";
 }
 
+export interface TimeSegmentSummary {
+  best:  { startHour: number; score: number };
+  worst: { startHour: number; score: number };
+  rise:  { fromHour: number; toHour: number; delta: number } | null;
+  drop:  { fromHour: number; toHour: number; delta: number } | null;
+}
+
 export interface DailyFortune {
   date: string;
   lunar_date: string;
@@ -66,7 +73,9 @@ export interface DailyFortune {
     endHour: number;
     score: number;
     tags: string[];
+    topEvents?: string[];
   }>;
+  timeSegmentSummary?: TimeSegmentSummary;
   notificationHints?: Array<{
     type: "best_window" | "caution_window" | "next_rise";
     hour: number;
@@ -266,11 +275,36 @@ export class FortuneAggregator {
     };
     fortune.timeSegments = generateTimeSegments(
       fortune,
+      stateResult.debug,
       this.userElements,
-      STEM_ELEMENT[this.sajuProfile.day_stem],
       sajuResult.factors.target_branch as string,
       sajuResult.factors.month_branch as string,
     );
+    if (fortune.timeSegments && fortune.timeSegments.length > 0) {
+      const segs = fortune.timeSegments;
+      let bestIdx = 0, worstIdx = 0;
+      let maxRise = 0, maxDrop = 0;
+      let riseFrom = -1, riseTo = -1, dropFrom = -1, dropTo = -1;
+      for (let i = 0; i < segs.length; i++) {
+        if (segs[i].score > segs[bestIdx].score) bestIdx = i;
+        if (segs[i].score < segs[worstIdx].score) worstIdx = i;
+      }
+      for (let i = 1; i < segs.length; i++) {
+        const delta = segs[i].score - segs[i - 1].score;
+        if (delta > maxRise)  { maxRise = delta;  riseFrom = i - 1; riseTo = i; }
+        if (-delta > maxDrop) { maxDrop = -delta; dropFrom = i - 1; dropTo = i; }
+      }
+      fortune.timeSegmentSummary = {
+        best:  { startHour: segs[bestIdx].startHour,  score: segs[bestIdx].score  },
+        worst: { startHour: segs[worstIdx].startHour, score: segs[worstIdx].score },
+        rise:  riseFrom >= 0 && maxRise >= 3
+          ? { fromHour: segs[riseFrom].startHour, toHour: segs[riseTo].startHour, delta: maxRise }
+          : null,
+        drop:  dropFrom >= 0 && maxDrop >= 3
+          ? { fromHour: segs[dropFrom].startHour, toHour: segs[dropTo].startHour, delta: maxDrop }
+          : null,
+      };
+    }
     fortune.notificationHints = generateNotificationHints(fortune);
     fortune.persisted = buildPersistedDailyModel(fortune);
     return fortune;
