@@ -18,6 +18,7 @@ import {
 } from "../services/notificationService";
 import { addDayRolloverListener, scheduleTodayNotifications, canScheduleExactAlarms, openExactAlarmSettings, getNotificationRegistrationStatus } from "../plugins/widgetPlugin";
 import styles from "./Main.module.css";
+import SegmentClock from "../components/SegmentClock";
 import {
   safeResolveInfo,
   safeResolveLabel,
@@ -26,8 +27,8 @@ import {
 } from "../constants/fortuneDictionary";
 import {
   planNotifications,
-  applyNotificationSettings,
   generateNotificationMessage,
+  applyNotificationSettings,
 } from "../engines/notificationPlanner";
 import type { PlannedNotification } from "../engines/notificationPlanner";
 import { normalizeBirthDateTimeByRegion } from "../utils/sajuTime";
@@ -64,9 +65,6 @@ function getElementColor(char: string) {
 type TabId = "calendar" | "detail";
 type SettingsView = "main" | "noti";
 
-function fmtHour(h: number) {
-  return String(h).padStart(2, "0") + ":00";
-}
 
 const HOUR_BRANCH_LABELS = ["자시","축시","인시","묘시","진시","사시","오시","미시","신시","유시","술시","해시"];
 function getHourBranch(hour: number): string {
@@ -135,7 +133,7 @@ export default function Main({ onBack }: Props) {
   const hasScheduledTodayRef                = useRef(false);
   const prevTodayStrRef                    = useRef(todayStr);
   const [resumeTick, setResumeTick]         = useState(0);
-  const [scheduledHours, setScheduledHours] = useState<Set<number>>(new Set());
+  const [_scheduledHours, setScheduledHours] = useState<Set<number>>(new Set());
   const dataRef = useRef<MonthlyFortuneResult | null>(null);
   const [showExactAlarmGuide, setShowExactAlarmGuide] = useState(false);
   const [notiModalOpen, setNotiModalOpen] = useState(false);
@@ -151,10 +149,9 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   dataRef.current = data;
 
   useEffect(() => {
-    const h = new Date().getHours();
-    const initSeg = selected?.timeSegments?.find(s => h >= s.startHour && h < s.endHour);
-    setExpandedSegs(initSeg ? initSeg.startHour : null);
+    setExpandedSegs(null);
   }, [selected?.date]);
+
 
   useEffect(() => {
     loadNotificationSettings().then(s => {
@@ -563,15 +560,6 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
 
   // Now / best segments
   const isSelectedToday = selected?.date === todayStr;
-  const nowSegment = (() => {
-    if (!selected?.timeSegments?.length) return null;
-    if (isSelectedToday) {
-      const h = new Date().getHours();
-      return selected.timeSegments.find(s => h >= s.startHour && h < s.endHour)
-          ?? selected.timeSegments[0];
-    }
-    return selected.timeSegments.reduce((a, b) => b.score > a.score ? b : a);
-  })();
   const bestSegment = selected?.timeSegments?.length
       ? selected.timeSegments.reduce((a, b) => b.score > a.score ? b : a)
       : null;
@@ -579,14 +567,30 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
       ? selected.timeSegments.reduce((a, b) => b.score < a.score ? b : a)
       : null;
 
+  const nowSegStartHour = (() => {
+    if (!selected?.timeSegments?.length) return null;
+    const h = new Date().getHours();
+    const seg = selected.timeSegments.find(s => s.startHour <= h && h < s.endHour);
+    return seg?.startHour ?? selected.timeSegments[0].startHour;
+  })();
+
+  const effectiveSegHour = expandedSegs ?? nowSegStartHour;
+
   const plannedNotifications = useMemo<PlannedNotification[]>(() => {
     if (!selected) return [];
     return planNotifications(selected, selected.date);
   }, [selected]);
 
-  const visibleNotifications = useMemo<PlannedNotification[]>(() => {
-    if (!selected) return [];
 
+
+  useEffect(() => {
+    if (!selected) { setScheduledHours(new Set()); return; }
+    loadNotificationReadyHours(selected.date).then(setScheduledHours);
+  }, [selected?.date]);
+
+  const notifsBySegment = useMemo<Map<number, PlannedNotification[]>>(() => {
+    const result = new Map<number, PlannedNotification[]>();
+    if (!selected?.timeSegments) return result;
     const settings = {
       dailyEnabled: notiDailyEnabled,
       flowEnabled:  notiFlowEnabled,
@@ -594,32 +598,17 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
       allowNight:   notiAllowNight,
       dailyTime:    `${String(notiStart).padStart(2, "0")}:00`,
     };
-
-    const planned = planNotifications(selected, selected.date);
-    return applyNotificationSettings(planned, settings, selected.date);
-  }, [
-    selected,
-    notiDailyEnabled,
-    notiFlowEnabled,
-    notiLowEnabled,
-    notiAllowNight,
-    notiStart,
-  ]);
-
-  const segmentVisibleNotifMap = useMemo(() => {
-    const map = new Map<number, PlannedNotification>();
-    for (const n of visibleNotifications) {
-      if (n.type !== "DAILY") {
-        map.set(n.triggerTime.getHours(), n);
+    const filtered = applyNotificationSettings(plannedNotifications, settings, selected.date);
+    for (const n of filtered) {
+      const h = n.triggerTime.getHours();
+      const seg = selected.timeSegments!.find(s => s.startHour <= h && h < s.endHour);
+      if (seg) {
+        if (!result.has(seg.startHour)) result.set(seg.startHour, []);
+        result.get(seg.startHour)!.push(n);
       }
     }
-    return map;
-  }, [visibleNotifications]);
-
-  useEffect(() => {
-    if (!selected) { setScheduledHours(new Set()); return; }
-    loadNotificationReadyHours(selected.date).then(setScheduledHours);
-  }, [selected?.date]);
+    return result;
+  }, [plannedNotifications, selected, notiDailyEnabled, notiFlowEnabled, notiLowEnabled, notiAllowNight, notiStart]);
 
   const dailySummary = useMemo(() => {
     const dailyNotif = plannedNotifications.find(n => n.type === "DAILY");
@@ -1220,14 +1209,11 @@ const normalizedBirthDisplay = useMemo(() => {
                                     {catEvents.map((evKey, j) => {
                                       const dispLabel = safeResolveLabel(evKey);
                                       const hasInfo   = safeResolveInfo(evKey) !== null;
-                                      const topEv     = selected.persisted?.topEvents?.find(e => e.key === evKey);
-                                      const polarity  = topEv?.polarity ?? "neutral";
                                       return (
                                         <span
                                           key={`${evKey}-${j}`}
                                           className={[
                                             styles.reasonChip,
-                                            polarity === "positive" ? styles.reasonChipPos : polarity === "negative" ? styles.reasonChipNeg : "",
                                             hasInfo ? styles.reasonChipClickable : "",
                                           ].filter(Boolean).join(" ")}
                                           onClick={hasInfo ? () => setEventInfoKey(evKey) : undefined}
@@ -1247,93 +1233,98 @@ const normalizedBirthDisplay = useMemo(() => {
                       })}
                     </div>
 
-                    {/* ── 시간대 흐름 (accordion) ── */}
+                    {/* ── 시간대 흐름 ── */}
                     {selected.timeSegments && selected.timeSegments.length > 0 && (
                         <div className={styles.segmentCard}>
                           <p className={styles.segmentCardHeader}>시간대 흐름</p>
-                          {selected.timeSegments.map((seg) => {
-                            const isNow        = isSelectedToday && nowSegment?.startHour === seg.startHour;
-                            const isBest       = bestSegment?.startHour === seg.startHour;
-                            const isWorst      = worstSegment?.startHour === seg.startHour
-                                && worstSegment?.startHour !== bestSegment?.startHour;
-                            const visibleNotif = segmentVisibleNotifMap.get(seg.startHour);
-                            const hasTopEvents = (seg.topEvents?.length ?? 0) > 0;
-                            const isOpen       = expandedSegs === seg.startHour;
-                            const segSummary   = selected.timeSegmentSummary;
-                            const isRise = !isBest && !isWorst && segSummary?.rise?.toHour === seg.startHour;
-                            const isDrop = !isBest && !isWorst && segSummary?.drop?.toHour === seg.startHour;
-
-                            const toggleSeg = () =>
-                              setExpandedSegs(prev => prev === seg.startHour ? null : seg.startHour);
-
+                          <SegmentClock
+                            segments={selected.timeSegments}
+                            selectedHour={effectiveSegHour}
+                            onSelect={(h) => setExpandedSegs(h)}
+                            bestStartHour={bestSegment?.startHour ?? undefined}
+                            worstStartHour={
+                              worstSegment?.startHour !== bestSegment?.startHour
+                                ? (worstSegment?.startHour ?? undefined)
+                                : undefined
+                            }
+                            overallScore={selected.scores.overall}
+                          />
+                          {(() => {
+                            const seg = selected.timeSegments!.find(s => s.startHour === effectiveSegHour) ?? selected.timeSegments![0];
+                            const segIdx = selected.timeSegments!.findIndex(s => s.startHour === seg.startHour);
+                            const prevSeg = segIdx > 0 ? selected.timeSegments![segIdx - 1] : null;
+                            const delta = prevSeg !== null ? seg.score - prevSeg.score : null;
+                            const segNotifs = (notifsBySegment.get(seg.startHour) ?? []).slice(0, 2);
+                            const fmtH = (h: number) => String(h).padStart(2, "0");
+                            const topEventKeys = (seg.topEvents ?? []).slice(0, 2);
+                            const isBest = seg.startHour === bestSegment?.startHour;
+                            const isWorst = seg.startHour === worstSegment?.startHour && !isBest;
                             return (
-                              <div key={seg.startHour} className={`${styles.segmentItem} ${isNow ? styles.segmentItemNow : ""}`}>
-                                <div className={styles.segmentRow} onClick={toggleSeg}>
-                                  {/* 1층: 시간 범위 + 상태/chevron */}
-                                  <div className={styles.segmentRowTop}>
-                                    <span className={styles.segmentTimeRange}>
-                                      {fmtHour(seg.startHour)} – {fmtHour(seg.endHour)}
-                                    </span>
-                                    <span className={styles.segmentRowActions}>
-                                      {isBest  && <span className={styles.segmentBadgeBest}>최고</span>}
-                                      {isWorst && <span className={styles.segmentBadgeWorst}>최저</span>}
-                                      <span className={styles.segmentSecondary}>
-                                        {isRise && <span className={styles.segmentDeltaRise}>▲ {segSummary!.rise!.delta}</span>}
-                                        {isDrop && <span className={styles.segmentDeltaDrop}>▼ {segSummary!.drop!.delta}</span>}
-                                        {visibleNotif?.type === "FLOW"  && <span className={`${styles.notiMarker} ${styles.notiMarkerFlow}`}>★</span>}
-                                        {visibleNotif?.type === "LOW"   && <span className={`${styles.notiMarker} ${styles.notiMarkerLow}`}>↓</span>}
-                                        {visibleNotif?.type === "POINT" && <span className={`${styles.notiMarker} ${styles.notiMarkerPoint}`}>●</span>}
-                                        {isSelectedToday && scheduledHours.has(seg.startHour) && <span className={styles.notiClockIcon}>⏰</span>}
-                                      </span>
-                                      <span className={styles.segmentChevron}>{isOpen ? "▾" : "▸"}</span>
-                                    </span>
-                                  </div>
-                                  {/* 2층: 점수 + 바그래프 */}
-                                  <div className={styles.segmentRowBottom}>
-                                    <span className={styles.segmentScore} style={{ color: scoreColor(seg.score) }}>
-                                      {seg.score}
-                                    </span>
-                                    <div className={styles.segmentBarTrack}>
-                                      <div className={styles.segmentBarFill} style={{ width: `${seg.score}%`, background: scoreColor(seg.score) }} />
-                                    </div>
-                                  </div>
+                              <div className={styles.segmentDetail}>
+                                <div className={styles.segmentDetailHeader}>
+                                  <span className={styles.segmentTimeRange}>
+                                    {fmtH(seg.startHour)}:00 – {fmtH(seg.endHour)}:00
+                                  </span>
+                                  <span className={styles.segmentDetailScore} style={{ color: scoreColor(seg.score) }}>
+                                    {seg.score}점
+                                  </span>
                                 </div>
-                                {isOpen && (
-                                  <div className={styles.segmentExpanded}>
-                                    <div className={styles.segmentTopChips}>
-                                      {hasTopEvents ? (
-                                        seg.topEvents!.map((evKey, j) => {
-                                          const dispLabel = safeResolveLabel(evKey);
-                                          const hasInfo   = safeResolveInfo(evKey) !== null;
-                                          const topEv     = selected.persisted?.topEvents?.find(e => e.key === evKey);
-                                          const polarity  = topEv?.polarity ?? "neutral";
-                                          return (
-                                            <span
-                                              key={`${evKey}-${j}`}
-                                              className={[
-                                                styles.reasonChip,
-                                                polarity === "positive" ? styles.reasonChipPos : polarity === "negative" ? styles.reasonChipNeg : "",
-                                                hasInfo ? styles.reasonChipClickable : "",
-                                              ].filter(Boolean).join(" ")}
-                                              onClick={hasInfo ? () => setEventInfoKey(evKey) : undefined}
-                                            >
-                                              {dispLabel}
-                                            </span>
-                                          );
-                                        })
-                                      ) : (
-                                        <span className={styles.segmentNoEvents}>눈에 띄게 크게 작용한 요소는 잘 보이지 않아요.</span>
-                                      )}
-                                    </div>
+                                {(isBest || isWorst || (delta !== null && delta !== 0)) && (
+                                  <div className={styles.segmentDetailMeta}>
+                                    {isBest && <span className={styles.segmentBadgeBest}>최고</span>}
+                                    {isWorst && <span className={styles.segmentBadgeWorst}>최저</span>}
+                                    {delta !== null && delta !== 0 && (
+                                      <span className={delta > 0 ? styles.segmentDeltaRise : styles.segmentDeltaDrop}>
+                                        {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                <div className={styles.segmentTopChips}>
+                                  {topEventKeys.length > 0 ? (
+                                    topEventKeys.map((evKey, j) => {
+                                      const dispLabel = safeResolveLabel(evKey);
+                                      const hasInfo   = safeResolveInfo(evKey) !== null;
+                                                                            return (
+                                        <span
+                                          key={`seg-ev-${j}`}
+                                          className={[
+                                            styles.reasonChip,
+                                            hasInfo ? styles.reasonChipClickable : "",
+                                          ].filter(Boolean).join(" ")}
+                                          onClick={hasInfo ? () => setEventInfoKey(evKey) : undefined}
+                                        >
+                                          {dispLabel}
+                                        </span>
+                                      );
+                                    })
+                                  ) : (
+                                    <span className={styles.segmentNoEvents}>눈에 띄게 크게 작용한 요소는 잘 보이지 않아요.</span>
+                                  )}
+                                </div>
+                                {segNotifs.length > 0 && (
+                                  <div className={styles.segmentNotifSection}>
+                                    {segNotifs.map((n, i) => {
+                                      const msg = generateNotificationMessage(n, "L2");
+                                      const body = msg.body || msg.title;
+                                      const th = String(n.triggerTime.getHours()).padStart(2, "0");
+                                      const tm = String(n.triggerTime.getMinutes()).padStart(2, "0");
+                                      return (
+                                        <div key={i} className={styles.segmentNotifItem}>
+                                          <span className={styles.segmentNotifTime}>{th}:{tm}</span>
+                                          <span className={styles.segmentNotifBody}>{body}</span>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
                             );
-                          })}
+                          })()}
                         </div>
                     )}
 
-                    {/* ── 이 날의 포인트 ── */}
+                                        {/* ── 이 날의 포인트 ── */}
                     <div className={styles.detailSection}>
                       <div className={styles.sectionTitle}>이 날의 포인트</div>
                       <div className={styles.todoRow}>
@@ -1552,9 +1543,6 @@ const normalizedBirthDisplay = useMemo(() => {
                     <div className={styles.eventInfoStateList}>
                       {info.relatedStates.map((s, i) => (
                         <div key={i} className={styles.eventInfoStateItem}>
-                          <span className={s.polarity === "positive" ? styles.polarityPos : styles.polarityNeg}>
-                            {s.polarity === "positive" ? "+" : "−"}
-                          </span>
                           <span>{STATE_LABELS[s.key] ?? s.key}</span>
                         </div>
                       ))}

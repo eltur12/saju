@@ -846,21 +846,13 @@
   font-size: 0.62rem;
   padding: 0.16rem 0.52rem;
   border-radius: 99px;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  background: transparent;
+  border: 1px solid rgba(120, 170, 150, 0.18);
+  color: rgba(45, 60, 55, 0.82);
+  background: rgba(120, 150, 140, 0.08);
   white-space: nowrap;
 }
 
-.reasonChipPos {
-  border-color: rgba(80, 170, 130, 0.5);
-  color: rgba(60, 145, 110, 0.9);
-}
-
-.reasonChipNeg {
-  border-color: rgba(210, 110, 90, 0.5);
-  color: rgba(185, 90, 70, 0.9);
-}
+/* reasonChipPos and reasonChipNeg intentionally neutral */
 
 .reasonChipClickable {
   cursor: pointer;
@@ -1046,6 +1038,65 @@
   margin: 0;
 }
 
+
+/* Segment detail card */
+.segmentDetail {
+  padding: 0.65rem 1rem 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.segmentDetailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.segmentDetailMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.segmentDetailScore {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.segmentNotifSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border);
+}
+
+.segmentNotifItem {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.segmentNotifTime {
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--accent-mint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.segmentNotifBody {
+  font-size: 0.63rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+
 /* Row item */
 .segmentItem {
   border-bottom: 1px solid var(--border);
@@ -1131,11 +1182,15 @@
 }
 .segmentDeltaRise {
   color: var(--accent-mint);
+  font-size: 0.72rem;
   letter-spacing: 0.02em;
+  opacity: 0.70;
 }
 .segmentDeltaDrop {
   color: var(--danger);
+  font-size: 0.72rem;
   letter-spacing: 0.02em;
+  opacity: 0.70;
 }
 
 /* Chevron */
