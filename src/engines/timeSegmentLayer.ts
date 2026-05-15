@@ -48,9 +48,10 @@ const SEGMENT_STATE_AFFINITY: Record<StateAtomKey, readonly number[]> = {
 
 const PHASE_STATE_NORMALIZER = 3.0;
 const PHASE_STATE_CAP        = 8;
-// Clamp applied only within timeSegment calculations.
-// stateAtomLayer values are uncapped (max ~13-16) and dominate when used raw.
-const ATOM_VAL_CAP = 5;
+// stateAtomLayer now applies softDamp (T=3) before emitting atom values,
+// so raw values stay ≤ ~5.5 for typical inputs. Cap raised to 6 to let
+// the smooth damped curve through without re-clipping.
+const ATOM_VAL_CAP = 6;
 
 // ── Phase → reference category domains ────────────────────────────────────────
 
@@ -178,12 +179,33 @@ const ALL_ATOM_KEYS: StateAtomKey[] = [
   "socialFatigue", "executionFlow", "energySustain", "organization", "impulsiveness",
 ];
 
+/**
+ * Source event priority for tie-breaking.
+ * When two sources share the same canonical key (e.g. 지지:충 vs 월지지:충)
+ * or differ only in their magnitude, the higher-priority source wins.
+ *
+ * Priority 3 — acute daily signal:  astro transit, day branch relation, ten god of day, ohaeng clash
+ * Priority 2 — ambient monthly:     month branch relation
+ * Priority 1 — persistent natal:    natal stars (always present → background, not "today")
+ *
+ * Equal magnitude + equal priority → insertion order (deterministic, no randomisation).
+ */
+function sourceEventPriority(src: string): number {
+  if (src.startsWith("행성:"))   return 3;  // astro transit — acute daily
+  if (src.startsWith("지지:"))   return 3;  // day branch relation — acute daily
+  if (src.startsWith("십신:"))   return 3;  // ten god of day — acute daily
+  if (src === "오행극")           return 3;  // ohaeng clash — acute daily
+  if (src.startsWith("월지지:")) return 2;  // month branch — ambient monthly
+  if (src.startsWith("살:"))     return 1;  // natal star — persistent background
+  return 2;
+}
+
 function phaseTopEvents(
   debug:     StateAtomDebug,
   phaseIdx:  number,
   maxEvents  = 2,
 ): string[] {
-  const canonMap = new Map<string, number>();
+  const canonMap = new Map<string, { mag: number; pri: number }>();
 
   for (const atomKey of ALL_ATOM_KEYS) {
     const atom     = debug.atoms[atomKey];
@@ -195,12 +217,16 @@ function phaseTopEvents(
     for (const src of atom.sources) {
       const key = sourceToCanonicalKey(src);
       if (!key) continue;
-      if (magnitude > (canonMap.get(key) ?? 0)) canonMap.set(key, magnitude);
+      const pri = sourceEventPriority(src);
+      const ex  = canonMap.get(key);
+      if (!ex || magnitude > ex.mag || (magnitude === ex.mag && pri > ex.pri)) {
+        canonMap.set(key, { mag: magnitude, pri });
+      }
     }
   }
 
   return [...canonMap.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => b[1].mag - a[1].mag || b[1].pri - a[1].pri)
     .slice(0, maxEvents)
     .map(([k]) => k);
 }

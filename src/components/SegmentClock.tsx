@@ -1,4 +1,5 @@
 import styles from "./SegmentClock.module.css";
+import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 
 interface Segment {
   startHour: number;
@@ -48,14 +49,16 @@ function outerArcPath(seg: Segment): string {
 
 function arcStroke(score: number, sel: boolean): string {
   const a = sel ? 0.90 : 0.60;
-  if (score >= 70) return `rgba(58,171,140,${a})`;
-  if (score >= 55) return `rgba(120,120,120,${a})`;
+  if (score >= SCORE_GOLD) return `rgba(201,145,42,${a})`;
+  if (score >= SCORE_MINT) return `rgba(58,171,140,${a})`;
+  if (score >= SCORE_GRAY) return `rgba(120,120,120,${a})`;
   return `rgba(224,92,92,${a})`;
 }
 
 function scoreTextColor(score: number): string {
-  if (score >= 70) return "var(--accent-mint)";
-  if (score >= 55) return "var(--text-muted)";
+  if (score >= SCORE_GOLD) return "var(--accent-gold)";
+  if (score >= SCORE_MINT) return "var(--accent-mint)";
+  if (score >= SCORE_GRAY) return "var(--text-muted)";
   return "var(--danger)";
 }
 

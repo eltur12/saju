@@ -12,6 +12,7 @@ import { generateTimeSegments } from "./timeSegmentLayer";
 import { generateNotificationHints } from "./notificationHintLayer";
 import { buildReasonSources, type ReasonSources } from "./reasonLayer";
 import { computeStateAtoms, type StateAtomDebug } from "./stateAtomLayer";
+import { computeBaselineAdj, applyBaselineCorrection, pushBaselineOverall, BASELINE_WINDOW } from "./profileBaselineLayer";
 import { buildPersistedDailyModel, type PersistedDailyModel } from "./persistedDailyMapper";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 
@@ -106,6 +107,7 @@ export class FortuneAggregator {
   private sajuProfile:     SajuEngineProfile;
   private enableBalanceAdj: boolean;
   private userElements:    { strong: string[]; weak: string[] };
+  private _baselineWindow: number[] = [];
 
   constructor(
     sajuProfile:              SajuEngineProfile,
@@ -127,6 +129,19 @@ export class FortuneAggregator {
       strong: Object.entries(dist).filter(([, v]) => v > 0.3).map(([k]) => k),
       weak:   Object.entries(dist).filter(([, v]) => v < 0.1).map(([k]) => k),
     };
+  }
+
+  prewarmBaseline(beforeDate: Date, days = BASELINE_WINDOW): void {
+    this._baselineWindow = [];
+    const start = new Date(beforeDate);
+    start.setDate(start.getDate() - days);
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const r = this.getDailyFortune(d);
+      // _rawOverall was already pushed inside getDailyFortune
+      void r;
+    }
   }
 
   private mergeScores(sajuScores: ScoreMap, ziweiScores: ScoreMap, astroScores: ScoreMap): ScoreMap {
@@ -248,11 +263,16 @@ export class FortuneAggregator {
       ));
     }
 
+    // Profile baseline correction — record pre-correction overall, then soft-shift
+    const _rawOverall = Math.round(merged.overall);
+    applyBaselineCorrection(merged, computeBaselineAdj(this._baselineWindow));
+
     // 최종 반올림 — 모든 중간 연산 완료 후 1회만 적용
     const allCats: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study", "overall"];
     for (const c of allCats) {
       merged[c] = Math.max(0, Math.min(100, Math.round(merged[c])));
     }
+    pushBaselineOverall(this._baselineWindow, _rawOverall);
 
     const badge   = scoreToBadge(merged.overall);
     const lunar   = getLunarDate(targetDate);

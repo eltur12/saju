@@ -90,6 +90,17 @@ const STATE_TO_CAT: Record<StateAtomKey, Partial<Record<keyof ScoreMap, number>>
 /** Maximum ±delta the state layer may contribute per category. */
 const MAX_CAT_DELTA = 3;
 
+// ── Symmetric soft damping ────────────────────────────────────────────────────
+// Identity for |v| ≤ T; sqrt-curve above T so extreme stacking is compressed
+// without losing small signals. Symmetric: positive/negative treated equally.
+// T=3 → 5→4.41, 6→4.73, 7→5.00, 9→5.45
+const SOFT_DAMP_T = 3.0;
+function softDamp(v: number): number {
+  const abs = Math.abs(v);
+  if (abs <= SOFT_DAMP_T) return v;
+  return Math.sign(v) * (SOFT_DAMP_T + Math.sqrt(abs - SOFT_DAMP_T));
+}
+
 // ── Event → State mappings ────────────────────────────────────────────────────
 
 type AtomDelta = Partial<Record<StateAtomKey, number>>;
@@ -267,6 +278,13 @@ export function computeStateAtoms(input: StateAtomInput): StateAtomResult {
     if (!mapping) continue;
     applyDelta(atoms, mapping[nature], `행성:${planet}${symbol}`);
     events.push(`${planet}${symbol}`);
+  }
+
+  // 5.5. Symmetric soft damping — applied after all sources are summed.
+  //      Extreme stacking (tension+socialFatigue+emotionalAmplitude piling) is
+  //      compressed; values within ±3 pass through unchanged.
+  for (const k of ALL_ATOM_KEYS) {
+    atoms[k].value = softDamp(atoms[k].value);
   }
 
   // 6. Compute raw category deltas from accumulated atom values
