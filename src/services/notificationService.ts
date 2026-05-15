@@ -27,11 +27,9 @@ const READY_VERSION      = 1;
 const ENABLE_JS_LOCAL_NOTIFICATIONS = false;
 
 const DEFAULT_SETTINGS: NotificationSettings = {
-  dailyEnabled: true,
-  flowEnabled:  true,
-  lowEnabled:   true,
-  allowNight:   false,
-  dailyTime:    "07:00",
+  dailyEnabled:      true,
+  eventStateEnabled: true,
+  dailyTime:         "07:00",
 };
 
 /** 알림 권한 요청 — 앱 시작 시 1회 호출 */
@@ -81,9 +79,8 @@ export interface NotificationReadyEntry {
 
 const READY_TYPE_INDEX: Record<NotificationType, number> = {
   DAILY: 1,
-  FLOW:  2,
-  LOW:   3,
-  POINT: 4,
+  EVENT: 2,
+  STATE: 3,
 };
 
 /**
@@ -119,7 +116,7 @@ export function buildNotificationReadyEntries(
   const seqMap = new Map<string, number>();
 
   return filtered.map(n => {
-    const { title, body } = generateNotificationMessage(n, "L1");
+    const { title, body } = generateNotificationMessage(n, date);
     const at        = n.triggerTime;
     const triggerAt = `${date}T${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}:00`;
 
@@ -202,7 +199,7 @@ export async function scheduleDailyFortuneNotifications(
       const id = dateNum * 100 + scheduleAt.getHours();
       if (existingIds.includes(id)) continue;
 
-      const { title, body } = generateNotificationMessage(n, "L1");
+      const { title, body } = generateNotificationMessage(n, date);
       console.log("[NOTI_SCHEDULE]", n.type, "at", scheduleAt.toString(), "—", title);
 
       await LocalNotifications.schedule({
@@ -261,7 +258,7 @@ export async function sendDebugTestNotificationsForToday(
 
     const offsets = [5, 10, 15]; // seconds from now (debug only)
     const notifications = filtered.slice(0, 3).map((n, i) => {
-      const { title, body } = generateNotificationMessage(n, "L1");
+      const { title, body } = generateNotificationMessage(n, date);
       const scheduleAt = new Date(Date.now() + offsets[i] * 1000);
       console.log(`[DEBUG_NOTI] #${i} ${n.type} at ${scheduleAt.toISOString()} — ${title}`);
       return {

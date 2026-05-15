@@ -120,10 +120,8 @@ export default function Main({ onBack }: Props) {
   const [pendingDay, setPendingDay]         = useState<{ year: number; month: number; day: number } | null>(null);
   const [notiStart, setNotiStart]           = useState(7);
 
-  const [notiDailyEnabled, setNotiDailyEnabled] = useState(true);
-  const [notiFlowEnabled,  setNotiFlowEnabled]  = useState(true);
-  const [notiLowEnabled,   setNotiLowEnabled]   = useState(true);
-  const [notiAllowNight,   setNotiAllowNight]   = useState(false);
+  const [notiDailyEnabled,      setNotiDailyEnabled]      = useState(true);
+  const [notiEventStateEnabled, setNotiEventStateEnabled] = useState(true);
   const [notiSaved, setNotiSaved]           = useState(false);
   const [testNotiSent, setTestNotiSent]     = useState(false);
   const [debugOpen, setDebugOpen]           = useState(false);
@@ -158,9 +156,7 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
       const [hh] = s.dailyTime.split(":").map(Number);
       setNotiStart(hh);
       setNotiDailyEnabled(s.dailyEnabled);
-      setNotiFlowEnabled(s.flowEnabled);
-      setNotiLowEnabled(s.lowEnabled);
-      setNotiAllowNight(s.allowNight);
+      setNotiEventStateEnabled(s.eventStateEnabled);
     });
   }, []);
 
@@ -190,11 +186,9 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
 
   const handleNotiSave = async () => {
     const settings = {
-      dailyEnabled: notiDailyEnabled,
-      flowEnabled:  notiFlowEnabled,
-      lowEnabled:   notiLowEnabled,
-      allowNight:   notiAllowNight,
-      dailyTime:    `${String(notiStart).padStart(2, "0")}:00`,
+      dailyEnabled:      notiDailyEnabled,
+      eventStateEnabled: notiEventStateEnabled,
+      dailyTime:         `${String(notiStart).padStart(2, "0")}:00`,
     };
     await saveNotificationSettings(settings);
 
@@ -592,11 +586,9 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
     const result = new Map<number, PlannedNotification[]>();
     if (!selected?.timeSegments) return result;
     const settings = {
-      dailyEnabled: notiDailyEnabled,
-      flowEnabled:  notiFlowEnabled,
-      lowEnabled:   notiLowEnabled,
-      allowNight:   notiAllowNight,
-      dailyTime:    `${String(notiStart).padStart(2, "0")}:00`,
+      dailyEnabled:      notiDailyEnabled,
+      eventStateEnabled: notiEventStateEnabled,
+      dailyTime:         `${String(notiStart).padStart(2, "0")}:00`,
     };
     const filtered = applyNotificationSettings(plannedNotifications, settings, selected.date);
     for (const n of filtered) {
@@ -608,12 +600,12 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
       }
     }
     return result;
-  }, [plannedNotifications, selected, notiDailyEnabled, notiFlowEnabled, notiLowEnabled, notiAllowNight, notiStart]);
+  }, [plannedNotifications, selected, notiDailyEnabled, notiEventStateEnabled, notiStart]);
 
   const dailySummary = useMemo(() => {
     const dailyNotif = plannedNotifications.find(n => n.type === "DAILY");
     if (!dailyNotif || !selected) return selected?.summary ?? "";
-    return generateNotificationMessage(dailyNotif, "L2").body;
+    return generateNotificationMessage(dailyNotif, selected.date).body;
   }, [plannedNotifications, selected]);
 
 
@@ -1444,38 +1436,12 @@ const normalizedBirthDisplay = useMemo(() => {
 
                         <div className={styles.notiItem}>
                           <div className={styles.notiItemText}>
-                            <span className={styles.notiItemLabel}>흐름이 좋아지는 타이밍 알림 받기</span>
-                            <span className={styles.notiItemHelper}>집중이나 추진 흐름이 살아나는 시간을 알려드려요</span>
+                            <span className={styles.notiItemLabel}>흐름 변화 알림 받기</span>
+                            <span className={styles.notiItemHelper}>하루 흐름이 크게 바뀌거나 특별한 구간이 있을 때 알려드려요</span>
                           </div>
                           <div className={styles.notiItemControl}>
                             <label className={styles.notiToggle}>
-                              <input type="checkbox" checked={notiFlowEnabled} onChange={e => setNotiFlowEnabled(e.target.checked)} />
-                              <span className={styles.notiToggleTrack} />
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className={styles.notiItem}>
-                          <div className={styles.notiItemText}>
-                            <span className={styles.notiItemLabel}>잠깐 쉬어가도 되는 흐름 알림 받기</span>
-                            <span className={styles.notiItemHelper}>무리하지 않고 속도를 조절하면 좋은 시간을 알려드려요</span>
-                          </div>
-                          <div className={styles.notiItemControl}>
-                            <label className={styles.notiToggle}>
-                              <input type="checkbox" checked={notiLowEnabled} onChange={e => setNotiLowEnabled(e.target.checked)} />
-                              <span className={styles.notiToggleTrack} />
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className={styles.notiItem}>
-                          <div className={styles.notiItemText}>
-                            <span className={styles.notiItemLabel}>밤 시간 알림 받기</span>
-                            <span className={styles.notiItemHelper}>오전 8시 이전, 오후 10시 이후 알림도 받을 수 있어요</span>
-                          </div>
-                          <div className={styles.notiItemControl}>
-                            <label className={styles.notiToggle}>
-                              <input type="checkbox" checked={notiAllowNight} onChange={e => setNotiAllowNight(e.target.checked)} />
+                              <input type="checkbox" checked={notiEventStateEnabled} onChange={e => setNotiEventStateEnabled(e.target.checked)} />
                               <span className={styles.notiToggleTrack} />
                             </label>
                           </div>
