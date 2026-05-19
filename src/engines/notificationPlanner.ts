@@ -43,12 +43,16 @@ export function planNotifications(
   const segments: Segment[] = fortune.timeSegments ?? [];
   if (segments.length === 0) return [];
 
-  // validSegs: daytime segments for range/event/state logic
+  // validSegs: daytime segments for EVENT/STATE range logic (startHour >= 9)
   const validSegs = segments.filter(s => s.startHour >= 9);
 
-  const scoreSet  = validSegs.length > 0 ? validSegs : segments;
-  const rangeMin  = Math.min(...scoreSet.map(s => s.score));
-  const rangeMax  = Math.max(...scoreSet.map(s => s.score));
+  // DAILY range: full day 00~24 (including overnight segments)
+  const rangeMin = Math.min(...segments.map(s => s.score));
+  const rangeMax = Math.max(...segments.map(s => s.score));
+
+  // EVENT/STATE range: validSegs only (09~24)
+  const validMin = validSegs.length > 0 ? Math.min(...validSegs.map(s => s.score)) : rangeMin;
+  const validMax = validSegs.length > 0 ? Math.max(...validSegs.map(s => s.score)) : rangeMax;
 
   const result: PlannedNotification[] = [];
 
@@ -66,7 +70,7 @@ export function planNotifications(
 
   if (validSegs.length < 2) return result;
 
-  const dailyRange = rangeMax - rangeMin;
+  const dailyRange = validMax - validMin;  // EVENT/STATE mode switch uses validSegs range
 
   if (dailyRange >= 12) {
     // EVENT mode: top 2 transitions by |delta| into validSeg startHours
@@ -94,8 +98,8 @@ export function planNotifications(
       count++;
     }
   } else {
-    // STATE mode: max ≥ 75 → HIGH, min ≤ 54 → LOW, otherwise NORMAL (no notification)
-    if (rangeMax >= 75) {
+    // STATE mode: validSegs max ≥ 75 → HIGH, validSegs min ≤ 54 → LOW, otherwise NORMAL
+    if (validMax >= 75) {
       const best = validSegs.reduce((a, b) => b.score > a.score ? b : a);
       result.push({
         type: "STATE",
@@ -103,7 +107,7 @@ export function planNotifications(
         score: best.score,
         stateHigh: true,
       });
-    } else if (rangeMin <= 54) {
+    } else if (validMin <= 54) {
       const worst = validSegs.reduce((a, b) => b.score < a.score ? b : a);
       result.push({
         type: "STATE",
@@ -131,23 +135,37 @@ const DAILY_GREETINGS = [
   "오늘도 힘내세요!",
   "좋은 하루 되길 바랄게요",
   "오늘 하루도 화이팅이에요!",
-  "따뜻한 하루 보내세요",
-  "오늘도 좋은 일 가득하세요",
-  "오늘 하루도 무사히 보내세요",
-  "오늘도 기분 좋은 하루 되세요",
   "좋은 하루 시작해봐요!",
   "오늘도 좋은 하루 함께해요",
   "오늘 하루도 잘 풀리길 바랄게요",
   "오늘도 웃는 하루 되세요 :)",
-  "편안한 하루 되셨으면 좋겠어요",
-  "오늘도 좋은 흐름 이어가세요",
-  "오늘 하루도 천천히 보내세요",
   "오늘 하루도 응원할게요",
-  "오늘도 좋은 하루 보내고 가세요!",
   "기분 좋은 하루 보내세요!",
-  "오늘도 가볍게 시작해봐요",
-  "오늘 하루도 잘 지나가길 바랄게요",
   "오늘도 좋은 하루 보내세요 :)",
+];
+
+// Short app-open prompts for EVENT/STATE — non-intrusive signal + invite
+const DETAIL_PROMPTS = [
+  "자세히 확인해볼까요?",
+  "조금 더 확인해볼까요?",
+  "오늘 내용을 살펴볼까요?",
+  "지금 구간을 확인해볼까요?",
+  "자세한 내용도 살펴볼까요?",
+  "앱에서 이어서 볼까요?",
+  "오늘 내용도 한번 볼까요?",
+  "한번 더 확인해볼까요?",
+  "조금 더 자세히 볼까요?",
+  "지금 내용을 확인해볼까요?",
+  "앱에서 조금 더 볼까요?",
+  "이어서 확인해볼까요?",
+  "조금 더 살펴보고 갈까요?",
+  "오늘 구간도 확인해볼까요?",
+  "자세한 내용도 볼까요?",
+  "지금 상태도 확인해볼까요?",
+  "오늘 내용을 이어서 볼까요?",
+  "조금 더 들여다볼까요?",
+  "앱에서 자세히 볼까요?",
+  "오늘 흐름을 확인해볼까요?",
 ];
 
 function pick<T>(arr: T[]): T {
@@ -167,15 +185,17 @@ export function generateNotificationMessage(
   }
 
   if (n.type === "EVENT") {
-    const d    = n.delta ?? 0;
-    const sign = d >= 0 ? `↑ +${d}` : `↓ ${d}`;
-    return { title: "흐름 변화", body: sign };
+    const d      = n.delta ?? 0;
+    const signal = d >= 0 ? `↑ +${d}` : `↓ ${d}`;
+    const detail = pick(DETAIL_PROMPTS);
+    return { title: "흐름 변화", body: `${signal} · ${detail}` };
   }
 
   // STATE
+  const detail = pick(DETAIL_PROMPTS);
   return n.stateHigh
-    ? { title: "좋은 흐름 시작", body: `· ${n.score}` }
-    : { title: "낮은 흐름 시작", body: `· ${n.score}` };
+    ? { title: "좋은 흐름 시작", body: `${n.score} · ${detail}` }
+    : { title: "낮은 흐름 시작", body: `${n.score} · ${detail}` };
 }
 
 function formatMonthDay(date: string): string {
