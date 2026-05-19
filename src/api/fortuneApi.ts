@@ -8,6 +8,7 @@ import { buildAstroProfile } from "../utils/astroCalculator";
 import { normalizeBirthDateTimeByRegion } from "../utils/sajuTime";
 import { refreshWidget } from "../plugins/widgetPlugin";
 import { buildProfileInsight, type ProfileInsight } from "../engines/profileInsightLayer";
+import { PERSISTED_SCHEMA_V } from "../engines/persistedDailyMapper";
 
 export type { ProfileInsight };
 
@@ -95,7 +96,7 @@ export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promi
   await setPreference(key, JSON.stringify(payload));
 }
 
-/** 캐시 스키마 버전 — 필드 변경 시 올리면 캐시 무효화 */
+/** 캐시 스키마 버전 — 필드 변경 시 올리면 캐시 무효화 (PersistedDailyModel 구조 변경 시 PERSISTED_SCHEMA_V 도 함께 올릴 것) */
 const CACHE_VERSION = "v8";
 
 export interface SajuUser {
@@ -124,9 +125,17 @@ function loadCache(): Record<string, MonthlyFortuneResult> {
   }
 }
 
+function stripRuntimeFields(fortune: DailyFortune): DailyFortune {
+  const f = { ...fortune } as Record<string, unknown>;
+  delete f["stateAtomDebug"];
+  delete f["reasonSources"];
+  delete f["balance_debug"];
+  return f as unknown as DailyFortune;
+}
+
 function saveCache(key: string, data: MonthlyFortuneResult): void {
   const cache = loadCache();
-  cache[key] = data;
+  cache[key] = { ...data, daily_fortunes: data.daily_fortunes.map(stripRuntimeFields) };
   localStorage.setItem("saju_cache", JSON.stringify(cache));
 }
 
@@ -147,6 +156,10 @@ export async function getMonthlyFortune(
   const cache = loadCache();
 
   if (cache[key]) {
+    const samplePersisted = cache[key].daily_fortunes[0]?.persisted;
+    if (samplePersisted && samplePersisted._v !== PERSISTED_SCHEMA_V) {
+      console.warn("[CACHE] persisted._v mismatch — bump CACHE_VERSION + PERSISTED_SCHEMA_V when schema changes");
+    }
     await saveWidgetMonthlyData(cache[key]);
 
     const todayStr = getTodayLocalString();

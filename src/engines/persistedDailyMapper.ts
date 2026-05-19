@@ -18,7 +18,7 @@
 
 import type { DailyFortune } from "./aggregator";
 import type { ScoreMap } from "./sajuEngine";
-import type { StateAtomKey } from "./stateAtomLayer";
+import { STATE_TO_CAT, type StateAtomKey } from "./stateAtomLayer";
 
 // ── Public types ───────────────────────────────────────────────────────────────
 
@@ -45,7 +45,10 @@ export interface PersistedSummary {
   flowType: string;  // canonical flow key
 }
 
+export const PERSISTED_SCHEMA_V = 1 as const;
+
 export interface PersistedDailyModel {
+  _v:                 typeof PERSISTED_SCHEMA_V;
   topEvents:          PersistedEventChip[];
   topStates:          PersistedState[];
   categoryHighlights: Partial<Record<keyof ScoreMap, CategoryHighlight>>;
@@ -262,42 +265,29 @@ const STATE_POLARITY: Record<string, "positive" | "negative" | "mixed"> = {
   impulsiveness:      "mixed",
 };
 
-/**
- * Read-only copy of STATE_TO_CAT from stateAtomLayer.
- * Used for category-to-state attribution in categoryHighlights.
- */
-const STATE_CAT_COEFF: Record<string, Partial<Record<string, number>>> = {
-  stability:          { health: 0.8, love: 0.4, relations: 0.5, career: 0.3 },
-  tension:            { health:-0.8, love:-0.3, relations:-0.4, career:-0.2 },
-  recovery:           { health: 1.0, study: 0.25, career: 0.25 },
-  focus:              { study: 1.0, career: 0.6 },
-  emotionalAmplitude: { love: 0.5, relations:-0.25, health:-0.2 },
-  socialFatigue:      { relations:-0.9, love:-0.4, health:-0.3 },
-  executionFlow:      { career: 1.0, wealth: 0.4, study: 0.3 },
-  energySustain:      { health: 0.7, career: 0.4, study: 0.3 },
-  organization:       { study: 0.7, career: 0.6, wealth: 0.4 },
-  impulsiveness:      { wealth:-0.6, love: 0.2, relations:-0.3, health:-0.2 },
-};
 
 // ── Flow type classifier ────────────────────────────────────────────────────────
 
 const FLOW_THRESHOLD = 2;
+const FLOW_DOMINANCE = 0.8;
 
 function classifyFlowType(topAtoms: ReadonlyArray<{ key: string; value: number }>): string {
-  const top = topAtoms[0];
+  const top    = topAtoms[0];
+  const second = topAtoms[1];
   if (!top || Math.abs(top.value) < 1) return "flow.neutral";
+  if (second && Math.abs(top.value) - Math.abs(second.value) < FLOW_DOMINANCE) return "flow.neutral";
   const { key: k, value: v } = top;
 
-  if (k === "executionFlow"    && v >  FLOW_THRESHOLD) return "flow.highExecution";
-  if (k === "recovery"         && v >  1)              return "flow.recoveryDay";
-  if (k === "focus"            && v >  1)              return "flow.focusBoost";
-  if (k === "stability"        && v >  FLOW_THRESHOLD) return "flow.stableFlow";
-  if (k === "emotionalAmplitude")                      return "flow.emotionalSwing";
-  if (k === "socialFatigue"    && v >  1)              return "flow.socialDrain";
-  if (k === "tension"          && v >  FLOW_THRESHOLD) return "flow.tensionSpike";
-  if (k === "energySustain"    && v < -1)              return "flow.lowEnergy";
-  if (k === "impulsiveness")                           return "flow.impulsive";
-  if (v < 0)                                           return "flow.blocked";
+  if (k === "executionFlow"      && v >  FLOW_THRESHOLD)  return "flow.highExecution";
+  if (k === "recovery"           && v >  1)               return "flow.recoveryDay";
+  if (k === "focus"              && v >  1)               return "flow.focusBoost";
+  if (k === "stability"          && v >  FLOW_THRESHOLD)  return "flow.stableFlow";
+  if (k === "emotionalAmplitude" && Math.abs(v) > 1.5)    return "flow.emotionalSwing";
+  if (k === "socialFatigue"      && v >  1)               return "flow.socialDrain";
+  if (k === "tension"            && v >  FLOW_THRESHOLD)  return "flow.tensionSpike";
+  if (k === "energySustain"      && v < -1)               return "flow.lowEnergy";
+  if (k === "impulsiveness"      && Math.abs(v) > 1.5)    return "flow.impulsive";
+  if (v < 0)                                              return "flow.blocked";
   return "flow.neutral";
 }
 
@@ -314,7 +304,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
   const reasons   = fortune.reasonSources;
 
   if (!atomDebug || !reasons) {
-    return { topEvents: [], topStates: [], categoryHighlights: {}, summary: { flowType: "flow.neutral" } };
+    return { _v: PERSISTED_SCHEMA_V, topEvents: [], topStates: [], categoryHighlights: {}, summary: { flowType: "flow.neutral" } };
   }
 
   const atomKeys = Object.keys(atomDebug.atoms) as StateAtomKey[];
@@ -377,6 +367,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
   }
 
   const topEvents = allEvents
+    .filter(e => !e.key.startsWith("unknown."))
     .sort((a, b) => b.impact - a.impact)
     .slice(0, MAX_TOP_EVENTS);
 
@@ -387,7 +378,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     const entry = atomDebug.atoms[atomKey];
     if (entry.value === 0) continue;
 
-    const sourceEvents = [...new Set(entry.sources)].map(sourceToCanonical);
+    const sourceEvents = [...new Set(entry.sources)].map(sourceToCanonical).filter(k => !k.startsWith("unknown."));
 
     allStates.push({
       key:          `state.${atomKey}`,
@@ -412,7 +403,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     for (const atomKey of atomKeys) {
       const entry = atomDebug.atoms[atomKey];
       if (entry.value === 0) continue;
-      const coeff = STATE_CAT_COEFF[atomKey]?.[cat] ?? 0;
+      const coeff = STATE_TO_CAT[atomKey]?.[cat] ?? 0;
       if (coeff === 0) continue;
       catStateEntries.push({
         stateKey:     `state.${atomKey}`,
@@ -435,7 +426,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     for (const atomKey of atomKeys) {
       const entry = atomDebug.atoms[atomKey];
       if (entry.value === 0 || entry.sources.length === 0) continue;
-      const coeff = STATE_CAT_COEFF[atomKey]?.[cat] ?? 0;
+      const coeff = STATE_TO_CAT[atomKey]?.[cat] ?? 0;
       if (coeff === 0) continue;
 
       const perSrc = (entry.value * coeff) / entry.sources.length;
@@ -470,6 +461,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     type Cand = { key: string; absImpact: number; polarity: "positive" | "negative" | "neutral" };
 
     const allCandidates: Cand[] = [...catEventImpact.entries()]
+      .filter(([key]) => !key.startsWith("unknown."))
       .map(([key, catImpact]) => ({
         key,
         absImpact: Math.abs(catImpact),
@@ -530,5 +522,5 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
   // ── Step 5: flowType ──────────────────────────────────────────────────────
   const flowType = classifyFlowType(atomDebug.topAtoms);
 
-  return { topEvents, topStates, categoryHighlights, summary: { flowType } };
+  return { _v: PERSISTED_SCHEMA_V, topEvents, topStates, categoryHighlights, summary: { flowType } };
 }

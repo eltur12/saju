@@ -74,7 +74,7 @@ const ALL_ATOM_KEYS: StateAtomKey[] = [
 ];
 
 /** State → category coefficients (spec values). */
-const STATE_TO_CAT: Record<StateAtomKey, Partial<Record<keyof ScoreMap, number>>> = {
+export const STATE_TO_CAT: Record<StateAtomKey, Partial<Record<keyof ScoreMap, number>>> = {
   stability:          { health:  0.8, love:  0.4, relations:  0.5, career:  0.3 },
   tension:            { health: -0.8, love: -0.3, relations: -0.4, career: -0.2 },
   recovery:           { health:  1.0, study: 0.25, career:   0.25 },
