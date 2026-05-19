@@ -602,11 +602,6 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
     return result;
   }, [plannedNotifications, selected, notiDailyEnabled, notiEventStateEnabled, notiStart]);
 
-  const dailySummary = useMemo(() => {
-    const dailyNotif = plannedNotifications.find(n => n.type === "DAILY");
-    if (!dailyNotif || !selected) return selected?.summary ?? "";
-    return generateNotificationMessage(dailyNotif, selected.date).body;
-  }, [plannedNotifications, selected]);
 
 
 const normalizedBirthDisplay = useMemo(() => {
@@ -729,7 +724,38 @@ const normalizedBirthDisplay = useMemo(() => {
                     <div className={styles.previewLeft}>
                       <div className={styles.previewDate}>{selectedDayStr}</div>
                       <div className={styles.previewLunar}>음력 {selected.lunar_date}</div>
-                      <div className={styles.previewSummary}>{dailySummary}</div>
+                      <div className={styles.previewFlowBlock}>
+                        {(() => {
+                          const peak = RADAR_CATS.reduce((b, c) =>
+                            (selected.scores[c.key] as number) > (selected.scores[b.key] as number) ? c : b
+                          );
+                          const low = RADAR_CATS.reduce((w, c) =>
+                            (selected.scores[c.key] as number) < (selected.scores[w.key] as number) ? c : w
+                          );
+                          const peakScore = selected.scores[peak.key] as number;
+                          const lowScore  = selected.scores[low.key]  as number;
+                          const peakChip  = selected.persisted?.categoryHighlights?.[peak.key]?.topEvents[0];
+                          const lowChip   = selected.persisted?.categoryHighlights?.[low.key]?.topEvents[0];
+                          return (
+                            <>
+                              <div className={styles.previewFlowRow}>
+                                <span className={styles.previewFlowLabel}>높은 흐름</span>
+                                <span className={`${styles.previewFlowCat} ${getScoreClass(peakScore)}`}>
+                                  {peak.label} {peakScore}
+                                </span>
+                                {peakChip && <span className={styles.previewFlowChip}>{safeResolveLabel(peakChip)}</span>}
+                              </div>
+                              <div className={styles.previewFlowRow}>
+                                <span className={styles.previewFlowLabel}>낮은 흐름</span>
+                                <span className={`${styles.previewFlowCat} ${getScoreClass(lowScore)}`}>
+                                  {low.label} {lowScore}
+                                </span>
+                                {lowChip && <span className={styles.previewFlowChip}>{safeResolveLabel(lowChip)}</span>}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
                     <div className={styles.previewRight}>
                 <span className={`${styles.previewScore} ${getScoreClass(selected.scores.overall)}`}>

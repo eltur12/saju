@@ -317,15 +317,39 @@
   color: var(--text-muted);
 }
 
-.previewSummary {
-  font-size: 0.75rem;
-  color: var(--text-sub);
-  margin-top: 0.25rem;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+.previewFlowBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.28rem;
+}
+
+.previewFlowRow {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.previewFlowLabel {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.previewFlowCat {
+  font-size: 0.7rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.previewFlowChip {
+  font-size: 0.62rem;
+  color: var(--text-dim);
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .previewRight {
