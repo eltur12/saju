@@ -47,15 +47,15 @@ class FortuneScoreWidget : AppWidgetProvider() {
             val date  = if (raw != null) runCatching { JSONObject(raw).getString("date") }.getOrDefault("") else ""
 
             val badgeLabel = when (badge) {
-                "대길" -> "좋은 흐름"
-                "길"   -> "안정적"
-                else   -> badge
+                "아주좋음" -> "아주 좋음"
+                "좋음"    -> "좋음"
+                else      -> badge
             }
 
             val scoreColor = when {
-                score >= 80 -> context.getColor(R.color.widget_score_gold)
-                score >= 65 -> context.getColor(R.color.widget_score_green)
-                score >= 52 -> context.getColor(R.color.widget_score_gray)
+                score >= 85 -> context.getColor(R.color.widget_score_gold)
+                score >= 75 -> context.getColor(R.color.widget_score_green)
+                score >= 61 -> context.getColor(R.color.widget_score_gray)
                 else        -> context.getColor(R.color.widget_score_red)
             }
 

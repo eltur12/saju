@@ -45,7 +45,7 @@ export interface PersistedSummary {
   flowType: string;  // canonical flow key
 }
 
-export const PERSISTED_SCHEMA_V = 1 as const;
+export const PERSISTED_SCHEMA_V = 2 as const;
 
 export interface PersistedDailyModel {
   _v:                 typeof PERSISTED_SCHEMA_V;
@@ -53,6 +53,8 @@ export interface PersistedDailyModel {
   topStates:          PersistedState[];
   categoryHighlights: Partial<Record<keyof ScoreMap, CategoryHighlight>>;
   summary:            PersistedSummary;
+  /** 월 활성 궁 — topEvents에서 분리된 30일 고정 배경 */
+  monthlyPalace?:     { key: string; polarity: "positive" | "negative" | "neutral" };
 }
 
 // ── Canonical key lookup tables ────────────────────────────────────────────────
@@ -304,7 +306,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
   const reasons   = fortune.reasonSources;
 
   if (!atomDebug || !reasons) {
-    return { _v: PERSISTED_SCHEMA_V, topEvents: [], topStates: [], categoryHighlights: {}, summary: { flowType: "flow.neutral" } };
+    return { _v: PERSISTED_SCHEMA_V, topEvents: [], topStates: [], categoryHighlights: {}, summary: { flowType: "flow.neutral" }, monthlyPalace: undefined };
   }
 
   const atomKeys = Object.keys(atomDebug.atoms) as StateAtomKey[];
@@ -352,6 +354,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
   }
 
   // Ziwei events from reasonSources.ziwei.chips (skip fallback placeholder chips)
+  // impact: 각 chip의 개별 value 사용 — 공유 weight 버그 수정
   for (const chip of reasons.ziwei.chips ?? []) {
     if (FALLBACK_CHIP_KEYS.has(chip.key)) continue;
     const palaceSlug = PALACE_KR_EN[chip.key];
@@ -361,7 +364,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     allEvents.push({
       key,
       source:   "ziwei",
-      impact:   +(reasons.ziwei.weight ?? 0),
+      impact:   chip.value !== undefined ? +Math.abs(chip.value).toFixed(2) : +(reasons.ziwei.weight ?? 0),
       polarity: chip.polarity,
     });
   }
@@ -522,5 +525,117 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
   // ── Step 5: flowType ──────────────────────────────────────────────────────
   const flowType = classifyFlowType(atomDebug.topAtoms);
 
-  return { _v: PERSISTED_SCHEMA_V, topEvents, topStates, categoryHighlights, summary: { flowType } };
+  // ── Step 6: monthly palace 분리 필드 ──────────────────────────────────────
+  const mpChip = reasons.ziwei.monthlyPalaceChip;
+  const monthlyPalace: PersistedDailyModel["monthlyPalace"] = mpChip
+    ? (() => {
+        const slug = PALACE_KR_EN[mpChip.key];
+        const key  = slug ? `ziwei.palace.${slug}` : undefined;
+        return key ? { key, polarity: mpChip.polarity } : undefined;
+      })()
+    : undefined;
+
+  return { _v: PERSISTED_SCHEMA_V, topEvents, topStates, categoryHighlights, summary: { flowType }, monthlyPalace };
+}
+
+// ── Debug utility ──────────────────────────────────────────────────────────────
+
+/**
+ * Print per-atom impact breakdown for each entry in persisted.topEvents.
+ * Requires fortune.stateAtomDebug to be populated (non-null).
+ *
+ * Output format:
+ *   N. <canonical-key>  [source]
+ *      impact = X.XX  polarity = positive|negative|neutral
+ *      <atomKey>           atom=  X.XX  contrib=Y.YY
+ *      ...
+ *      ────────────────────────────────────────
+ *      합계                                total=Z.ZZ
+ */
+export function logImpactDebug(fortune: DailyFortune): void {
+  const atomDebug = fortune.stateAtomDebug;
+  const topEvents = fortune.persisted?.topEvents ?? [];
+
+  if (!atomDebug) {
+    console.log("[IMPACT] stateAtomDebug 없음 — persisted 계산 전 호출됨");
+    return;
+  }
+
+  const atomKeys = Object.keys(atomDebug.atoms) as StateAtomKey[];
+
+  // ── Build: raw-string → Map<atomKey, unsigned contribution> ──────────────
+  const evAtomContrib = new Map<string, Map<StateAtomKey, number>>();
+
+  for (const atomKey of atomKeys) {
+    const entry = atomDebug.atoms[atomKey];
+    if (entry.value === 0 || entry.sources.length === 0) continue;
+    const perSrc = entry.value / entry.sources.length;
+
+    for (const src of entry.sources) {
+      let raw = src;
+      if      (src.startsWith("십신:"))   raw = src.slice(3);
+      else if (src.startsWith("지지:"))   raw = src.slice(3);
+      else if (src.startsWith("월지지:")) raw = src.slice(4);
+      else if (src.startsWith("살:"))     raw = src.slice(2);
+      else if (src.startsWith("행성:"))   raw = src.slice(3);
+
+      if (!evAtomContrib.has(raw)) evAtomContrib.set(raw, new Map());
+      const m = evAtomContrib.get(raw)!;
+      m.set(atomKey, (m.get(atomKey) ?? 0) + Math.abs(perSrc));
+    }
+  }
+
+  // ── Build: canonical key → raw reverse map via activeEvents ──────────────
+  const keyToRaw = new Map<string, string>();
+  for (const raw of atomDebug.activeEvents) {
+    const { key } = rawToCanonical(raw);
+    if (!keyToRaw.has(key)) keyToRaw.set(key, raw);
+  }
+
+  // ── Print ─────────────────────────────────────────────────────────────────
+  const LINE = "═".repeat(60);
+  const DIV  = "─".repeat(48);
+
+  console.log(`\n${LINE}`);
+  console.log(`[IMPACT DEBUG]  ${fortune.date}  overall=${fortune.scores.overall}`);
+  console.log(LINE);
+
+  const events = topEvents.slice(0, 10);
+
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
+    console.log(`\n${i + 1}. ${ev.key}  [${ev.source}]`);
+    console.log(`   impact=${ev.impact}  polarity=${ev.polarity}`);
+
+    if (ev.source === "ziwei") {
+      console.log(`   └─ 자미두수 궁 직접 기여 (atom 분해 없음)`);
+      console.log(`      weight = ${ev.impact}`);
+      continue;
+    }
+
+    const raw = keyToRaw.get(ev.key);
+    if (!raw) {
+      console.log(`   └─ [activeEvents에서 raw 매핑 없음]`);
+      continue;
+    }
+
+    const contrib = evAtomContrib.get(raw);
+    if (!contrib || contrib.size === 0) {
+      console.log(`   └─ [atom 기여 없음]`);
+      continue;
+    }
+
+    const sorted = [...contrib.entries()].sort((a, b) => b[1] - a[1]);
+    let total = 0;
+    for (const [atomKey, val] of sorted) {
+      const atomValue = atomDebug.atoms[atomKey]?.value ?? 0;
+      const atomStr   = atomValue >= 0 ? `+${atomValue.toFixed(2)}` : atomValue.toFixed(2);
+      console.log(`   ${atomKey.padEnd(20)}  atom=${atomStr.padStart(7)}  contrib=${val.toFixed(2)}`);
+      total += val;
+    }
+    console.log(`   ${DIV}`);
+    console.log(`   ${"합계".padEnd(20)}                    total=${total.toFixed(2)}`);
+  }
+
+  console.log(`\n${LINE}\n`);
 }

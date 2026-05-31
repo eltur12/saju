@@ -51,6 +51,11 @@ export interface StateAtomInput {
   ohaeng_clash_stem:           boolean;
   ohaeng_clash_branch:         boolean;
   active_transit_aspects:      string[];
+  /**
+   * "static"    (기본) — STAR_TO_STATE 0.3× 가산 (현행)
+   * "amplifier" (실험) — STAR_AMPLIFIER 배율 적용 (가산 없음)
+   */
+  specialStarsMode?:           "static" | "amplifier";
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -73,18 +78,29 @@ const ALL_ATOM_KEYS: StateAtomKey[] = [
   "socialFatigue", "executionFlow", "energySustain", "organization", "impulsiveness",
 ];
 
-/** State → category coefficients (spec values). */
+/** State → category coefficients.
+ *
+ *  설계 원칙:
+ *  - focus   → study 전담 (career 제거): 집중/몰입은 학습의 대표 신호
+ *  - organization → career 전담 (study 제거): 계획·구조화는 업무의 대표 신호
+ *  - executionFlow → career+wealth (study 제거): 실행력은 커리어/재물에 직결
+ *  - career-study 공유 positive state: recovery·energySustain 소량만 유지
+ *  - relations socialFatigue 패널티 완화(-0.7→-0.5)
+ *  - organization에 relations +0.3 추가 (구조적 관계 관리)
+ *
+ *  순 긍정 용량: career +1.95 / wealth +1.50 / love +1.20 / study +1.05 / health +1.00 / relations -0.25
+ */
 export const STATE_TO_CAT: Record<StateAtomKey, Partial<Record<keyof ScoreMap, number>>> = {
-  stability:          { health:  0.8, love:  0.4, relations:  0.5, career:  0.3 },
-  tension:            { health: -0.8, love: -0.3, relations: -0.4, career: -0.2 },
-  recovery:           { health:  1.0, study: 0.25, career:   0.25 },
-  focus:              { study:   1.0, career: 0.6 },
-  emotionalAmplitude: { love:    0.5, relations: -0.25, health: -0.2 },
-  socialFatigue:      { relations: -0.9, love: -0.4, health: -0.3 },
-  executionFlow:      { career:  1.0, wealth: 0.4, study:   0.3 },
-  energySustain:      { health:  0.7, career: 0.4, study:   0.3 },
-  organization:       { study:   0.7, career: 0.6, wealth:  0.4 },
-  impulsiveness:      { wealth: -0.6, love:   0.2, relations: -0.3, health: -0.2 },
+  stability:          { health: 0.8, love: 0.5, relations: 0.6, career: 0.3, wealth: 0.2 },
+  tension:            { health: -0.8, love: -0.3, relations: -0.4, career: -0.2, study: -0.15 },
+  recovery:           { health: 1.0, study: 0.3, career: 0.2, love: 0.2, wealth: 0.15 },
+  focus:              { study: 0.9, wealth: 0.3 },
+  emotionalAmplitude: { love: 0.6, relations: -0.2, health: -0.2 },
+  socialFatigue:      { relations: -0.5, love: -0.25, health: -0.3, career: -0.2, study: -0.15 },
+  executionFlow:      { career: 0.8, wealth: 0.7, relations: 0.2 },
+  energySustain:      { health: 0.7, career: 0.35, study: 0.25, love: 0.2, wealth: 0.15 },
+  organization:       { career: 0.7, wealth: 0.5, relations: 0.3 },
+  impulsiveness:      { wealth: -0.5, love: 0.25, relations: -0.25, health: -0.2, study: -0.1 },
 };
 
 /** Maximum ±delta the state layer may contribute per category. */
@@ -128,6 +144,22 @@ const STAR_TO_STATE: Record<string, AtomDelta> = {
   "겁살":     { tension: 2, stability: -2 },
   "천덕귀인": { stability: 2, recovery: 1 },
   "월덕귀인": { stability: 2, energySustain: 1 },
+};
+
+/**
+ * 특별성 증폭기 — AMPLIFIER 모드 전용
+ * 가산이 아닌 배율: 해당 state atom의 절댓값을 지정 배수로 조정.
+ * multiplier > 1 : 해당 atom 신호 강화 (나쁜 날을 더 나쁘게 / 좋은 날을 더 좋게)
+ * multiplier < 1 : 해당 atom 신호 약화
+ */
+const STAR_AMPLIFIER: Record<string, Partial<Record<StateAtomKey, number>>> = {
+  "겁살":     { tension: 1.4, socialFatigue: 1.3 },
+  "백호살":   { tension: 1.5, recovery: 0.70 },
+  "화개살":   { focus: 1.3,  organization: 1.2 },
+  "도화살":   { emotionalAmplitude: 1.4, impulsiveness: 1.3 },
+  "역마살":   { executionFlow: 1.3, energySustain: 1.2 },
+  "천덕귀인": { stability: 1.4, recovery: 1.4 },
+  "월덕귀인": { stability: 1.3, energySustain: 1.3 },
 };
 
 /** 지지관계(地支關係) → state atoms */
@@ -222,18 +254,22 @@ export function computeStateAtoms(input: StateAtomInput): StateAtomResult {
     }
   }
 
-  // 2. Natal special stars — scaled down (0.3×) because these are permanent daily signals.
-  //    Full weight would create a constant category bias that violates "no dominant category" spec.
-  const NATAL_STAR_SCALE = 0.3;
-  for (const star of input.active_stars) {
-    const delta = STAR_TO_STATE[star];
-    if (delta) {
-      const scaledDelta: AtomDelta = {};
-      for (const [k, v] of Object.entries(delta) as [StateAtomKey, number][]) {
-        scaledDelta[k] = v * NATAL_STAR_SCALE;
+  // 2. Natal special stars
+  //    static 모드: 0.3× 가산 (현행)
+  //    amplifier 모드: 가산 없음 → 5.3단계에서 배율 적용
+  const mode = input.specialStarsMode ?? "static";
+  if (mode === "static") {
+    const NATAL_STAR_SCALE = 0.3;
+    for (const star of input.active_stars) {
+      const delta = STAR_TO_STATE[star];
+      if (delta) {
+        const scaledDelta: AtomDelta = {};
+        for (const [k, v] of Object.entries(delta) as [StateAtomKey, number][]) {
+          scaledDelta[k] = v * NATAL_STAR_SCALE;
+        }
+        applyDelta(atoms, scaledDelta, `살:${star}`);
+        events.push(star);
       }
-      applyDelta(atoms, scaledDelta, `살:${star}`);
-      events.push(star);
     }
   }
 
@@ -278,6 +314,20 @@ export function computeStateAtoms(input: StateAtomInput): StateAtomResult {
     if (!mapping) continue;
     applyDelta(atoms, mapping[nature], `행성:${planet}${symbol}`);
     events.push(`${planet}${symbol}`);
+  }
+
+  // 5.3. Amplifier 모드 — 특별성 배율 적용 (softDamp 전, 이미 누적된 atom에 곱함)
+  if (mode === "amplifier") {
+    for (const star of input.active_stars) {
+      const mults = STAR_AMPLIFIER[star];
+      if (!mults) continue;
+      for (const [k, mult] of Object.entries(mults) as [StateAtomKey, number][]) {
+        if (atoms[k].value !== 0) {
+          atoms[k].value = atoms[k].value * mult;
+          atoms[k].sources.push(`살증폭:${star}`);
+        }
+      }
+    }
   }
 
   // 5.5. Symmetric soft damping — applied after all sources are summed.

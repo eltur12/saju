@@ -13,7 +13,7 @@ export interface PlannedNotification {
   triggerTime: Date;
   score:       number;
   delta?:      number;    // EVENT: signed score change (+rise / -drop)
-  stateHigh?:  boolean;   // STATE: true=HIGH (≥75), false=LOW (≤54)
+  stateHigh?:  boolean;   // STATE: true=HIGH (≥80), false=LOW (≤50)
   rangeMin?:   number;    // DAILY
   rangeMax?:   number;    // DAILY
 }
@@ -98,8 +98,8 @@ export function planNotifications(
       count++;
     }
   } else {
-    // STATE mode: validSegs max ≥ 75 → HIGH, validSegs min ≤ 54 → LOW, otherwise NORMAL
-    if (validMax >= 75) {
+    // STATE mode: validSegs max ≥ 80 → HIGH, validSegs min ≤ 50 → LOW, otherwise NORMAL
+    if (validMax >= 85) {
       const best = validSegs.reduce((a, b) => b.score > a.score ? b : a);
       result.push({
         type: "STATE",
@@ -107,7 +107,7 @@ export function planNotifications(
         score: best.score,
         stateHigh: true,
       });
-    } else if (validMin <= 54) {
+    } else if (validMin <= 60) {
       const worst = validSegs.reduce((a, b) => b.score < a.score ? b : a);
       result.push({
         type: "STATE",

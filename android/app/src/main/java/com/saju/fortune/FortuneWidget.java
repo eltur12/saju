@@ -324,9 +324,9 @@ public class FortuneWidget extends AppWidgetProvider {
     }
 
     private static int scoreColor(int score) {
-        if (score >= 75) return Color.parseColor("#FFD700");
-        if (score >= 65) return Color.parseColor("#1BC4A8");
-        if (score >= 55) return Color.parseColor("#AAAAAA");
+        if (score >= 85) return Color.parseColor("#FFD700");
+        if (score >= 75) return Color.parseColor("#1BC4A8");
+        if (score >= 61) return Color.parseColor("#AAAAAA");
         return Color.parseColor("#FF6666");
     }
 

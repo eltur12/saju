@@ -13,6 +13,8 @@ export interface ReasonChip {
   key:      string;
   polarity: "positive" | "negative" | "neutral";
   canonKey?: string;
+  /** 이 칩의 개별 contribution 절댓값 — impact 계산에 사용 */
+  value?:   number;
 }
 
 export interface ReasonSource {
@@ -21,6 +23,8 @@ export interface ReasonSource {
   polarity?: "positive" | "negative" | "neutral";
   weight?:   number;    // absolute contribution value (for debugging / sorting)
   chips?:    ReasonChip[];  // top-3 influence chips, sorted by abs(value) DESC
+  /** 월 활성 궁 — topEvents/chips에서 분리된 30일 고정 배경 정보 */
+  monthlyPalaceChip?: { key: string; polarity: "positive" | "negative" | "neutral"; value: number };
 }
 
 export interface ReasonSources {
@@ -56,6 +60,7 @@ function contribsToChips(
     result.push({
       key:      displayKey,
       polarity: c.value > 0 ? "positive" : c.value < 0 ? "negative" : "neutral",
+      value:    c.value,
     });
   }
   return result;
@@ -69,7 +74,7 @@ const SAJU_KEY_KR: Record<string, string> = {
   "比肩": "비견", "劫財": "겁재",
 };
 
-const SAJU_KEYWORDS: Record<string, string> = {
+export const SAJU_KEYWORDS: Record<string, string> = {
   "傷官": "표현 · 창의",
   "偏財": "기회 · 변화",
   "正財": "재정 · 관리",
@@ -82,7 +87,7 @@ const SAJU_KEYWORDS: Record<string, string> = {
   "劫財": "변화 · 소비",
 };
 
-const SAJU_KEYWORDS_NEG: Record<string, string> = {
+export const SAJU_KEYWORDS_NEG: Record<string, string> = {
   "傷官": "표현 · 마찰",
   "偏財": "변수 · 불안정",
   "正財": "재정 · 부담",
@@ -106,7 +111,7 @@ const PALACE_KR: Record<string, string> = {
   "田宅": "전택궁", "福德": "복덕궁", "父母": "부모궁",
 };
 
-const PALACE_KEYWORDS: Record<string, string> = {
+export const PALACE_KEYWORDS: Record<string, string> = {
   "命宮": "방향 · 의지",
   "兄弟": "관계 · 교류",
   "夫妻": "감정 · 인연",
@@ -121,7 +126,7 @@ const PALACE_KEYWORDS: Record<string, string> = {
   "父母": "기준 · 관계",
 };
 
-const PALACE_KEYWORDS_NEG: Record<string, string> = {
+export const PALACE_KEYWORDS_NEG: Record<string, string> = {
   "命宮": "혼란 · 흔들림",
   "兄弟": "관계 · 어긋남",
   "夫妻": "감정 · 불안정",
@@ -150,7 +155,7 @@ const ASPECT_NATURE: Record<string, "easy" | "tense" | "neutral"> = {
   "□": "tense",   "⚹": "easy",  "⚻": "tense", "∠": "tense",
 };
 
-const PLANET_KEYWORDS: Record<string, string> = {
+export const PLANET_KEYWORDS: Record<string, string> = {
   "Sun": "자기표현 · 방향",
   "Moon": "감정 · 컨디션",
   "Mercury": "생각 · 소통",
@@ -297,10 +302,19 @@ export function buildReasonSources(
       "化科": "ziwei.transform.huaKe",
       "化忌": "ziwei.transform.huaJi",
     };
-    const chips = contribsToChips(ziweiContribs ?? [], k => PALACE_KR[k] ?? null);
+
+    // monthly palace를 chips에서 분리 — 30일 고정 배경이므로 topEvents에 포함하지 않음
+    const monthlyPalaceName = ziweiFactors.monthly_palace as string | undefined;
+    const activeContribs = (ziweiContribs ?? []).filter(c => c.key !== monthlyPalaceName);
+    const monthlyContrib  = monthlyPalaceName
+      ? (ziweiContribs ?? []).find(c => c.key === monthlyPalaceName)
+      : undefined;
+
+    const chips = contribsToChips(activeContribs, k => PALACE_KR[k] ?? null);
+
     // 활성 궁에 사화(四化)가 있으면 해당 사화 칩 추가
-    const activePalace  = ziweiFactors.active_palace as string | null;
-    const sihuaSummary  = ziweiFactors.sihua_summary as Record<string, string> | undefined;
+    const activePalace = ziweiFactors.active_palace as string | null;
+    const sihuaSummary = ziweiFactors.sihua_summary as Record<string, string> | undefined;
     if (activePalace && sihuaSummary) {
       for (const [sihuaType, palace] of Object.entries(sihuaSummary)) {
         if (palace === activePalace) {
@@ -315,6 +329,15 @@ export function buildReasonSources(
     ziweiSource.chips = chips.length > 0
       ? chips
       : [{ key: ziweiSource.key, polarity: ziweiSource.polarity ?? "neutral" }];
+
+    // monthly palace chip — 별도 필드로 저장
+    if (monthlyContrib && PALACE_KR[monthlyContrib.key]) {
+      ziweiSource.monthlyPalaceChip = {
+        key:      PALACE_KR[monthlyContrib.key],
+        polarity: monthlyContrib.value > 0 ? "positive" : monthlyContrib.value < 0 ? "negative" : "neutral",
+        value:    monthlyContrib.value,
+      };
+    }
   }
 
   // ── 별자리 ────────────────────────────

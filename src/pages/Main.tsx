@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import WheelPickerModal from "../components/WheelPickerModal";
 import { getMonthlyFortune, getProfileInsight, getUser, clearUser } from "../api/fortuneApi";
+import { generateDailyInterpretationFull } from "../api/aiApi";
+import { buildAiDailyRequest } from "../ai/buildAiDailyRequest";
 import type { ProfileInsight } from "../api/fortuneApi";
 import { App } from "@capacitor/app";
 import type { MonthlyFortuneResult, DailyFortune } from "../engines/aggregator";
@@ -93,8 +95,8 @@ function getBadgeClass(badge: string) {
 }
 
 const BADGE_LABELS: Record<string, string> = {
-  "대길": "좋은 흐름",
-  "길":   "안정적",
+  "아주좋음": "아주 좋음",
+  "좋음":    "좋음",
 };
 function getBadgeLabel(badge: string): string {
   return BADGE_LABELS[badge] ?? badge;
@@ -141,6 +143,11 @@ export default function Main({ onBack }: Props) {
   const [infoTooltip, setInfoTooltip] = useState<"region" | "saju" | null>(null);
 const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<keyof DailyFortune["scores"] | null>(null);
+  const [aiResult,     setAiResult]     = useState<{ subtitle: string; summary: string } | null>(null);
+  const [aiLoading,    setAiLoading]    = useState(false);
+  const [batchRunning,   setBatchRunning]   = useState(false);
+  const [batchProgress,  setBatchProgress]  = useState("");
+  const [batchResultKey, setBatchResultKey] = useState<string | null>(null);
   const [expandedSegs, setExpandedSegs] = useState<number | null>(null);
   const [adjPrevScore, setAdjPrevScore] = useState<number | null>(null);
   const [adjNextScore, setAdjNextScore] = useState<number | null>(null);
@@ -148,6 +155,10 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
 
   useEffect(() => {
     setExpandedSegs(null);
+    setAiResult(null);
+    setAiLoading(false);
+    setBatchProgress("");
+    setBatchResultKey(null);
   }, [selected?.date]);
 
 
@@ -665,6 +676,20 @@ const normalizedBirthDisplay = useMemo(() => {
         {/* ── 달력 탭 ── */}
         {tab === "calendar" && (
             <div className={styles.calendarView}>
+              {data && (
+                <div className={styles.monthInfoBar}>
+                  {data.monthly_palace && (
+                    <span className={styles.monthInfoBadge}>
+                      활성궁&nbsp;<strong>{data.monthly_palace}</strong>
+                    </span>
+                  )}
+                  {data.monthly_flow_type && (
+                    <span className={styles.monthInfoBadge}>
+                      흐름&nbsp;<strong>{data.monthly_flow_type}</strong>
+                    </span>
+                  )}
+                </div>
+              )}
               <div className={styles.calendarHeader}>
                 {DAY_NAMES.map((n, i) => (
                     <div key={n} className={`${styles.dayName} ${i === 0 ? styles["dayName-sun"] : i === 6 ? styles["dayName-sat"] : ""}`}>
@@ -1177,9 +1202,9 @@ const normalizedBirthDisplay = useMemo(() => {
                             </div>
                             <div className={styles.daySummarySep} />
                             <div className={styles.daySummaryCell}>
-                              <span className={styles.daySummaryCellLabel}>이번 달</span>
+                              <span className={styles.daySummaryCellLabel}>이번 달에서의 위치</span>
                               <span className={`${styles.daySummaryCellVal} ${rank + 1 <= Math.ceil(total / 3) ? styles.daySummaryPos : rank + 1 >= Math.ceil(total * 2 / 3) ? styles.daySummaryNeg : styles.daySummaryNeutral}`}>
-                                {total}일 중 {rank + 1}등
+                                {rank + 1}/{total}일
                               </span>
                             </div>
                             <div className={styles.daySummarySep} />
@@ -1363,6 +1388,196 @@ const normalizedBirthDisplay = useMemo(() => {
                           </ul>
                         </div>
                       </div>
+                    </div>
+
+                    {/* ── 오늘의 흐름 ── */}
+                    <div className={styles.detailSection}>
+                      <div className={styles.sectionTitle}>오늘의 흐름</div>
+
+                      {/* 빈 상태 + 버튼 */}
+                      {!aiResult && !aiLoading && (
+                        <>
+                          <p className={styles.flowEmptyHint}>
+                            오늘 흐름을 조금 더 자세히 볼 수 있어요.
+                          </p>
+                          <button
+                            className={styles.flowBtn}
+                            disabled={batchRunning}
+                            onClick={async () => {
+                              setAiLoading(true);
+                              try {
+                                const monthCtx = data ? {
+                                  displayScores: data.daily_fortunes.map(f => f.scores.overall as number),
+                                  flowType: data.monthly_flow_type,
+                                  palace:   data.monthly_palace,
+                                } : undefined;
+                                const req = buildAiDailyRequest(selected, monthCtx);
+                                const { content } = await generateDailyInterpretationFull(req);
+                                const clean = content.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+                                try {
+                                  const parsed = JSON.parse(clean);
+                                  setAiResult({
+                                    subtitle: typeof parsed.subtitle === "string" ? parsed.subtitle : "",
+                                    summary:  typeof parsed.summary  === "string" ? parsed.summary  : clean,
+                                  });
+                                } catch {
+                                  setAiResult({ subtitle: "", summary: clean });
+                                }
+                              } catch (err) {
+                                const msg = err instanceof Error ? err.message : String(err);
+                                setAiResult({ subtitle: "", summary: `오류가 발생했어요.\n\n${msg}` });
+                              } finally {
+                                setAiLoading(false);
+                              }
+                            }}
+                          >
+                            자세히 풀어보기
+                          </button>
+                        </>
+                      )}
+
+                      {/* 로딩 */}
+                      {aiLoading && (
+                        <p className={styles.flowLoading}>오늘의 흐름을 정리하고 있어요...</p>
+                      )}
+
+                      {/* 결과 */}
+                      {aiResult && (
+                        <div>
+                          {aiResult.subtitle !== "" && (
+                            <p className={styles.flowSubtitle}>{aiResult.subtitle}</p>
+                          )}
+                          <div className={styles.flowSummary}>
+                            {aiResult.summary.split(/\n\n+/).map((para, i) => (
+                              <p key={i}>{para.replace(/\n/g, " ").trim()}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── 한달 AI 해석 배치 ── */}
+                    <div className={styles.detailSection}>
+                      {!batchRunning && !batchResultKey && (
+                        <button
+                          disabled={aiLoading || !data}
+                          style={{
+                            width: "100%",
+                            padding: "0.7rem",
+                            border: "1px solid var(--border)",
+                            borderRadius: "0.5rem",
+                            background: "var(--surface)",
+                            color: (aiLoading || !data) ? "var(--text-muted)" : "var(--text-main)",
+                            fontSize: "0.9rem",
+                            cursor: (aiLoading || !data) ? "not-allowed" : "pointer",
+                          }}
+                          onClick={async () => {
+                            if (!selected || !data) return;
+                            const [y, m] = selected.date.split("-").map(Number);
+                            const mm = String(m).padStart(2, "0");
+                            const prefix = `${y}-${mm}`;
+                            const fortunes = data.daily_fortunes.filter(f => f.date.startsWith(prefix));
+                            const total = fortunes.length;
+                            if (total === 0) return;
+
+                            setBatchRunning(true);
+                            setBatchProgress(`0/${total} 준비 중…`);
+                            setBatchResultKey(null);
+
+                            const batchMonthCtx = {
+                              displayScores: data.daily_fortunes.map(f => f.scores.overall as number),
+                              flowType: data.monthly_flow_type,
+                              palace:   data.monthly_palace,
+                            };
+
+                            const days: Array<{
+                              date: string;
+                              request: object;
+                              response: string;
+                              usage: { input: number; output: number; total: number } | null;
+                            }> = [];
+                            let sumInput = 0, sumOutput = 0, sumTotal = 0;
+
+                            for (let i = 0; i < fortunes.length; i++) {
+                              const fortune = fortunes[i];
+                              setBatchProgress(`${i + 1}/${total} 처리 중… (${fortune.date})`);
+                              try {
+                                const req = buildAiDailyRequest(fortune, batchMonthCtx);
+                                const { content, usage } = await generateDailyInterpretationFull(req);
+                                if (usage) {
+                                  sumInput  += usage.input;
+                                  sumOutput += usage.output;
+                                  sumTotal  += usage.total;
+                                }
+                                console.log(`[AI-BATCH] ${fortune.date} (${i + 1}/${total}) input=${usage?.input ?? "-"} output=${usage?.output ?? "-"} total=${usage?.total ?? "-"}`);
+                                console.log(`[AI-BATCH] 응답: ${content}`);
+                                days.push({ date: fortune.date, request: req, response: content, usage: usage ?? null });
+                              } catch (err) {
+                                const msg = err instanceof Error ? err.message : String(err);
+                                console.error(`[AI-BATCH] ${fortune.date} 오류: ${msg}`);
+                                days.push({ date: fortune.date, request: buildAiDailyRequest(fortune, batchMonthCtx), response: `ERROR: ${msg}`, usage: null });
+                              }
+                            }
+
+                            console.log(`[AI-BATCH] 완료 ${total}/${total}일 총 input=${sumInput} output=${sumOutput} total=${sumTotal}`);
+
+                            const key = `ai_batch_log_${prefix}`;
+                            const log = {
+                              generated_at: new Date().toISOString(),
+                              month: prefix,
+                              days,
+                              total_usage: { input: sumInput, output: sumOutput, total: sumTotal },
+                            };
+                            localStorage.setItem(key, JSON.stringify(log));
+                            console.log(`[AI-BATCH] 저장 key=${key}`);
+
+                            setBatchProgress("");
+                            setBatchResultKey(key);
+                            setBatchRunning(false);
+                          }}
+                        >
+                          한달 AI 해석
+                        </button>
+                      )}
+                      {batchRunning && (
+                        <div style={{ color: "var(--text-muted)", fontSize: "0.875rem", padding: "0.5rem 0" }}>
+                          {batchProgress}
+                        </div>
+                      )}
+                      {batchResultKey && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0" }}>
+                          <span style={{ fontSize: "0.8rem", color: "var(--text-sub)", flex: 1 }}>
+                            저장 완료: {batchResultKey}
+                          </span>
+                          <button
+                            style={{
+                              padding: "0.3rem 0.7rem",
+                              border: "1px solid var(--border)",
+                              borderRadius: "0.4rem",
+                              background: "var(--surface)",
+                              color: "var(--text-main)",
+                              fontSize: "0.8rem",
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                            }}
+                            onClick={() => {
+                              const raw = localStorage.getItem(batchResultKey);
+                              if (!raw) return;
+                              const blob = new Blob([raw], { type: "application/json" });
+                              const url  = URL.createObjectURL(blob);
+                              const a    = document.createElement("a");
+                              a.href     = url;
+                              a.download = `${batchResultKey}.json`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            }}
+                          >
+                            다운로드
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                   </>

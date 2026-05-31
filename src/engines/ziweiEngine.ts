@@ -61,6 +61,57 @@ const PALACE_WEIGHT: Record<string, ScoreMap> = {
 const DEFAULT_WEIGHT: ScoreMap = { overall:0.5, wealth:0.5, love:0.5, health:0.5, career:0.5, relations:0.5, study:0.5 };
 
 // ──────────────────────────────────────────────
+// 실험 플래그
+// ──────────────────────────────────────────────
+
+export interface ZiweiExperimentFlags {
+  /** 명궁 기본점수 + 부처궁 패시브 페널티 적용 여부 */
+  USE_NATAL_ZIWEI:       boolean;
+  /** 원국·유년 사화 패시브 적용 여부 */
+  USE_SIHUA_PASSIVE:     boolean;
+  /** 활성 궁 사화 강화 보정 적용 여부 */
+  USE_SIHUA_ACTIVE:      boolean;
+  /** 대한(大限) 적용 여부 */
+  USE_DAEHAN:            boolean;
+  /** 유월(流月) 가중치 (기본 0.4) */
+  MONTHLY_PALACE_WEIGHT: number;
+}
+
+export const DEFAULT_ZIWEI_FLAGS: ZiweiExperimentFlags = {
+  USE_NATAL_ZIWEI:       true,
+  USE_SIHUA_PASSIVE:     true,
+  USE_SIHUA_ACTIVE:      true,
+  USE_DAEHAN:            true,
+  MONTHLY_PALACE_WEIGHT: 0.4,
+};
+
+export const EXPERIMENT_ZIWEI_FLAGS: ZiweiExperimentFlags = {
+  USE_NATAL_ZIWEI:       false,
+  USE_SIHUA_PASSIVE:     false,
+  USE_SIHUA_ACTIVE:      false,
+  USE_DAEHAN:            false,
+  MONTHLY_PALACE_WEIGHT: 0.2,
+};
+
+/** 일 활성 궁만 남김 (monthly_palace 완전 제거) */
+export const EXPERIMENT_ZIWEI_FLAGS_0: ZiweiExperimentFlags = {
+  USE_NATAL_ZIWEI:       false,
+  USE_SIHUA_PASSIVE:     false,
+  USE_SIHUA_ACTIVE:      false,
+  USE_DAEHAN:            false,
+  MONTHLY_PALACE_WEIGHT: 0,
+};
+
+/** 일 활성 궁 + monthly_palace 약 반영 */
+export const EXPERIMENT_ZIWEI_FLAGS_01: ZiweiExperimentFlags = {
+  USE_NATAL_ZIWEI:       false,
+  USE_SIHUA_PASSIVE:     false,
+  USE_SIHUA_ACTIVE:      false,
+  USE_DAEHAN:            false,
+  MONTHLY_PALACE_WEIGHT: 0.1,
+};
+
+// ──────────────────────────────────────────────
 // 인터페이스
 // ──────────────────────────────────────────────
 
@@ -279,28 +330,37 @@ export class ZiweiEngine {
     return result;
   }
 
-  calculate(targetDate: Date): { scores: ScoreMap; factors: Record<string, unknown>; contributions: { key: string; value: number }[] } {
+  calculate(targetDate: Date, flags: ZiweiExperimentFlags = DEFAULT_ZIWEI_FLAGS): { scores: ScoreMap; factors: Record<string, unknown>; contributions: { key: string; value: number }[] } {
     const scores = zeroScore();
     const todayBranch = dateToEarthlyBranch(targetDate);
 
-    // 명궁 기본 점수
     let result = { ...scores };
-    const mingScores = this.palaceScore("命宮");
     const keys = Object.keys(result) as (keyof ScoreMap)[];
-    keys.forEach(k => { result[k] += mingScores[k] ?? 0; });
+
+    // 명궁 기본 점수
+    if (flags.USE_NATAL_ZIWEI) {
+      const mingScores = this.palaceScore("命宮");
+      keys.forEach(k => { result[k] += mingScores[k] ?? 0; });
+    }
 
     // 사화 패시브 (매일 배경 효과)
-    result = this.applySihuaPassive(result);
-    result = this.applyYearSihuaPassive(result);
+    if (flags.USE_SIHUA_PASSIVE) {
+      result = this.applySihuaPassive(result);
+      result = this.applyYearSihuaPassive(result);
+    }
 
     // 부처궁 살성 패시브 연애 페널티
-    const fuqi = this.palaces["夫妻"];
-    if (fuqi && fuqi.unlucky_stars.length > 0) {
-      result.love -= 3;
+    if (flags.USE_NATAL_ZIWEI) {
+      const fuqi = this.palaces["夫妻"];
+      if (fuqi && fuqi.unlucky_stars.length > 0) {
+        result.love -= 3;
+      }
     }
 
     // 대한 적용
-    result = this.applyDahan(result);
+    if (flags.USE_DAEHAN) {
+      result = this.applyDahan(result);
+    }
 
     // ── 오늘 일진 지지 기반 활성 궁 판단 ──
     let activePalaceName = "";
@@ -338,7 +398,9 @@ export class ZiweiEngine {
       }
 
       // 사화 활성화 보정
-      result = this.applySihuaActive(result, activePalaceName);
+      if (flags.USE_SIHUA_ACTIVE) {
+        result = this.applySihuaActive(result, activePalaceName);
+      }
 
       // 천마(天馬)가 관록궁에 있으면 직장 +4 (단, 공궁이면 절반만)
       if (activePalaceName === "官祿" && this.palaces["官祿"]?.lucky_stars.includes("天馬")) {
@@ -350,11 +412,11 @@ export class ZiweiEngine {
       ? { key: activePalaceName, value: _avgDelta6Zw(result, _bActivePalace) }
       : null;
 
-    // 유월(流月): 달력 월 기준 활성 궁 (0.4 가중치)
+    // 유월(流月): 달력 월 기준 활성 궁
     const _bMonthly = { ...result };
     const monthlyPalace = this.monthly_palaces[targetDate.getMonth()] ?? "命宮";
     const monthlyScores = this.palaceScore(monthlyPalace);
-    keys.forEach(k => { result[k] += Math.trunc((monthlyScores[k] ?? 0) * 0.4); });
+    keys.forEach(k => { result[k] += Math.trunc((monthlyScores[k] ?? 0) * flags.MONTHLY_PALACE_WEIGHT); });
     const _cMonthly = { key: monthlyPalace, value: _avgDelta6Zw(result, _bMonthly) };
 
     return {

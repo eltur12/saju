@@ -1,7 +1,7 @@
 /**
  * 캐시 관리 + 엔진 호출 통합
  */
-import { FortuneAggregator, type MonthlyFortuneResult, type DailyFortune } from "../engines/aggregator";
+import { FortuneAggregator, scoreToBadge, type MonthlyFortuneResult, type DailyFortune } from "../engines/aggregator";
 import { calculateSajuProfile } from "../utils/sajuCalculator";
 import { buildZiweiProfile } from "../utils/ziweiCalculator";
 import { buildAstroProfile } from "../utils/astroCalculator";
@@ -97,7 +97,7 @@ export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promi
 }
 
 /** 캐시 스키마 버전 — 필드 변경 시 올리면 캐시 무효화 (PersistedDailyModel 구조 변경 시 PERSISTED_SCHEMA_V 도 함께 올릴 것) */
-const CACHE_VERSION = "v8";
+const CACHE_VERSION = "v10";
 
 export interface SajuUser {
   birth_year: number;
@@ -147,6 +147,96 @@ function getTodayLocalString(): string {
   return `${year}-${month}-${day}`;
 }
 
+// NORM_67+5: per-profile monthly normalization applied at display time
+const NORM_TARGET  = 67;
+const NORM_MAX_OFF = 6;
+const DISPLAY_ADD  = 5;
+
+function computeMonthlyFlowType(displayScores: number[]): string {
+  const n = displayScores.length;
+  if (n < 2) return "안정형";
+
+  const first10 = displayScores.slice(0, Math.min(10, n));
+  const last10  = displayScores.slice(Math.max(0, n - 10));
+  const avg10 = (arr: number[]) => arr.reduce((s, x) => s + x, 0) / arr.length;
+  const trend = avg10(last10) - avg10(first10);
+
+  if (trend >= 6)  return "상승형";
+  if (trend <= -6) return "하강형";
+
+  const goldCount = displayScores.filter(s => s >= 85).length;
+  if (goldCount / n >= 0.15) return "집중형";
+
+  const mean = displayScores.reduce((s, x) => s + x, 0) / n;
+  const std  = Math.sqrt(displayScores.reduce((s, x) => s + (x - mean) ** 2, 0) / n);
+  if (std < 7) return "안정형";
+
+  return "변화형";
+}
+
+const NORM_CAT_KEYS = ["wealth", "love", "health", "career", "relations", "study"] as const;
+
+function segTags(score: number): string[] {
+  if (score >= 75) return ["집중", "추진"];
+  if (score >= 60) return ["정리", "무난"];
+  if (score >= 45) return ["신중", "유지"];
+  return ["휴식", "주의"];
+}
+
+function applyDisplayNorm(result: MonthlyFortuneResult): MonthlyFortuneResult {
+  const raws = result.daily_fortunes.map(f => f.scores.overall as number);
+  if (raws.length === 0) return result;
+  const avg = raws.reduce((s, x) => s + x, 0) / raws.length;
+  const off = Math.max(-NORM_MAX_OFF, Math.min(NORM_MAX_OFF, NORM_TARGET - avg));
+  const norm = (raw: number) => Math.round(Math.max(0, Math.min(100, raw + off + DISPLAY_ADD)));
+
+  const normalized = result.daily_fortunes.map(f => {
+    // overall + 6 categories
+    const display = norm(f.scores.overall as number);
+    const catScores = Object.fromEntries(
+      NORM_CAT_KEYS.map(cat => [cat, norm(f.scores[cat] as number)])
+    ) as Pick<typeof f.scores, typeof NORM_CAT_KEYS[number]>;
+
+    // time segments
+    const timeSegments = f.timeSegments?.map(seg => {
+      const s = norm(seg.score);
+      return { ...seg, score: s, tags: segTags(s) };
+    });
+
+    // timeSegmentSummary — re-derive best/worst from normalized segments; keep deltas unchanged
+    let timeSegmentSummary = f.timeSegmentSummary;
+    if (timeSegmentSummary && timeSegments && timeSegments.length > 0) {
+      const best  = timeSegments.reduce((a, b) => b.score > a.score ? b : a);
+      const worst = timeSegments.reduce((a, b) => b.score < a.score ? b : a);
+      timeSegmentSummary = {
+        ...timeSegmentSummary,
+        best:  { startHour: best.startHour,  score: best.score  },
+        worst: { startHour: worst.startHour, score: worst.score },
+      };
+    }
+
+    // notificationHints — normalize stored scores for consistency
+    const notificationHints = f.notificationHints?.map(h => ({ ...h, score: norm(h.score) }));
+
+    return {
+      ...f,
+      scores: { ...f.scores, ...catScores, overall: display },
+      badge: scoreToBadge(display),
+      timeSegments,
+      timeSegmentSummary,
+      notificationHints,
+    };
+  });
+
+  const displayScores = normalized.map(f => f.scores.overall as number);
+  return {
+    ...result,
+    monthly_average:   Math.round(displayScores.reduce((s, x) => s + x, 0) / displayScores.length),
+    daily_fortunes:    normalized,
+    monthly_flow_type: computeMonthlyFlowType(displayScores),
+  };
+}
+
 export async function getMonthlyFortune(
     user: SajuUser,
     year: number,
@@ -160,10 +250,11 @@ export async function getMonthlyFortune(
     if (samplePersisted && samplePersisted._v !== PERSISTED_SCHEMA_V) {
       console.warn("[CACHE] persisted._v mismatch — bump CACHE_VERSION + PERSISTED_SCHEMA_V when schema changes");
     }
-    await saveWidgetMonthlyData(cache[key]);
+    const cached = applyDisplayNorm(cache[key]);
+    await saveWidgetMonthlyData(cached);
 
     const todayStr = getTodayLocalString();
-    const todayFortune = cache[key].daily_fortunes.find(d => d.date === todayStr);
+    const todayFortune = cached.daily_fortunes.find(d => d.date === todayStr);
 
     if (todayFortune) {
       await saveWidgetData(todayFortune);
@@ -171,7 +262,7 @@ export async function getMonthlyFortune(
       await refreshWidget();
     }
 
-    return cache[key];
+    return cached;
   }
 
   const isMale = user.gender === "M";
@@ -212,10 +303,11 @@ export async function getMonthlyFortune(
   const result = aggregator.getMonthlyFortune(year, month);
   saveCache(key, result);
 
-  await saveWidgetMonthlyData(result);
+  const normalized = applyDisplayNorm(result);
+  await saveWidgetMonthlyData(normalized);
 
   const todayStr = getTodayLocalString();
-  const todayFortune = result.daily_fortunes.find(d => d.date === todayStr);
+  const todayFortune = normalized.daily_fortunes.find(d => d.date === todayStr);
 
   if (todayFortune) {
     await saveWidgetData(todayFortune);
@@ -223,7 +315,7 @@ export async function getMonthlyFortune(
     await refreshWidget();
   }
 
-  return result;
+  return normalized;
 }
 
 export function getUser(): SajuUser | null {
@@ -256,6 +348,145 @@ export async function getProfileInsight(user: SajuUser): Promise<ProfileInsight>
   } catch { /* ignore */ }
   return insight;
 }
+
+// ──────────────────────────────────────────────
+// Ziwei 구조 실험 비교
+// ──────────────────────────────────────────────
+
+import {
+  DEFAULT_ZIWEI_FLAGS, EXPERIMENT_ZIWEI_FLAGS,
+  EXPERIMENT_ZIWEI_FLAGS_0, EXPERIMENT_ZIWEI_FLAGS_01,
+  type ZiweiExperimentFlags,
+} from "../engines/ziweiEngine";
+
+export interface ZiweiExpStats {
+  overall: { avg: number; min: number; max: number; stddev: number };
+  categories: Record<string, { avg: number; stddev: number }>;
+  /** topEvents 중 ziwei.* 비율 (%) */
+  ziweiRatio: number;
+  /** canonical key → 출현 횟수, 상위 20개 */
+  topLabels: [string, number][];
+}
+
+export interface ZiweiExperimentReport {
+  days: number;
+  months: string[];
+  /** DEFAULT: 현행 설정 */
+  DEFAULT:    ZiweiExpStats;
+  /** EXP_0: 일 활성궁만 (monthly weight=0) */
+  EXP_0:      ZiweiExpStats;
+  /** EXP_01: 일 활성궁 + monthly weight=0.1 */
+  EXP_01:     ZiweiExpStats;
+  /** EXP_02: 일 활성궁 + monthly weight=0.2 */
+  EXP_02:     ZiweiExpStats;
+}
+
+export async function runZiweiExperiment(
+  user: SajuUser,
+  anchorYear: number,
+  anchorMonth: number,
+): Promise<ZiweiExperimentReport> {
+  const isMale = user.gender === "M";
+
+  const normalizedBirth = normalizeBirthDateTimeByRegion({
+    year:     user.birth_year,
+    month:    user.birth_month,
+    day:      user.birth_day,
+    hour:     user.birth_hour   ?? 12,
+    minute:   user.birth_minute ?? 0,
+    regionId: user.birth_region ?? "seoul",
+  });
+
+  const sajuProfile = calculateSajuProfile(
+    normalizedBirth.year, normalizedBirth.month, normalizedBirth.day,
+    normalizedBirth.hour, user.gender, user.injong_rules, normalizedBirth.minute,
+  );
+  const ziweiProfile = buildZiweiProfile(
+    normalizedBirth.year, normalizedBirth.month, normalizedBirth.day,
+    normalizedBirth.hour, anchorYear, isMale,
+  );
+  const astroProfile = await buildAstroProfile(
+    normalizedBirth.year, normalizedBirth.month, normalizedBirth.day,
+    normalizedBirth.hour, undefined, undefined, normalizedBirth.minute,
+  );
+
+  const birthDate = new Date(user.birth_year, user.birth_month - 1, user.birth_day);
+
+  // 앵커 월 기준 ±1개월 (3개월 창)
+  const monthWindow: { year: number; month: number }[] = [];
+  for (let offset = -1; offset <= 1; offset++) {
+    let m = anchorMonth + offset;
+    let y = anchorYear;
+    if (m < 1)  { m += 12; y--; }
+    if (m > 12) { m -= 12; y++; }
+    monthWindow.push({ year: y, month: m });
+  }
+
+  function runMonths(flags: ZiweiExperimentFlags): DailyFortune[] {
+    const agg = new FortuneAggregator(sajuProfile, ziweiProfile, astroProfile, undefined, birthDate, true);
+    const all: DailyFortune[] = [];
+    for (const { year, month } of monthWindow) {
+      all.push(...agg.getMonthlyFortune(year, month, flags).daily_fortunes);
+    }
+    return all;
+  }
+
+  const CAT_KEYS = ["wealth", "love", "health", "career", "relations", "study"] as const;
+
+  function buildStats(days: DailyFortune[]): ZiweiExpStats {
+    const overallVals = days.map(d => d.scores.overall);
+    const n = overallVals.length;
+    const oAvg = overallVals.reduce((a, b) => a + b, 0) / n;
+    const oVar = overallVals.reduce((a, v) => a + (v - oAvg) ** 2, 0) / n;
+
+    const categories: Record<string, { avg: number; stddev: number }> = {};
+    for (const cat of CAT_KEYS) {
+      const vals = days.map(d => d.scores[cat]);
+      const avg  = vals.reduce((a, b) => a + b, 0) / n;
+      const vari = vals.reduce((a, v) => a + (v - avg) ** 2, 0) / n;
+      categories[cat] = { avg: r1(avg), stddev: r1(Math.sqrt(vari)) };
+    }
+
+    let total = 0, ziweiCnt = 0;
+    const labelMap: Record<string, number> = {};
+    for (const day of days) {
+      for (const ev of day.persisted?.topEvents ?? []) {
+        total++;
+        if (ev.key.startsWith("ziwei.")) ziweiCnt++;
+        labelMap[ev.key] = (labelMap[ev.key] ?? 0) + 1;
+      }
+    }
+
+    const topLabels = Object.entries(labelMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20) as [string, number][];
+
+    return {
+      overall:   { avg: r1(oAvg), min: Math.min(...overallVals), max: Math.max(...overallVals), stddev: r1(Math.sqrt(oVar)) },
+      categories,
+      ziweiRatio: total > 0 ? r1(ziweiCnt / total * 100) : 0,
+      topLabels,
+    };
+  }
+
+  const [defaultDays, exp0Days, exp01Days, exp02Days] = [
+    runMonths(DEFAULT_ZIWEI_FLAGS),
+    runMonths(EXPERIMENT_ZIWEI_FLAGS_0),
+    runMonths(EXPERIMENT_ZIWEI_FLAGS_01),
+    runMonths(EXPERIMENT_ZIWEI_FLAGS),
+  ];
+
+  return {
+    days:    defaultDays.length,
+    months:  monthWindow.map(m => `${m.year}-${String(m.month).padStart(2, "0")}`),
+    DEFAULT: buildStats(defaultDays),
+    EXP_0:   buildStats(exp0Days),
+    EXP_01:  buildStats(exp01Days),
+    EXP_02:  buildStats(exp02Days),
+  };
+}
+
+function r1(v: number) { return Math.round(v * 10) / 10; }
 
 export function clearUser(): void {
   localStorage.removeItem("saju_user");

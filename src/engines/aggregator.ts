@@ -1,10 +1,10 @@
 /**
  * 운세 통합 집계기 (Fortune Aggregator)
  */
-import type { ScoreMap } from "./sajuEngine";
-import { buildSajuEngineFromProfile, type SajuEngineProfile } from "./sajuEngine";
+import type { ScoreMap, SpecialStarInfo } from "./sajuEngine";
+import { buildSajuEngineFromProfile, type SajuEngineProfile, type SajuExperimentFlags, DEFAULT_SAJU_FLAGS } from "./sajuEngine";
 import { applySajuBalanceAdjustment, computeElementDistribution, type SajuBalanceDebug } from "./sajuBalanceLayer";
-import { buildZiweiEngineFromProfile, type ZiweiProfile } from "./ziweiEngine";
+import { buildZiweiEngineFromProfile, type ZiweiProfile, type ZiweiExperimentFlags, DEFAULT_ZIWEI_FLAGS } from "./ziweiEngine";
 import { buildAstroEngineFromProfile, type AstroProfile } from "./astroEngine";
 import { getLunarDate } from "../utils/lunarConverter";
 import { generateTodos, generateSummary } from "./todoGenerator";
@@ -12,7 +12,7 @@ import { generateTimeSegments } from "./timeSegmentLayer";
 import { generateNotificationHints } from "./notificationHintLayer";
 import { buildReasonSources, type ReasonSources } from "./reasonLayer";
 import { computeStateAtoms, type StateAtomDebug } from "./stateAtomLayer";
-import { computeBaselineAdj, applyBaselineCorrection, pushBaselineOverall, BASELINE_WINDOW } from "./profileBaselineLayer";
+import { computeBaselineAdj, applyBaselineCorrection, pushBaselineOverall, BASELINE_WINDOW, DEFAULT_BASELINE_CONFIG, type BaselineConfig } from "./profileBaselineLayer";
 import { buildPersistedDailyModel, type PersistedDailyModel } from "./persistedDailyMapper";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 
@@ -49,8 +49,8 @@ function softScale(score: number): number {
 const BASE = 60; // 기본 베이스 점수
 
 export function scoreToBadge(score: number): string {
-  if (score >= SCORE_GOLD) return "대길";
-  if (score >= SCORE_MINT) return "길";
+  if (score >= SCORE_GOLD) return "아주좋음";
+  if (score >= SCORE_MINT) return "좋음";
   if (score >= SCORE_GRAY) return "보통";
   return "주의";
 }
@@ -86,6 +86,7 @@ export interface DailyFortune {
   reasonSources?: ReasonSources;
   stateAtomDebug?: StateAtomDebug;
   persisted?: PersistedDailyModel;
+  profileSpecialStars?: SpecialStarInfo[];
 }
 
 export interface MonthlyFortuneResult {
@@ -96,6 +97,8 @@ export interface MonthlyFortuneResult {
   peak_days: number[];
   caution_days: number[];
   daily_fortunes: DailyFortune[];
+  monthly_palace: string;    // e.g. "관록궁", "" if unavailable
+  monthly_flow_type: string; // computed from display scores in applyDisplayNorm
 }
 
 export class FortuneAggregator {
@@ -108,6 +111,7 @@ export class FortuneAggregator {
   private enableBalanceAdj: boolean;
   private userElements:    { strong: string[]; weak: string[] };
   private _baselineWindow: number[] = [];
+  private _baselineConfig: BaselineConfig;
 
   constructor(
     sajuProfile:              SajuEngineProfile,
@@ -116,6 +120,7 @@ export class FortuneAggregator {
     engineWeights             = DOMAIN_WEIGHTS,
     birthDate                 = new Date(1998, 0, 22),
     enableSajuBalanceAdjustment = false,
+    baselineConfig:           BaselineConfig = DEFAULT_BASELINE_CONFIG,
   ) {
     this.sajuEngine      = buildSajuEngineFromProfile(sajuProfile);
     this.ziweiEngine     = buildZiweiEngineFromProfile(ziweiProfile);
@@ -124,6 +129,7 @@ export class FortuneAggregator {
     this.birthDate       = birthDate;
     this.sajuProfile     = sajuProfile;
     this.enableBalanceAdj = enableSajuBalanceAdjustment;
+    this._baselineConfig  = baselineConfig;
     const dist = computeElementDistribution(sajuProfile);
     this.userElements = {
       strong: Object.entries(dist).filter(([, v]) => v > 0.3).map(([k]) => k),
@@ -203,9 +209,9 @@ export class FortuneAggregator {
     return merged;
   }
 
-  getDailyFortune(targetDate: Date): DailyFortune & { balance_debug?: SajuBalanceDebug } {
-    const sajuResult  = this.sajuEngine.calculate(targetDate);
-    const ziweiResult = this.ziweiEngine.calculate(targetDate);
+  getDailyFortune(targetDate: Date, ziweiFlags: ZiweiExperimentFlags = DEFAULT_ZIWEI_FLAGS, sajuFlags: SajuExperimentFlags = DEFAULT_SAJU_FLAGS): DailyFortune & { balance_debug?: SajuBalanceDebug } {
+    const sajuResult  = this.sajuEngine.calculate(targetDate, sajuFlags);
+    const ziweiResult = this.ziweiEngine.calculate(targetDate, ziweiFlags);
     const astroResult = this.astroEngine.calculate(targetDate, this.birthDate);
 
     let sajuScoresForMerge = sajuResult.scores;
@@ -245,12 +251,13 @@ export class FortuneAggregator {
     // State atom layer — additive adjustment after stabilizers, before rounding
     const stateResult = computeStateAtoms({
       ten_god_of_day:         sajuResult.factors.ten_god_of_day as string | undefined,
-      active_stars:           (sajuResult.factors.active_stars as string[]) ?? [],  // NATAL_STAR_SCALE=0.3 applied inside stateAtomLayer
+      active_stars:           (sajuResult.factors.active_stars as string[]) ?? [],
       day_branch_relation_types:   (sajuResult.factors.day_branch_relation_types   as string[]) ?? [],
       month_branch_relation_types: (sajuResult.factors.month_branch_relation_types as string[]) ?? [],
       ohaeng_clash_stem:      (sajuResult.factors.ohaeng_clash_stem  as boolean)     ?? false,
       ohaeng_clash_branch:    (sajuResult.factors.ohaeng_clash_branch as boolean)    ?? false,
       active_transit_aspects: (astroResult.factors.active_transit_aspects as string[]) ?? [],
+      specialStarsMode:       sajuFlags.SPECIAL_STARS_MODE,
     });
     {
       const _dc: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
@@ -265,7 +272,7 @@ export class FortuneAggregator {
 
     // Profile baseline correction — record pre-correction overall, then soft-shift
     const _rawOverall = Math.round(merged.overall);
-    applyBaselineCorrection(merged, computeBaselineAdj(this._baselineWindow));
+    applyBaselineCorrection(merged, computeBaselineAdj(this._baselineWindow, this._baselineConfig));
 
     // 최종 반올림 — 모든 중간 연산 완료 후 1회만 적용
     const allCats: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study", "overall"];
@@ -290,8 +297,9 @@ export class FortuneAggregator {
         sajuResult.factors,  ziweiResult.factors,  astroResult.factors,
         sajuResult.contributions, ziweiResult.contributions, astroResult.contributions,
       ),
-      balance_debug:   balanceDebug,
-      stateAtomDebug:  stateResult.debug,
+      balance_debug:    balanceDebug,
+      stateAtomDebug:   stateResult.debug,
+      profileSpecialStars: sajuResult.factors.profile_special_stars as SpecialStarInfo[] | undefined,
     };
     fortune.timeSegments = generateTimeSegments(
       fortune,
@@ -330,12 +338,12 @@ export class FortuneAggregator {
     return fortune;
   }
 
-  getMonthlyFortune(year: number, month: number): MonthlyFortuneResult {
+  getMonthlyFortune(year: number, month: number, ziweiFlags: ZiweiExperimentFlags = DEFAULT_ZIWEI_FLAGS, sajuFlags: SajuExperimentFlags = DEFAULT_SAJU_FLAGS): MonthlyFortuneResult {
     const daysInMonth = new Date(year, month, 0).getDate();
     const dailyList: DailyFortune[] = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
-      dailyList.push(this.getDailyFortune(new Date(year, month - 1, day)));
+      dailyList.push(this.getDailyFortune(new Date(year, month - 1, day), ziweiFlags, sajuFlags));
     }
 
     // Task 7: 순위 고착 방지 — 카테고리 자체 일별 신호 조건 충족 시에만 보정
@@ -389,6 +397,15 @@ export class FortuneAggregator {
     const peakDays    = sorted.slice(0, 5);
     const cautionDays = [...sorted].reverse().slice(0, 3);
 
+    const PALACE_SLUG_KR: Record<string, string> = {
+      life: "명궁", siblings: "형제궁", spouse: "부처궁", children: "자녀궁",
+      wealth: "재백궁", health: "질액궁", travel: "천이궁", friends: "교우궁",
+      career: "관록궁", property: "전택궁", spirit: "복덕궁", parents: "부모궁",
+    };
+    const rawPalaceKey   = dailyList[0]?.persisted?.monthlyPalace?.key ?? "";
+    const palaceSlug     = rawPalaceKey.startsWith("ziwei.palace.") ? rawPalaceKey.slice("ziwei.palace.".length) : "";
+    const monthly_palace = PALACE_SLUG_KR[palaceSlug] ?? "";
+
     return {
       year,
       month,
@@ -397,6 +414,8 @@ export class FortuneAggregator {
       peak_days:        peakDays,
       caution_days:     cautionDays,
       daily_fortunes:   dailyList,
+      monthly_palace,
+      monthly_flow_type: "", // computed by applyDisplayNorm in fortuneApi.ts
     };
   }
 }

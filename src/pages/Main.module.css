@@ -166,6 +166,30 @@
   overflow-y: auto;
 }
 
+.monthInfoBar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.monthInfoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--surface-2, rgba(255,255,255,0.07));
+  border-radius: 999px;
+  padding: 0.18rem 0.65rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.monthInfoBadge strong {
+  color: var(--text-main, #fff);
+  font-weight: 600;
+}
+
 .calendarHeader {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -544,10 +568,10 @@
   font-size: 0.72rem;
   font-weight: 700;
 }
-.badge-대길 { background: var(--accent-gold-bg);  color: var(--accent-gold); border: 1px solid var(--accent-gold); }
-.badge-길   { background: var(--accent-mint-bg);  color: var(--accent-mint); border: 1px solid var(--accent-mint); }
-.badge-보통 { background: rgba(136,136,136,0.1);   color: var(--text-muted);  border: 1px solid var(--text-muted); }
-.badge-주의 { background: var(--danger-bg);        color: var(--danger);      border: 1px solid var(--danger); }
+.badge-아주좋음 { background: var(--accent-gold-bg);  color: var(--accent-gold); border: 1px solid var(--accent-gold); }
+.badge-좋음     { background: var(--accent-mint-bg);  color: var(--accent-mint); border: 1px solid var(--accent-mint); }
+.badge-보통     { background: rgba(136,136,136,0.1);   color: var(--text-muted);  border: 1px solid var(--text-muted); }
+.badge-주의     { background: var(--danger-bg);        color: var(--danger);      border: 1px solid var(--danger); }
 
 /* ── Now / Best Cards ── */
 .cardsRow {
@@ -616,6 +640,56 @@
   margin-bottom: 0.7rem;
   padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--border);
+}
+
+/* ── 오늘의 흐름 (AI 해석) ── */
+.flowEmptyHint {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.flowBtn {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-main);
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-align: center;
+}
+.flowBtn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.flowLoading {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0.4rem 0;
+}
+
+.flowSubtitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.4;
+  margin-bottom: 0.75rem;
+}
+
+.flowSummary {
+  font-size: 0.875rem;
+  color: var(--text-sub);
+  line-height: 1.75;
+}
+.flowSummary p {
+  margin: 0 0 0.75rem;
+}
+.flowSummary p:last-child {
+  margin-bottom: 0;
 }
 
 /* ── Radar Chart ── */

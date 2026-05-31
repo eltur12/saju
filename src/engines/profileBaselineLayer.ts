@@ -21,15 +21,43 @@ import type { ScoreMap } from "./sajuEngine";
 export const BASELINE_WINDOW   = 30;   // rolling window length in days
 export const BASELINE_MIN_DAYS = 7;    // minimum days before correction activates
 
-const FLOOR_THR   = 58;
-const CEIL_THR    = 74;
-const TARGET      = 60;
-const STRENGTH_LO = 0.35;
-const STRENGTH_HI = 0.15;
-const MAX_ADJ_LO  =  5.0;   // max upward correction
-const MAX_ADJ_HI  = -3.0;   // max downward correction
-
 const DOM_CATS = ["wealth", "love", "health", "career", "relations", "study"] as const;
+
+// ── Config Interface ────────────────────────────────────────────────────────────
+
+export interface BaselineConfig {
+  floorThr:   number;   // avg below this triggers upward correction
+  ceilThr:    number;   // avg above this triggers downward correction
+  target:     number;   // correction target
+  strengthLo: number;   // multiplier for low correction
+  strengthHi: number;   // multiplier for high correction
+  maxAdjLo:   number;   // max upward correction (positive)
+  maxAdjHi:   number;   // max downward correction (negative)
+  minDays:    number;   // min window size before correction activates
+}
+
+export const DEFAULT_BASELINE_CONFIG: BaselineConfig = {
+  floorThr:   58,
+  ceilThr:    74,
+  target:     60,
+  strengthLo: 0.35,
+  strengthHi: 0.15,
+  maxAdjLo:   5.0,
+  maxAdjHi:   -3.0,
+  minDays:    7,
+};
+
+/** 낮은 프로필 수렴 강화 — FLOOR_THR 상향, STRENGTH_LO 강화, MIN_DAYS 단축 */
+export const STRONG_BASELINE_CONFIG: BaselineConfig = {
+  floorThr:   62,
+  ceilThr:    74,
+  target:     60,
+  strengthLo: 0.50,
+  strengthHi: 0.15,
+  maxAdjLo:   6.0,
+  maxAdjHi:   -3.0,
+  minDays:    4,
+};
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
@@ -37,11 +65,11 @@ const DOM_CATS = ["wealth", "love", "health", "career", "relations", "study"] as
  * Compute the correction amount from the current rolling window.
  * Returns 0 when the window is too small or the average is in the normal range.
  */
-export function computeBaselineAdj(window: readonly number[]): number {
-  if (window.length < BASELINE_MIN_DAYS) return 0;
+export function computeBaselineAdj(window: readonly number[], cfg: BaselineConfig = DEFAULT_BASELINE_CONFIG): number {
+  if (window.length < cfg.minDays) return 0;
   const avg = window.reduce((s, v) => s + v, 0) / window.length;
-  if (avg < FLOOR_THR) return Math.min(MAX_ADJ_LO, (TARGET - avg) * STRENGTH_LO);
-  if (avg > CEIL_THR)  return Math.max(MAX_ADJ_HI, (TARGET - avg) * STRENGTH_HI);
+  if (avg < cfg.floorThr) return Math.min(cfg.maxAdjLo,  (cfg.target - avg) * cfg.strengthLo);
+  if (avg > cfg.ceilThr)  return Math.max(cfg.maxAdjHi, (cfg.target - avg) * cfg.strengthHi);
   return 0;
 }
 

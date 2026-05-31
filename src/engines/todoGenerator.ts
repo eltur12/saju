@@ -68,12 +68,12 @@ const FACTOR_LABELS: Record<string, string> = {
 
 // 따뜻하고 자연스러운 말투의 요약 템플릿
 const SUMMARY_TEMPLATES: Record<string, string[]> = {
-  "대길": [
+  "아주좋음": [
     "{factor} 날이에요. 오늘은 가볍게 움직여도 괜찮아요.",
     "{factor} 날이에요. 하고 싶던 일을 시도해보기 좋아요.",
     "{factor} 날이에요. 오늘 흐름을 잘 활용해봐도 좋아요.",
   ],
-  "길": [
+  "좋음": [
     "{factor} 날이에요. 계획한 일을 차분히 진행하기 괜찮아요.",
     "{factor} 날이에요. 무리하지 않으면 잘 맞을 수 있어요.",
     "{factor} 날이에요. 오늘은 안정적으로 움직이기 좋아요.",
@@ -155,7 +155,7 @@ export function generateTodos(scores: ScoreMap, sajuFactors: Record<string, unkn
 
 export function generateSummary(scores: ScoreMap, sajuFactors: Record<string, unknown>, _ziweiFactors: Record<string, unknown>): string {
   const overall = scores.overall ?? 65;
-  const badge = overall >= 80 ? "대길" : overall >= 65 ? "길" : overall >= 52 ? "보통" : "주의";
+  const badge = overall >= 85 ? "아주좋음" : overall >= 75 ? "좋음" : overall >= 61 ? "보통" : "주의";
 
   // ten_god_of_day 우선 참조 (날짜마다 달라짐)
   const tenGod = (sajuFactors.ten_god_of_day as string) || (sajuFactors.ten_god_of_month as string) || "";

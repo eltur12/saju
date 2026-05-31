@@ -67,6 +67,7 @@ const TEN_GOD_INFLUENCE: Record<string, DomainInfluence> = {
   "正印": { wealth:5,   love:3,   health:7,  career:10,  relations:5,  study:4  },
 };
 
+/** 특별성 점수 테이블 — 점수 계산에는 미사용 (1차 분리 완료), profileSpecialStars 메타데이터용으로만 보존 */
 const SPECIAL_STARS: Record<string, ScoreMap> = {
   "천덕귀인": { overall:10, wealth:8,  love:5,  health:8,  career:8,  relations:6,  study:5  },
   "월덕귀인": { overall:8,  wealth:10, love:5,  health:5,  career:5,  relations:5,  study:4  },
@@ -76,6 +77,24 @@ const SPECIAL_STARS: Record<string, ScoreMap> = {
   "겁살":     { overall:-5, wealth:-8, love:-5, health:-5, career:-5, relations:-5, study:-3 },
   "백호살":   { overall:-5, wealth:0,  love:-3, health:-5, career:-3, relations:-5, study:-2 },
 };
+
+/** 특별성 → AI 전달용 메타데이터 매핑 */
+const SPECIAL_STARS_META: Record<string, { key: string; polarity: "positive" | "negative" | "mixed" }> = {
+  "천덕귀인": { key: "saju.star.cheonDeok", polarity: "positive" },
+  "월덕귀인": { key: "saju.star.wolDeok",   polarity: "positive" },
+  "도화살":   { key: "saju.star.doHwa",     polarity: "mixed"    },
+  "역마살":   { key: "saju.star.yeokMa",    polarity: "mixed"    },
+  "화개살":   { key: "saju.star.hwaGae",    polarity: "mixed"    },
+  "겁살":     { key: "saju.star.geobSal",   polarity: "negative" },
+  "백호살":   { key: "saju.star.baekHo",    polarity: "negative" },
+};
+
+/** AI Request에 전달되는 특별성 프로필 정보 */
+export interface SpecialStarInfo {
+  key:      string;
+  label:    string;
+  polarity: "positive" | "negative" | "mixed";
+}
 
 // ──────────────────────────────────────────────
 // 지지 관계 테이블
@@ -541,7 +560,7 @@ export class SajuEngine {
     return [HEAVENLY_STEMS[stemIdx], EARTHLY_BRANCHES[branchIdx]];
   }
 
-  calculate(targetDate: Date): { scores: ScoreMap; factors: Record<string, unknown>; contributions: { key: string; value: number }[] } {
+  calculate(targetDate: Date, flags: SajuExperimentFlags = DEFAULT_SAJU_FLAGS): { scores: ScoreMap; factors: Record<string, unknown>; contributions: { key: string; value: number }[] } {
     const [targetStem, targetBranch] = this.dateToStemBranch(targetDate);
     const [monthStem, monthBranch] = this.dateToMonthPillar(targetDate);
     const chartBranches = [this.day_branch, this.month_branch, this.year_branch, this.hour_branch];
@@ -549,18 +568,20 @@ export class SajuEngine {
     let scores = baseScore();
 
     // 원국 내 고정 패널티 (매일 자동 적용)
-    scores = addScore(scores, this.natal_fixed_penalty);
+    if (!flags.SKIP_NATAL_PENALTY) scores = addScore(scores, this.natal_fixed_penalty);
 
-    // 출생 월주 천간 (0.53)
-    scores = this.applyTenGod(scores, this.month_stem, 0.53);
-    // 현재 월주 천간 (0.47)
+    // 출생 월주 천간 (0.53) — 정적: 프로필마다 고정
+    if (!flags.SKIP_BIRTH_MONTH_TG) scores = this.applyTenGod(scores, this.month_stem, 0.53);
+    // 현재 월주 천간 (0.47) — 동적: 모든 유저 공통
     const _bMonthTg = { ...scores };
     scores = this.applyTenGod(scores, monthStem, 0.47);
     const _cMonthTg = { key: this.getTenGod(monthStem) ?? "", value: _avgDelta6(scores, _bMonthTg) };
-    // 특별성
-    scores = this.applySpecialStars(scores);
-    // 대운
-    scores = this.applyDayun(scores);
+    // 특별성 — static 모드이고 skip 플래그 없을 때만 직접 가산
+    if (flags.SPECIAL_STARS_MODE === "static" && !flags.SKIP_SPECIAL_STARS) {
+      scores = this.applySpecialStars(scores);
+    }
+    // 대운 고정 영향 — 정적: 대운 기간 내 매일 동일
+    if (!flags.SKIP_DAYUN) scores = this.applyDayun(scores);
     // 현재 일진 지지 관계
     const _bBranch = { ...scores };
     scores = applyBranchRelationsToScore(scores, targetBranch, chartBranches);
@@ -607,6 +628,14 @@ export class SajuEngine {
     const keys = Object.keys(scores) as (keyof ScoreMap)[];
     keys.forEach(k => { scores[k] = Math.max(0, Math.min(100, scores[k])); });
 
+    const profileSpecialStars: SpecialStarInfo[] = this.special_stars
+      .map(star => {
+        const meta = SPECIAL_STARS_META[star];
+        return meta
+          ? { key: meta.key, label: star, polarity: meta.polarity }
+          : { key: `saju.star.${star}`, label: star, polarity: "mixed" as const };
+      });
+
     return {
       scores,
       factors: {
@@ -626,6 +655,7 @@ export class SajuEngine {
         month_branch_relation_types:  monthBranchRelTypes,
         ohaeng_clash_stem:        ohaengClashStem,
         ohaeng_clash_branch:      ohaengClashBranch,
+        profile_special_stars:    profileSpecialStars,
       },
       contributions: [_cDayTg, _cMonthTg, _cBranch].filter(c => c.key !== ""),
     };
@@ -644,3 +674,47 @@ export class SajuEngine {
 export function buildSajuEngineFromProfile(profile: SajuEngineProfile): SajuEngine {
   return new SajuEngine(profile);
 }
+
+// ── 사주 실험 플래그 ──────────────────────────────────────────────────────────
+export interface SajuExperimentFlags {
+  /**
+   * "static"    : 현행 — 매일 SPECIAL_STARS 점수를 직접 가산 (기본값)
+   * "amplifier" : 실험 — 특별성을 점수 상수 대신 state atom 배율로만 작용
+   */
+  SPECIAL_STARS_MODE: "static" | "amplifier";
+
+  /**
+   * 정적 기준선 분리 실험 — true 시 해당 정적 요소를 계산에서 제외.
+   * 기본값 false (현행 유지). 요소별 독립 on/off 가능.
+   */
+  SKIP_NATAL_PENALTY?:   boolean;  // 원국 내 지지 충돌 패널티
+  SKIP_BIRTH_MONTH_TG?:  boolean;  // 출생월 천간 TG (0.53)
+  SKIP_SPECIAL_STARS?:   boolean;  // 특별성 직접 점수 (static 모드에서만)
+  SKIP_DAYUN?:           boolean;  // 대운 TG 고정 영향
+}
+
+/** 현행 기본 플래그 — 특별성 점수 분리(1차) 적용됨 */
+export const DEFAULT_SAJU_FLAGS: SajuExperimentFlags = {
+  SPECIAL_STARS_MODE: "static",
+  SKIP_SPECIAL_STARS:  true,   // 특별성 직접 점수 제거 (profileSpecialStars 메타데이터로 이동)
+};
+
+/** 구 동작 플래그 — 비교 실험 전용, 프로덕션 미사용 */
+export const LEGACY_SAJU_FLAGS: SajuExperimentFlags = {
+  SPECIAL_STARS_MODE: "static",
+  SKIP_SPECIAL_STARS:  false,
+};
+
+export const AMPLIFIER_SAJU_FLAGS: SajuExperimentFlags = {
+  SPECIAL_STARS_MODE: "amplifier",
+  SKIP_SPECIAL_STARS:  true,
+};
+
+/** 4가지 정적 요소 전부 제외 — 동적 일진 신호만 유지 */
+export const DYNAMIC_ONLY_SAJU_FLAGS: SajuExperimentFlags = {
+  SPECIAL_STARS_MODE: "static",
+  SKIP_NATAL_PENALTY:  true,
+  SKIP_BIRTH_MONTH_TG: true,
+  SKIP_SPECIAL_STARS:  true,
+  SKIP_DAYUN:          true,
+};
