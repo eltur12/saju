@@ -20,6 +20,7 @@ import type { DailyFortune } from "./aggregator";
 import type { ScoreMap } from "./sajuEngine";
 import { STATE_TO_CAT, type StateAtomKey } from "./stateAtomLayer";
 import { buildDailyFocus, applyFocusBoost } from "./focusBuilder";
+import type { DailyHighlight } from "./dailyHighlight";
 
 // ── Public types ───────────────────────────────────────────────────────────────
 
@@ -72,6 +73,8 @@ export interface PersistedDailyModel {
   focus?:             DailyFocus[];
   /** displayScores: categoryScores에 focus boost 적용한 결과 (UI 우선 사용) */
   displayScores?:     ScoreMap;
+  /** Daily Highlight: 이번 달 흐름 대비 오늘 가장 눈에 띄는 변화 */
+  dailyHighlight?:    DailyHighlight | null;
 }
 
 // ── Canonical key lookup tables ────────────────────────────────────────────────
@@ -359,18 +362,21 @@ function buildPersistedV2(fortune: DailyFortune): PersistedDailyModel {
     sourceEvents: [], // V2에서는 sourceEvents 추적 안 함 (event→state 매핑이 복잡)
   }));
 
-  // categoryHighlights: V2 drivers 사용
+  // categoryHighlights: V1 persisted에서 가져오기 (topEvents 포함)
+  // V2 drivers로 topStates는 업데이트하되, topEvents는 V1 것을 유지
   const categoryHighlights: Partial<Record<keyof ScoreMap, CategoryHighlight>> = {};
   const catKeys = ["wealth", "love", "health", "career", "relations", "study"] as const;
 
   for (const cat of catKeys) {
-    const h = v2.categoryHighlights[cat];
-    if (!h) continue;
+    const v2Cat = v2.categoryHighlights[cat];
+    const v1Cat = fortune.persisted?.categoryHighlights?.[cat];
 
-    categoryHighlights[cat] = {
-      topStates: h.drivers.map(d => `state.${d}`),
-      topEvents: [], // V2에서는 category별 topEvents 제공 안 함 (전체 topEvents 사용)
-    };
+    if (v2Cat || v1Cat) {
+      categoryHighlights[cat] = {
+        topStates: v2Cat ? v2Cat.drivers.map(d => `state.${d}`) : (v1Cat?.topStates ?? []),
+        topEvents: v1Cat?.topEvents ?? [], // V1에서 계산된 topEvents 재사용
+      };
+    }
   }
 
   // monthlyPalace: V2에서는 직접 제공하지 않으므로 undefined
@@ -379,31 +385,21 @@ function buildPersistedV2(fortune: DailyFortune): PersistedDailyModel {
   // summary: V2에서는 flow 분류 없음 (neutral로 처리)
   const summary: PersistedSummary = { flowType: "flow.neutral" };
 
-  // ── Focus Catalog v2 적용 (V2에서도 동일) ────────────────────────────────────
+  // ── Focus Catalog v2 적용 ─────────────────────────────────────────────────────
+  // V2에서는 focus 정보를 V1 persisted에서 그대로 가져온다.
+  // (V1에서 이미 전체 activeEventKeys로 계산했으므로)
   let focus: DailyFocus[] | undefined;
   let displayScores: ScoreMap | undefined;
 
-  try {
-    const activeEventKeys = new Set<string>(topEvents.map(e => e.key));
-
-    // 월간 Top1 통계 (임시 균등 분배)
-    const monthlyTop1Stats = {
-      wealth:    5,
-      love:      5,
-      health:    5,
-      career:    5,
-      relations: 5,
-      study:     5,
-    };
-
-    focus = buildDailyFocus(activeEventKeys, fortune.scores, monthlyTop1Stats);
-
-    if (focus.length > 0) {
-      displayScores = applyFocusBoost(fortune.scores, focus);
-    }
-  } catch (err) {
-    console.warn("[buildPersistedV2] Focus generation failed:", err);
+  // fortune.persisted가 있으면 V1에서 이미 계산된 focus를 재사용
+  // (buildAiDailyRequestV2 호출 전에 V1 persisted가 생성되었음)
+  if (fortune.persisted) {
+    focus = fortune.persisted.focus;
+    displayScores = fortune.persisted.displayScores;
   }
+
+  // dailyHighlight: fortune.dailyHighlight에서 가져옴
+  const dailyHighlight = fortune.dailyHighlight ?? null;
 
   return {
     _v: PERSISTED_SCHEMA_V,
@@ -414,6 +410,7 @@ function buildPersistedV2(fortune: DailyFortune): PersistedDailyModel {
     monthlyPalace,
     focus,
     displayScores,
+    dailyHighlight,
   };
 }
 
@@ -768,6 +765,9 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     console.warn("[buildPersistedDailyModel] Focus generation failed:", err);
   }
 
+  // dailyHighlight: fortune.dailyHighlight에서 가져옴
+  const dailyHighlight = fortune.dailyHighlight ?? null;
+
   return {
     _v: PERSISTED_SCHEMA_V,
     topEvents,
@@ -777,6 +777,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     monthlyPalace,
     focus,
     displayScores,
+    dailyHighlight,
   };
 }
 

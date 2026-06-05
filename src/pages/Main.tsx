@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import WheelPickerModal from "../components/WheelPickerModal";
 import { getMonthlyFortune, getProfileInsight, getUser, clearUser } from "../api/fortuneApi";
 import { generateDailyInterpretationFull } from "../api/aiApi";
-import { buildAiDailyRequest } from "../ai/buildAiDailyRequest";
+import { buildAiDailyRequestV2 } from "../ai/v2/buildAiDailyRequestV2";
 import type { ProfileInsight } from "../api/fortuneApi";
 import { App } from "@capacitor/app";
 import type { MonthlyFortuneResult, DailyFortune } from "../engines/aggregator";
@@ -24,6 +24,7 @@ import SegmentClock from "../components/SegmentClock";
 import {
   safeResolveInfo,
   safeResolveLabel,
+  isKeyRegistered,
   STATE_LABELS,
   FLOW_LABELS,
 } from "../constants/fortuneDictionary";
@@ -444,7 +445,10 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
     prevTodayStrRef.current = todayStr;
     if (selected === null || dayChanged) {
       const f = data.daily_fortunes.find(d => d.date === todayStr);
-      if (f) setSelected(f);
+      if (f) {
+        console.log(`[MAIN] 📅 Selected today: ${f.date}, overall=${f.scores.overall}, persisted._v=${f.persisted?._v}, topStates=${f.persisted?.topStates.length ?? 0}`);
+        setSelected(f);
+      }
     }
     if (dayChanged) {
       const todayFortune = data.daily_fortunes.find(d => d.date === todayStr);
@@ -482,6 +486,7 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   };
 
   const handleDayClick = (fortune: DailyFortune) => {
+    console.log(`[MAIN] Day clicked: ${fortune.date}, focus=${fortune.persisted?.focus?.length ?? 0}, dailyHighlight=${fortune.persisted?.dailyHighlight ? 'exists' : 'null'}`);
     setSelected(fortune);
   };
 
@@ -751,6 +756,70 @@ const normalizedBirthDisplay = useMemo(() => {
                       <div className={styles.previewLunar}>음력 {selected.lunar_date}</div>
                       <div className={styles.previewFlowBlock}>
                         {(() => {
+                          // 우선순위: 1. Focus → 2. Daily Highlight → 3. Top1/Bottom1 Fallback
+
+                          // CASE 1: Focus 존재
+                          if (selected.persisted?.focus && selected.persisted.focus.length > 0) {
+                            const focus = selected.persisted.focus[0]; // 첫 번째 focus만 프리뷰 표시
+
+                            // Source keys 처리 (클릭 가능한 칩으로 렌더링)
+                            // isKeyRegistered로 등록 여부 확인, unknown.* 제외
+                            const sourceKeys = focus.sourceKeys || [];
+                            const validSourceKeys = sourceKeys.filter(key => {
+                              if (key.startsWith("unknown.")) return false;
+                              return isKeyRegistered(key);
+                            });
+
+                            // Category 라벨
+                            const catLabel = RADAR_CATS.find(c => c.key === focus.category)?.label || focus.category;
+
+                            return (
+                              <div className={styles.previewFlowSingle}>
+                                <span className={styles.previewFlowLabel}>오늘의 포커스</span>
+                                <span className={styles.previewFlowMain}>{focus.label}</span>
+                                {validSourceKeys.length > 0 && (
+                                  <div className={styles.previewFlowChips}>
+                                    {validSourceKeys.map((key, idx) => {
+                                      const dispLabel = safeResolveLabel(key);
+                                      const hasInfo = safeResolveInfo(key) !== null;
+                                      return (
+                                        <span key={`${key}-${idx}`} style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
+                                          {idx > 0 && <span style={{ color: "var(--text-dim)", fontSize: "0.6rem" }}>+</span>}
+                                          <span
+                                            className={[
+                                              styles.reasonChip,
+                                              styles.reasonChipSmall,
+                                              hasInfo ? styles.reasonChipClickable : "",
+                                            ].filter(Boolean).join(" ")}
+                                            onClick={hasInfo ? () => setEventInfoKey(key) : undefined}
+                                          >
+                                            {dispLabel}
+                                          </span>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                <span className={styles.previewFlowCategory}>{catLabel} ↑</span>
+                              </div>
+                            );
+                          }
+
+                          // CASE 2: Daily Highlight 존재
+                          if (selected.persisted?.dailyHighlight) {
+                            const highlight = selected.persisted.dailyHighlight;
+                            const catLabel = RADAR_CATS.find(c => c.key === highlight.category)?.label || highlight.category;
+                            const arrow = highlight.direction === "up" ? "↑" : "↓";
+
+                            return (
+                              <div className={styles.previewFlowSingle}>
+                                <span className={styles.previewFlowLabel}>오늘의 변화</span>
+                                <span className={styles.previewFlowMain}>{catLabel} {arrow}</span>
+                              </div>
+                            );
+                          }
+
+                          // CASE 3: Fallback (기존 로직)
                           const peak = RADAR_CATS.reduce((b, c) =>
                             (selected.scores[c.key] as number) > (selected.scores[b.key] as number) ? c : b
                           );
@@ -759,8 +828,9 @@ const normalizedBirthDisplay = useMemo(() => {
                           );
                           const peakScore = selected.scores[peak.key] as number;
                           const lowScore  = selected.scores[low.key]  as number;
-                          const peakChip  = selected.persisted?.categoryHighlights?.[peak.key]?.topEvents[0];
-                          const lowChip   = selected.persisted?.categoryHighlights?.[low.key]?.topEvents[0];
+                          const peakChip  = selected.persisted?.categoryHighlights?.[peak.key]?.topEvents?.[0];
+                          const lowChip   = selected.persisted?.categoryHighlights?.[low.key]?.topEvents?.[0];
+
                           return (
                             <>
                               <div className={styles.previewFlowRow}>
@@ -768,14 +838,42 @@ const normalizedBirthDisplay = useMemo(() => {
                                 <span className={`${styles.previewFlowCat} ${getScoreClass(peakScore)}`}>
                                   {peak.label} {peakScore}
                                 </span>
-                                {peakChip && <span className={styles.previewFlowChip}>{safeResolveLabel(peakChip)}</span>}
+                                {peakChip && (() => {
+                                  const dispLabel = safeResolveLabel(peakChip);
+                                  const hasInfo = safeResolveInfo(peakChip) !== null;
+                                  return (
+                                    <span
+                                      className={[
+                                        styles.previewFlowChip,
+                                        hasInfo ? styles.reasonChipClickable : "",
+                                      ].filter(Boolean).join(" ")}
+                                      onClick={hasInfo ? (e) => { e.stopPropagation(); setEventInfoKey(peakChip); } : undefined}
+                                    >
+                                      {dispLabel}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <div className={styles.previewFlowRow}>
                                 <span className={styles.previewFlowLabel}>낮은 흐름</span>
                                 <span className={`${styles.previewFlowCat} ${getScoreClass(lowScore)}`}>
                                   {low.label} {lowScore}
                                 </span>
-                                {lowChip && <span className={styles.previewFlowChip}>{safeResolveLabel(lowChip)}</span>}
+                                {lowChip && (() => {
+                                  const dispLabel = safeResolveLabel(lowChip);
+                                  const hasInfo = safeResolveInfo(lowChip) !== null;
+                                  return (
+                                    <span
+                                      className={[
+                                        styles.previewFlowChip,
+                                        hasInfo ? styles.reasonChipClickable : "",
+                                      ].filter(Boolean).join(" ")}
+                                      onClick={hasInfo ? (e) => { e.stopPropagation(); setEventInfoKey(lowChip); } : undefined}
+                                    >
+                                      {dispLabel}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             </>
                           );
@@ -1218,6 +1316,65 @@ const normalizedBirthDisplay = useMemo(() => {
                         );
                       })()}
                     </div>
+                    {/* ── Focus & Daily Highlight ── */}
+                    {(selected.persisted?.focus?.length || selected.persisted?.dailyHighlight) && (
+                      <div className={styles.highlightSection}>
+                        {/* Focus */}
+                        {selected.persisted?.focus && selected.persisted.focus.length > 0 && (
+                          <div className={styles.highlightCard}>
+                            <span className={styles.highlightLabel}>오늘의 포커스</span>
+                            <span className={styles.highlightMain}>{selected.persisted.focus[0].label}</span>
+                            {(() => {
+                              const focus = selected.persisted.focus[0];
+                              const sourceKeys = focus.sourceKeys || [];
+                              const validSourceKeys = sourceKeys.filter(key => {
+                                if (key.startsWith("unknown.")) return false;
+                                return isKeyRegistered(key);
+                              });
+
+                              if (validSourceKeys.length === 0) return null;
+
+                              return (
+                                <div className={styles.highlightChips}>
+                                  {validSourceKeys.map((key, idx) => {
+                                    const dispLabel = safeResolveLabel(key);
+                                    const hasInfo = safeResolveInfo(key) !== null;
+                                    return (
+                                      <span key={`${key}-${idx}`} style={{ display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
+                                        {idx > 0 && <span style={{ color: "var(--text-dim)", fontSize: "0.6rem" }}>+</span>}
+                                        <span
+                                          className={[
+                                            styles.reasonChip,
+                                            styles.reasonChipSmall,
+                                            hasInfo ? styles.reasonChipClickable : "",
+                                          ].filter(Boolean).join(" ")}
+                                          onClick={hasInfo ? () => setEventInfoKey(key) : undefined}
+                                        >
+                                          {dispLabel}
+                                        </span>
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+
+                        {/* Daily Highlight */}
+                        {selected.persisted?.dailyHighlight && (
+                          <div className={styles.highlightCard}>
+                            <span className={styles.highlightLabel}>오늘의 변화</span>
+                            <span className={styles.highlightMain}>
+                              {RADAR_CATS.find(c => c.key === selected.persisted!.dailyHighlight!.category)?.label || selected.persisted.dailyHighlight.category}
+                              {" "}
+                              {selected.persisted.dailyHighlight.direction === "up" ? "↑" : "↓"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* ── 분석 영역 공통 안내 ── */}
                     <p className={styles.analysisHint}>흐름을 만든 요소들 중,{" "}눈여겨볼 만한 내용들만 정리해봤어요.</p>
 
@@ -1411,8 +1568,9 @@ const normalizedBirthDisplay = useMemo(() => {
                                   flowType: data.monthly_flow_type,
                                   palace:   data.monthly_palace,
                                 } : undefined;
-                                const req = buildAiDailyRequest(selected, monthCtx);
-                                const { content } = await generateDailyInterpretationFull(req);
+                                const v2Result = buildAiDailyRequestV2(selected, monthCtx);
+                                console.log(`[AI] V2 Request: topEvents=${v2Result.request.topEvents.length}, topStates=${v2Result.request.topStates.length}, categoryHighlights=${Object.keys(v2Result.request.categoryHighlights).length}, monthlyPosition=${!!v2Result.request.monthlyPosition}, dailyCompare=${!!v2Result.request.dailyCompare}, keyMoment=${!!v2Result.request.keyMoment}`);
+                                const { content } = await generateDailyInterpretationFull(v2Result.request as any);
                                 const clean = content.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
                                 try {
                                   const parsed = JSON.parse(clean);
@@ -1502,8 +1660,9 @@ const normalizedBirthDisplay = useMemo(() => {
                               const fortune = fortunes[i];
                               setBatchProgress(`${i + 1}/${total} 처리 중… (${fortune.date})`);
                               try {
-                                const req = buildAiDailyRequest(fortune, batchMonthCtx);
-                                const { content, usage } = await generateDailyInterpretationFull(req);
+                                const v2Result = buildAiDailyRequestV2(fortune, batchMonthCtx);
+                                console.log(`[AI-BATCH] ${fortune.date} V2: topEvents=${v2Result.request.topEvents.length}, topStates=${v2Result.request.topStates.length}`);
+                                const { content, usage } = await generateDailyInterpretationFull(v2Result.request as any);
                                 if (usage) {
                                   sumInput  += usage.input;
                                   sumOutput += usage.output;
@@ -1511,11 +1670,12 @@ const normalizedBirthDisplay = useMemo(() => {
                                 }
                                 console.log(`[AI-BATCH] ${fortune.date} (${i + 1}/${total}) input=${usage?.input ?? "-"} output=${usage?.output ?? "-"} total=${usage?.total ?? "-"}`);
                                 console.log(`[AI-BATCH] 응답: ${content}`);
-                                days.push({ date: fortune.date, request: req, response: content, usage: usage ?? null });
+                                days.push({ date: fortune.date, request: v2Result.request, response: content, usage: usage ?? null });
                               } catch (err) {
                                 const msg = err instanceof Error ? err.message : String(err);
                                 console.error(`[AI-BATCH] ${fortune.date} 오류: ${msg}`);
-                                days.push({ date: fortune.date, request: buildAiDailyRequest(fortune, batchMonthCtx), response: `ERROR: ${msg}`, usage: null });
+                                const v2Result = buildAiDailyRequestV2(fortune, batchMonthCtx);
+                                days.push({ date: fortune.date, request: v2Result.request, response: `ERROR: ${msg}`, usage: null });
                               }
                             }
 

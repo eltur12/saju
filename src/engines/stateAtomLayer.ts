@@ -56,6 +56,10 @@ export interface StateAtomInput {
    * "amplifier" (실험) — STAR_AMPLIFIER 배율 적용 (가산 없음)
    */
   specialStarsMode?:           "static" | "amplifier";
+  /** 12운성: 오늘 일지 & 프로필 일간 기준 활성 12운성 */
+  twelve_state?:               string | null;
+  /** 도화살 보유 여부 & 오늘 일지가 도화 지지인지 */
+  doHwa_active?:               boolean;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -314,6 +318,17 @@ export function computeStateAtoms(input: StateAtomInput): StateAtomResult {
     if (!mapping) continue;
     applyDelta(atoms, mapping[nature], `행성:${planet}${symbol}`);
     events.push(`${planet}${symbol}`);
+  }
+
+  // 5.1. 12운성 이벤트
+  if (input.twelve_state) {
+    // EVENT_CATEGORY_MAP에 정의된 7개 (장생/건록/제왕/양/관대/목욕/태)
+    events.push(input.twelve_state);
+  }
+
+  // 5.2. 도화살 이벤트
+  if (input.doHwa_active) {
+    events.push("도화살");
   }
 
   // 5.3. Amplifier 모드 — 특별성 배율 적용 (softDamp 전, 이미 누적된 atom에 곱함)

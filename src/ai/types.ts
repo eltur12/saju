@@ -88,8 +88,17 @@ export interface AiInterpretationRequest {
 
   /** Focus Catalog v2: 오늘 특별히 드러난 흐름 (선택적 강조 포인트) */
   focus?: Array<{
-    category:  "wealth" | "love" | "health" | "career" | "relations" | "study";
-    label:     string;
-    strength:  "medium" | "strong";
+    category:    "wealth" | "love" | "health" | "career" | "relations" | "study";
+    label:       string;
+    strength:    "medium" | "strong";
+    sourceKeys:  string[];
+    sourceLabels: string[];
   }>;
+
+  /** Daily Highlight: 이번 달 흐름 대비 오늘 가장 눈에 띄는 변화 */
+  dailyHighlight?: {
+    category:  "wealth" | "love" | "health" | "career" | "relations" | "study";
+    direction: "up" | "down";
+    strength:  "noticeable" | "strong";
+  };
 }

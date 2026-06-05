@@ -78,6 +78,32 @@ const SPECIAL_STARS: Record<string, ScoreMap> = {
   "백호살":   { overall:-5, wealth:0,  love:-3, health:-5, career:-3, relations:-5, study:-2 },
 };
 
+/** 도화살 지지 */
+const DOHWA_BRANCHES = ["子", "午", "卯", "酉"];
+
+/** 12운성 매핑 테이블 */
+function getTwelveStatesMapping(dayStem: string) {
+  const stemToBranchStart: Record<string, number> = {
+    "甲": 10, "乙": 5, "丙": 2, "丁": 8, "戊": 2, "己": 8, "庚": 4, "辛": 11, "壬": 7, "癸": 2,
+  };
+  const branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+  const start = stemToBranchStart[dayStem];
+  return {
+    "장생": branches[(start + 0) % 12],
+    "목욕": branches[(start + 1) % 12],
+    "관대": branches[(start + 2) % 12],
+    "건록": branches[(start + 3) % 12],
+    "제왕": branches[(start + 4) % 12],
+    "쇠":   branches[(start + 5) % 12],
+    "병":   branches[(start + 6) % 12],
+    "사":   branches[(start + 7) % 12],
+    "묘":   branches[(start + 8) % 12],
+    "절":   branches[(start + 9) % 12],
+    "태":   branches[(start + 10) % 12],
+    "양":   branches[(start + 11) % 12],
+  };
+}
+
 /** 특별성 → AI 전달용 메타데이터 매핑 */
 const SPECIAL_STARS_META: Record<string, { key: string; polarity: "positive" | "negative" | "mixed" }> = {
   "천덕귀인": { key: "saju.star.cheonDeok", polarity: "positive" },
@@ -636,6 +662,23 @@ export class SajuEngine {
           : { key: `saju.star.${star}`, label: star, polarity: "mixed" as const };
       });
 
+    // 12운성 체크
+    const twelveStatesMapping = getTwelveStatesMapping(this.day_stem);
+    let twelve_state: string | null = null;
+    for (const [stateName, stateBranch] of Object.entries(twelveStatesMapping)) {
+      if (targetBranch === stateBranch) {
+        // 긍정/중립 7개만 활성화
+        if (["장생", "건록", "제왕", "양", "관대", "목욕", "태"].includes(stateName)) {
+          twelve_state = stateName;
+          break;
+        }
+      }
+    }
+
+    // 도화살 체크
+    const hasDoHwa = [this.day_branch, this.month_branch].some(b => DOHWA_BRANCHES.includes(b));
+    const doHwa_active = hasDoHwa && DOHWA_BRANCHES.includes(targetBranch);
+
     return {
       scores,
       factors: {
@@ -656,6 +699,8 @@ export class SajuEngine {
         ohaeng_clash_stem:        ohaengClashStem,
         ohaeng_clash_branch:      ohaengClashBranch,
         profile_special_stars:    profileSpecialStars,
+        twelve_state:             twelve_state,
+        doHwa_active:             doHwa_active,
       },
       contributions: [_cDayTg, _cMonthTg, _cBranch].filter(c => c.key !== ""),
     };

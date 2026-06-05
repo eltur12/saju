@@ -68,6 +68,20 @@ export const EVENT_LABELS: Record<string, string> = {
   "saju.star.cheonDeok": "천덕귀인 활성",
   "saju.star.wolDeok":   "월덕귀인 활성",
 
+  // ── saju · twelve state (십이운성) ────────────────────────────────────────────
+  "saju.twelveState.jangSaeng": "장생 기운",
+  "saju.twelveState.mokYok":    "목욕 기운",
+  "saju.twelveState.gwanDae":   "관대 기운",
+  "saju.twelveState.imGwan":    "임관 기운",
+  "saju.twelveState.jeWang":    "제왕 기운",
+  "saju.twelveState.soe":       "쇠 기운",
+  "saju.twelveState.byeong":    "병 기운",
+  "saju.twelveState.sa":        "사 기운",
+  "saju.twelveState.myo":       "묘 기운",
+  "saju.twelveState.jeol":      "절 기운",
+  "saju.twelveState.tae":       "태 기운",
+  "saju.twelveState.yang":      "양 기운",
+
   // ── saju · ohaeng ────────────────────────────────────────────────────────────
   "saju.ohaeng.clash": "오행 충돌",
 
@@ -202,6 +216,20 @@ export const EVENT_META: Record<string, EventMeta> = {
   "saju.star.geobSal":   { icon: "shield",  tone: "negative", priority: 1 },
   "saju.star.cheonDeok": { icon: "star",    tone: "positive", priority: 2 },
   "saju.star.wolDeok":   { icon: "star",    tone: "positive", priority: 2 },
+
+  // saju · twelve state (십이운성)
+  "saju.twelveState.jangSaeng": { icon: "sprout",   tone: "positive", priority: 2 },
+  "saju.twelveState.mokYok":    { icon: "droplet",  tone: "neutral",  priority: 3 },
+  "saju.twelveState.gwanDae":   { icon: "crown",    tone: "positive", priority: 2 },
+  "saju.twelveState.imGwan":    { icon: "shield",   tone: "positive", priority: 2 },
+  "saju.twelveState.jeWang":    { icon: "star",     tone: "positive", priority: 1 },
+  "saju.twelveState.soe":       { icon: "minus",    tone: "neutral",  priority: 3 },
+  "saju.twelveState.byeong":    { icon: "warning",  tone: "negative", priority: 2 },
+  "saju.twelveState.sa":        { icon: "cross",    tone: "negative", priority: 2 },
+  "saju.twelveState.myo":       { icon: "circle",   tone: "neutral",  priority: 3 },
+  "saju.twelveState.jeol":      { icon: "minus",    tone: "negative", priority: 2 },
+  "saju.twelveState.tae":       { icon: "dot",      tone: "neutral",  priority: 3 },
+  "saju.twelveState.yang":      { icon: "sprout",   tone: "positive", priority: 3 },
 
   // saju · ohaeng
   "saju.ohaeng.clash": { icon: "bolt", tone: "negative", priority: 1 },
@@ -848,6 +876,41 @@ export const EVENT_INFO: Record<string, EventInfo> = {
     relatedFlows: ["flow.stableFlow", "flow.recoveryDay"],
   },
 
+  // ── saju · twelve state (십이운성) ────────────────────────────────────────────
+  "saju.twelveState.jangSaeng": {
+    title:               "장생",
+    shortDescription:    "새로운 시작과 성장 에너지가 펼쳐지는 흐름이에요.",
+    detailedDescription: "장생(長生)은 십이운성 중 생명이 처음 태어나는 단계로, 새로운 일을 시작하거나 성장 에너지가 올라오는 시기와 겹쳐요. 희망적이고 활력 있는 흐름이 느껴지는 편이에요.",
+    commonPatterns: ["새로운 시작이 순조롭게 진행되는 흐름", "성장과 발전 에너지가 느껴지는 시기", "희망적이고 긍정적인 기운"],
+    relatedStates: [
+      { key: "state.optimism", polarity: "positive" },
+      { key: "state.initiative", polarity: "positive" },
+    ],
+    relatedFlows: ["flow.newBeginning"],
+  },
+  "saju.twelveState.jeWang": {
+    title:               "제왕",
+    shortDescription:    "에너지가 절정에 이르는 강력한 흐름이에요.",
+    detailedDescription: "제왕(帝旺)은 십이운성 중 에너지가 가장 강력한 절정 단계예요. 추진력이 최고조에 달하고 성취감이 느껴지는 시기와 겹쳐요. 다만 과도한 에너지로 피로감이 동반될 수도 있어요.",
+    commonPatterns: ["추진력과 성취 에너지가 최고조인 시기", "자신감과 리더십이 두드러지는 흐름", "에너지 소모가 클 수 있음"],
+    relatedStates: [
+      { key: "state.executionFlow", polarity: "positive" },
+      { key: "state.initiative", polarity: "positive" },
+    ],
+    relatedFlows: ["flow.highExecution"],
+  },
+  "saju.twelveState.tae": {
+    title:               "태",
+    shortDescription:    "내면 형성과 준비 에너지가 쌓이는 흐름이에요.",
+    detailedDescription: "태(胎)는 십이운성 중 생명이 잉태되는 단계로, 표면적으로는 조용하지만 내면에서 준비와 구상이 이루어지는 시기예요. 성찰과 계획에 유리한 편이에요.",
+    commonPatterns: ["표면적으로는 조용하지만 내면 준비가 진행되는 시기", "성찰과 구상에 집중하기 좋은 흐름", "새로운 가능성을 탐색하는 편"],
+    relatedStates: [
+      { key: "state.reflection", polarity: "positive" },
+      { key: "state.insight", polarity: "positive" },
+    ],
+    relatedFlows: ["flow.introspection"],
+  },
+
   // ── astro · aspect — sun ─────────────────────────────────────────────────────
   "astro.aspect.sun.conjunction": {
     title:               "태양 합",
@@ -1477,4 +1540,23 @@ export const EVENT_INFO: Record<string, EventInfo> = {
  */
 export function safeResolveInfo(key: string): EventInfo | null {
   return EVENT_INFO[key] ?? null;
+}
+
+/**
+ * Check if a key is registered in any dictionary (EVENT_LABELS, STATE_LABELS, FLOW_LABELS, or astro).
+ * Returns true only if the key has a valid label definition.
+ *
+ * Use this for filtering UI elements to prevent exposing raw internal keys.
+ */
+export function isKeyRegistered(key: string): boolean {
+  // Check dictionaries
+  if (EVENT_LABELS[key]) return true;
+  if (STATE_LABELS[key]) return true;
+  if (FLOW_LABELS[key]) return true;
+
+  // Check astro labels
+  const astroLabel = resolveAstroLabel(key);
+  if (astroLabel && astroLabel !== key) return true;
+
+  return false;
 }

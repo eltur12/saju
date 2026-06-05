@@ -15,6 +15,7 @@ import { computeStateAtoms, type StateAtomDebug } from "./stateAtomLayer";
 import { computeBaselineAdj, applyBaselineCorrection, pushBaselineOverall, BASELINE_WINDOW, DEFAULT_BASELINE_CONFIG, type BaselineConfig } from "./profileBaselineLayer";
 import { buildPersistedDailyModel, type PersistedDailyModel } from "./persistedDailyMapper";
 import { buildAiDailyRequestV2 } from "../ai/v2/buildAiDailyRequestV2";
+import { generateMonthlyCategoryStats, buildDailyHighlight } from "./dailyHighlight";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 
 /**
@@ -90,6 +91,8 @@ export interface DailyFortune {
   profileSpecialStars?: SpecialStarInfo[];
   /** V2 AI request (runtime only, not cached) */
   aiRequestV2?: import("../ai/v2/types").AiInterpretationRequestV2;
+  /** Daily Highlight: 이번 달 흐름 대비 오늘 가장 눈에 띄는 변화 */
+  dailyHighlight?: import("./dailyHighlight").DailyHighlight | null;
   /** Internal use - saju factors for time segment generation */
   saju_factors?: Record<string, unknown>;
 }
@@ -432,6 +435,21 @@ export class FortuneAggregator {
     const rawPalaceKey   = dailyList[0]?.persisted?.monthlyPalace?.key ?? "";
     const palaceSlug     = rawPalaceKey.startsWith("ziwei.palace.") ? rawPalaceKey.slice("ziwei.palace.".length) : "";
     const monthly_palace = PALACE_SLUG_KR[palaceSlug] ?? "";
+
+    // Generate monthly category stats and add dailyHighlight to each fortune
+    const rawScores = dailyList.map(f => f.scores);
+    const period = `${year}-${String(month).padStart(2, '0')}`;
+    const monthlyStats = generateMonthlyCategoryStats(rawScores, period);
+
+    for (const fortune of dailyList) {
+      const dailyHighlight = buildDailyHighlight(fortune.scores, monthlyStats);
+      fortune.dailyHighlight = dailyHighlight;
+
+      // Update persisted.dailyHighlight directly (don't rebuild to preserve focus)
+      if (fortune.persisted) {
+        fortune.persisted.dailyHighlight = dailyHighlight;
+      }
+    }
 
     return {
       year,

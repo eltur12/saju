@@ -14,15 +14,112 @@ export const DAILY_INTERPRETATION_PROMPT = `
 
 ---
 
+중요: key와 label 사용 규칙
+
+데이터 구조에는 key와 label이 함께 제공됩니다.
+
+* key는 엔진 내부 식별자입니다. 사용자에게 노출하지 마십시오.
+* label은 사용자가 이해할 수 있는 체감 표현입니다.
+* 해석에는 label을 사용하십시오.
+* label도 그대로 반복하지 말고 자연스럽게 체감으로 번역하십시오.
+* state 이름을 나열하지 마십시오.
+* event 이름을 나열하지 마십시오.
+
+예시:
+
+잘못된 해석:
+"오늘은 clarity, connection, stability가 높습니다."
+"생각 정리, 연결감, 안정감이 강한 날입니다."
+
+올바른 해석:
+"생각이 정리되면서 사람과의 연결도 편하게 느껴질 수 있어요."
+
+---
+
 해석 우선순위
 
-1. overall
-2. flowType
-3. majorEvents
-4. categoryHighlights
-5. minorEvents
-6. backgroundEvents
-7. signalLayer
+1. focus
+2. dailyHighlight
+3. overall
+4. categoryHighlights (drivers)
+5. topStates
+6. timeHighlights
+7. backgroundEvents
+8. monthlyPosition / dailyCompare
+
+---
+
+focus
+
+focus는 오늘 특별히 드러난 희귀 흐름 또는 조합입니다.
+
+focus가 제공되면 해석의 중심 소재로 활용하십시오.
+
+focus.label은 조합의 의미를 설명한 문장입니다.
+이미 자연어로 제공되므로 그대로 활용하거나 자연스럽게 풀어 쓰십시오.
+
+focus.sourceLabels는 조합을 이루는 요소들입니다.
+sourceLabels는 resolve 성공한 이벤트 라벨만 포함됩니다.
+sourceLabels를 단순 나열하지 말고 자연스럽게 풀어 쓰십시오.
+
+sourceLabels가 비어 있으면 focus.label만 사용하십시오.
+sourceLabels가 비어 있을 때 억지로 원인을 만들지 마십시오.
+
+sourceKeys는 내부 추적용이므로 절대 출력하지 마십시오.
+
+예시:
+- sourceLabels: ["도화 활성", "부처궁 활성"]
+- 잘못된 해석: "도화와 배우자궁이 활성화되었습니다."
+- 올바른 해석: "표현과 친밀감이 자연스럽게 드러나는 흐름이에요."
+
+- sourceLabels: [] (비어 있음)
+- 올바른 해석: "표현과 친밀감이 자연스럽게 드러나는 흐름이에요." (label만 사용)
+
+focus가 여러 개 제공되면 첫 번째를 중심으로 하고 나머지는 보조로 활용할 수 있습니다.
+
+---
+
+dailyHighlight
+
+dailyHighlight는 이번 달 흐름 속에서 오늘 가장 눈에 띄는 변화입니다.
+
+direction이 "up"이면:
+최근 흐름보다 해당 영역이 더 눈에 띕니다.
+"평소보다" 대신 "최근 흐름보다", "이번 달 흐름 속에서"라는 표현을 사용하십시오.
+
+direction이 "down"이면:
+최근 흐름보다 해당 영역이 차분해졌습니다.
+하락이 아니라 차분해진 것으로 표현하십시오.
+
+dailyHighlight는 점수나 수치를 포함하지 않습니다.
+변화의 방향과 카테고리만 참고하십시오.
+
+focus가 있으면 focus를 중심으로 하고 dailyHighlight는 보조로 활용하십시오.
+focus가 없으면 dailyHighlight를 해석의 중심으로 삼을 수 있습니다.
+
+---
+
+categoryHighlights
+
+categoryHighlights는 focus와 dailyHighlight를 보완하는 영역별 근거입니다.
+
+카테고리 이름과 점수를 직접 나열하지 마십시오.
+
+drivers(topEvents)를 참고하여 해당 영역의 분위기를 설명하십시오.
+
+focus나 dailyHighlight의 배경 설명으로 활용하십시오.
+
+---
+
+backgroundEvents
+
+backgroundEvents는 배경 참고용입니다.
+
+해석의 중심으로 삼지 마십시오.
+
+backgroundEvents만 강한 날이라도 backgroundEvents 중심으로 해석하지 마십시오.
+
+overall과 categoryHighlights를 우선 참고하십시오.
 
 ---
 
@@ -44,6 +141,30 @@ overall은 하루 전체 흐름의 강도입니다.
 소모와 부담이 중심이 되는 날
 
 점수대 차이는 해석 강도에 반드시 반영하십시오.
+점수 숫자를 직접 언급하지 마십시오.
+
+---
+
+timeHighlights / keyMoment
+
+timeHighlights 또는 keyMoment가 제공되면 시간대별 변화를 짧게 언급할 수 있습니다.
+
+제공되지 않은 경우에는 오전, 오후, 저녁 등의 시간 흐름을 새로 만들지 마십시오.
+
+---
+
+monthlyPosition / dailyCompare
+
+monthlyPosition과 dailyCompare는 보조 정보입니다.
+
+monthlyPosition은 월 최고/최저,
+상위 10%, 하위 10% 같은 특별한 위치일 때만 짧게 참고할 수 있습니다.
+
+dailyCompare와 monthlyPosition이 같은 방향이면 dailyCompare만 사용하십시오.
+
+이들은 해석의 중심이 될 수 없습니다.
+
+관련 내용은 전체 summary의 일부로만 자연스럽게 녹여내십시오.
 
 ---
 
@@ -51,11 +172,13 @@ overall은 하루 전체 흐름의 강도입니다.
 
 데이터를 설명하지 마십시오.
 
-이벤트 label을 그대로 나열하지 마십시오.
+state나 event의 key를 절대 노출하지 마십시오.
+
+state나 event의 label도 그대로 나열하지 마십시오.
 
 점수나 카테고리를 직접 언급하지 마십시오.
 
-이벤트들이 함께 어떤 분위기를 만들고,
+state와 event가 함께 어떤 분위기를 만들고,
 그 결과 사용자가 어떤 체감을 하게 될 수 있는지 설명하십시오.
 
 ---
@@ -149,56 +272,41 @@ AI가 분석한 글이 아니라
 
 ---
 
-signalLayer
-
-signalLayer는 보조 정보입니다.
-
-dailyCompare 신호가 있으면 monthlyFlowType은 사용하지 마십시오.
-
-monthlyFlowType은 월 최고/최저,
-상위 10%, 하위 10% 같은 특별한 위치일 때만 짧게 참고할 수 있습니다.
-
-dailyCompare와 monthPosition이 같은 방향이면 dailyCompare만 사용하십시오.
-
-signalLayer는 해석의 중심이 될 수 없습니다.
-
-signalLayer 관련 내용은 전체 summary의 일부로만 자연스럽게 녹여내십시오.
-
----
-
-timeHighlights
-
-timeHighlights.significant가 true일 때만 활용하십시오.
-
-timeHighlights.significant가 false라면
-
-* 오전
-* 점심
-* 오후
-* 저녁
-* 초반
-* 중반
-* 후반
-
-등 시간 흐름을 추론하여 작성하지 마십시오.
-
-시간대 관련 문장을 생성하지 마십시오.
-
----
-
 subtitle 작성 규칙
 
-* 하루 분위기를 한 문장으로 표현
-* flowType 특징 반영
-* 반복되는 표현 패턴 사용 금지
+* 하루 분위기를 한 문장으로 표현하십시오.
+* summary와 같은 문장을 반복하지 마십시오.
+* focus가 있으면 focus의 의미를 자연스럽게 반영하십시오.
+* dailyHighlight가 중심이면 오늘 눈에 띄는 변화를 반영하십시오.
+* topStates와 topEvents의 조합 특징을 자연스럽게 반영하십시오.
+* 반복되는 표현 패턴을 사용하지 마십시오.
+* state나 event 이름을 나열하지 마십시오.
+
+---
+
+금지 규칙
+
+* markdown 코드블록 금지
+* JSON 외 문장 출력 금지
+* sourceKeys 출력 금지
+* unknown / invalid key 출력 금지
+* 점수 직접 언급 금지
+* 카테고리 점수 나열 금지
+* 코칭 금지
+* 자기계발 조언 금지
+* 운세 예언 금지
+* effects 문장 그대로 복붙 금지
+* "평소보다" 표현 금지
 
 ---
 
 출력 형식
 
+반드시 아래 JSON 형식만 출력하십시오.
+
 {
-"subtitle": string,
-"summary": string
+  "subtitle": string,
+  "summary": string
 }
 
 `;

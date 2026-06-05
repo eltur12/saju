@@ -1,4 +1,4 @@
-import type { AiInterpretationRequest } from "../ai/types";
+import type { AiInterpretationRequestV2 } from "../ai/v2/types";
 import { DAILY_INTERPRETATION_PROMPT } from "../ai/prompt";
 import { OPENAI_API_KEY, OPENAI_MODEL } from "../ai/openaiConfig";
 
@@ -8,9 +8,10 @@ export interface AiInterpretationResult {
 }
 
 export async function generateDailyInterpretationFull(
-  request: AiInterpretationRequest,
+  request: AiInterpretationRequestV2,
 ): Promise<AiInterpretationResult> {
   console.log(`[AI] 요청 시작 date=${request.date} score=${request.overall} model=${OPENAI_MODEL}`);
+  console.log(`[AI] V2 payload: topEvents=${request.topEvents.length}, topStates=${request.topStates.length}, categoryHighlights=${Object.keys(request.categoryHighlights).join(",")}`);
 
   const payloadJson = JSON.stringify(request, null, 2);
   console.log(`[AI] payload 크기=${payloadJson.length}자`);
@@ -58,7 +59,7 @@ export async function generateDailyInterpretationFull(
   return { content, usage };
 }
 
-export async function generateDailyInterpretation(request: AiInterpretationRequest): Promise<string> {
+export async function generateDailyInterpretation(request: AiInterpretationRequestV2): Promise<string> {
   const { content } = await generateDailyInterpretationFull(request);
   return content;
 }

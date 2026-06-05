@@ -1,6 +1,7 @@
 import type { DailyFortune } from "../engines/aggregator";
 import type { AiInterpretationRequest, AiEvent, AiCategoryHighlight, AiTimeHighlights, AiSignalLayer } from "./types";
 import { getEventLabel } from "./eventLabels";
+import { safeResolveLabel } from "../constants/fortuneDictionary";
 
 const SIGNIFICANT_DIFF = 10;
 
@@ -173,11 +174,34 @@ export function buildAiDailyRequest(fortune: DailyFortune, monthCtx?: MonthConte
   // ── focus ─────────────────────────────────────────────────────────────────
   const focus = persisted?.focus
     ?.filter(f => f.category !== "overall")
-    .map(f => ({
-      category: f.category as "wealth" | "love" | "health" | "career" | "relations" | "study",
-      label:    f.label,
-      strength: f.strength,
-    }));
+    .map(f => {
+      // sourceLabels: resolve 성공한 label만 포함 (unknown.* 제외)
+      const sourceLabels = (f.sourceKeys || [])
+        .filter(key => !key.startsWith("unknown."))
+        .map(key => {
+          const label = safeResolveLabel(key);
+          // resolve 실패 시 (label === key) 제외
+          return label !== key ? label : null;
+        })
+        .filter((label): label is string => label !== null);
+
+      return {
+        category:     f.category as "wealth" | "love" | "health" | "career" | "relations" | "study",
+        label:        f.label,
+        strength:     f.strength,
+        sourceKeys:   f.sourceKeys || [],
+        sourceLabels,
+      };
+    });
+
+  // ── dailyHighlight ────────────────────────────────────────────────────────
+  const dailyHighlight = persisted?.dailyHighlight
+    ? {
+        category:  persisted.dailyHighlight.category as "wealth" | "love" | "health" | "career" | "relations" | "study",
+        direction: persisted.dailyHighlight.direction,
+        strength:  persisted.dailyHighlight.strength,
+      }
+    : undefined;
 
   return {
     date:     fortune.date,
@@ -193,5 +217,6 @@ export function buildAiDailyRequest(fortune: DailyFortune, monthCtx?: MonthConte
     profileSpecialStars,
     signalLayer,
     focus,
+    dailyHighlight,
   };
 }

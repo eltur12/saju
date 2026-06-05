@@ -97,7 +97,7 @@ export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promi
 }
 
 /** 캐시 스키마 버전 — 필드 변경 시 올리면 캐시 무효화 (PersistedDailyModel 구조 변경 시 PERSISTED_SCHEMA_V 도 함께 올릴 것) */
-const CACHE_VERSION = "v10";
+const CACHE_VERSION = "v13-event-expansion"; // 도화살 + 12운성 7개 추가
 
 export interface SajuUser {
   birth_year: number;
@@ -130,6 +130,7 @@ function stripRuntimeFields(fortune: DailyFortune): DailyFortune {
   delete f["stateAtomDebug"];
   delete f["reasonSources"];
   delete f["balance_debug"];
+  delete f["aiRequestV2"]; // V2 request는 runtime only, cache에 저장 안 함
   return f as unknown as DailyFortune;
 }
 
@@ -145,6 +146,16 @@ function getTodayLocalString(): string {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * 캐시 무효화 (V1 → V2 마이그레이션 시 사용)
+ * CACHE_VERSION이 변경되면 자동으로 무효화되지만,
+ * 수동으로 즉시 클리어하고 싶을 때 사용
+ */
+export function clearFortuneCache(): void {
+  console.log("[CACHE] 🗑️ Clearing all fortune cache");
+  localStorage.removeItem("saju_cache");
 }
 
 // NORM_67+5: per-profile monthly normalization applied at display time
@@ -250,6 +261,7 @@ export async function getMonthlyFortune(
     if (samplePersisted && samplePersisted._v !== PERSISTED_SCHEMA_V) {
       console.warn("[CACHE] persisted._v mismatch — bump CACHE_VERSION + PERSISTED_SCHEMA_V when schema changes");
     }
+    console.log(`[FORTUNE_API] 📦 Using CACHE: ${key}, persisted._v=${samplePersisted?._v}, PERSISTED_SCHEMA_V=${PERSISTED_SCHEMA_V}`);
     const cached = applyDisplayNorm(cache[key]);
     await saveWidgetMonthlyData(cached);
 
@@ -301,6 +313,16 @@ export async function getMonthlyFortune(
   );
 
   const result = aggregator.getMonthlyFortune(year, month);
+
+  // Debug: Check V2 persisted data
+  const sampleDay = result.daily_fortunes[0];
+  console.log(`[FORTUNE_API] 🆕 NEW CALCULATION: ${key}`);
+  console.log(`[FORTUNE_API]   Sample day: ${sampleDay.date}, overall=${sampleDay.scores.overall}`);
+  console.log(`[FORTUNE_API]   persisted._v=${sampleDay.persisted?._v}, topStates count=${sampleDay.persisted?.topStates.length ?? 0}`);
+  if (sampleDay.persisted?.topStates && sampleDay.persisted.topStates.length > 0) {
+    console.log(`[FORTUNE_API]   Sample topStates:`, sampleDay.persisted.topStates.slice(0, 3).map(s => s.key));
+  }
+
   saveCache(key, result);
 
   const normalized = applyDisplayNorm(result);
