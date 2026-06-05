@@ -93,9 +93,9 @@ export function buildAiDailyRequest(fortune: DailyFortune, monthCtx?: MonthConte
   const scores    = fortune.scores;
 
   // ── events ────────────────────────────────────────────────────────────────
-  // saju.star.* 는 profileSpecialStars로 이동 — events에서 제외
+  // saju.star.* 활성화됨 — unknown만 제외
   const topEvents = (persisted?.topEvents ?? []).filter(c =>
-    !c.key.startsWith("unknown.") && !c.key.startsWith("saju.star.")
+    !c.key.startsWith("unknown.")
   );
   const majorEvents:      AiEvent[] = topEvents.slice(0, 3).map(toAiEvent);
   const minorEvents:      AiEvent[] = topEvents.slice(3, 6).map(toAiEvent);
@@ -118,7 +118,7 @@ export function buildAiDailyRequest(fortune: DailyFortune, monthCtx?: MonthConte
     .map(k => ({
       label:     k,
       score:     catScore[k],
-      topEvents: (catMap[k]!.topEvents).filter(e => !e.startsWith("unknown.")).map(getEventLabel),
+      topEvents: (catMap[k]?.topEvents ?? []).filter(e => !e.startsWith("unknown.")).map(getEventLabel),
     }))
     .sort((a, b) => b.score - a.score);
 
@@ -170,6 +170,15 @@ export function buildAiDailyRequest(fortune: DailyFortune, monthCtx?: MonthConte
     }
   }
 
+  // ── focus ─────────────────────────────────────────────────────────────────
+  const focus = persisted?.focus
+    ?.filter(f => f.category !== "overall")
+    .map(f => ({
+      category: f.category as "wealth" | "love" | "health" | "career" | "relations" | "study",
+      label:    f.label,
+      strength: f.strength,
+    }));
+
   return {
     date:     fortune.date,
     overall:  scores.overall ?? 0,
@@ -183,5 +192,6 @@ export function buildAiDailyRequest(fortune: DailyFortune, monthCtx?: MonthConte
     monthlyPalace,
     profileSpecialStars,
     signalLayer,
+    focus,
   };
 }

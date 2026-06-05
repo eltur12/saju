@@ -127,6 +127,18 @@ const AI_EVENT_LABELS: Record<string, string> = {
   "astro.aspect.chiron.opposition": "상처와 인식",
   "astro.aspect.chiron.conjunction":"치유의 집중",
   "astro.aspect.chiron.semisquare": "작은 민감함",
+
+  // ── Saju Special Stars (duplicates removed) ──────────────────────────────
+  // Already defined above
+
+  // ── Saju 12운성 ──────────────────────────────────────────────────────────
+  "saju.twelveState.jangSaeng": "새로운 시작 에너지",
+  "saju.twelveState.mokYok":    "감각적 민감함",
+  "saju.twelveState.gwanDae":   "성장과 확장",
+  "saju.twelveState.geonRok":   "안정된 기반",
+  "saju.twelveState.jeWang":    "절정의 기운",
+  "saju.twelveState.tae":       "내면 형성",
+  "saju.twelveState.yang":      "성숙과 결실",
 };
 
 export function getEventLabel(key: string): string {

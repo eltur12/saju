@@ -14,6 +14,7 @@ import { buildReasonSources, type ReasonSources } from "./reasonLayer";
 import { computeStateAtoms, type StateAtomDebug } from "./stateAtomLayer";
 import { computeBaselineAdj, applyBaselineCorrection, pushBaselineOverall, BASELINE_WINDOW, DEFAULT_BASELINE_CONFIG, type BaselineConfig } from "./profileBaselineLayer";
 import { buildPersistedDailyModel, type PersistedDailyModel } from "./persistedDailyMapper";
+import { buildAiDailyRequestV2 } from "../ai/v2/buildAiDailyRequestV2";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 
 /**
@@ -87,6 +88,10 @@ export interface DailyFortune {
   stateAtomDebug?: StateAtomDebug;
   persisted?: PersistedDailyModel;
   profileSpecialStars?: SpecialStarInfo[];
+  /** V2 AI request (runtime only, not cached) */
+  aiRequestV2?: import("../ai/v2/types").AiInterpretationRequestV2;
+  /** Internal use - saju factors for time segment generation */
+  saju_factors?: Record<string, unknown>;
 }
 
 export interface MonthlyFortuneResult {
@@ -195,10 +200,19 @@ export class FortuneAggregator {
 
     const domainCats: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
 
-    // Task 1: Base 스프레드 압축 — 카테고리 평균 기준 편차를 0.75 배율로 압축
-    const catAvg = domainCats.reduce((s, c) => s + (merged[c] as number), 0) / domainCats.length;
+    // Task 1: Base 스프레드 압축 — REMOVED (Convergence Removal A/B Test 결과 채택)
+    // const catAvg = domainCats.reduce((s, c) => s + (merged[c] as number), 0) / domainCats.length;
+    // for (const c of domainCats) {
+    //   merged[c] = Math.max(0, Math.min(100, catAvg + (merged[c] - catAvg) * 0.75));
+    // }
+
+    // Task 1-B: Category base offset — Health/Study 최저 순위 개선 (spread compression 이후 적용)
+    merged.health += 2;
+    merged.study += 1;
+
+    // Final clamp
     for (const c of domainCats) {
-      merged[c] = Math.max(0, Math.min(100, catAvg + (merged[c] - catAvg) * 0.75));
+      merged[c] = Math.max(0, Math.min(100, merged[c]));
     }
 
     // FIX 7: overall = 6개 영역 단순 평균 후 클램프 (float 유지)
@@ -258,6 +272,8 @@ export class FortuneAggregator {
       ohaeng_clash_branch:    (sajuResult.factors.ohaeng_clash_branch as boolean)    ?? false,
       active_transit_aspects: (astroResult.factors.active_transit_aspects as string[]) ?? [],
       specialStarsMode:       sajuFlags.SPECIAL_STARS_MODE,
+      twelve_state:           (sajuResult.factors.twelve_state as string | null | undefined) ?? null,
+      doHwa_active:           (sajuResult.factors.doHwa_active as boolean | undefined) ?? false,
     });
     {
       const _dc: (keyof ScoreMap)[] = ["wealth", "love", "health", "career", "relations", "study"];
@@ -300,6 +316,7 @@ export class FortuneAggregator {
       balance_debug:    balanceDebug,
       stateAtomDebug:   stateResult.debug,
       profileSpecialStars: sajuResult.factors.profile_special_stars as SpecialStarInfo[] | undefined,
+      saju_factors:    sajuResult.factors,
     };
     fortune.timeSegments = generateTimeSegments(
       fortune,
@@ -334,7 +351,17 @@ export class FortuneAggregator {
       };
     }
     fortune.notificationHints = generateNotificationHints(fortune);
+
+    // Step 1: Build V1 persisted first (needed for buildAiDailyRequestV2)
     fortune.persisted = buildPersistedDailyModel(fortune);
+
+    // Step 2: Build V2 AI request using V1 persisted events
+    const v2Result = buildAiDailyRequestV2(fortune);
+    fortune.aiRequestV2 = v2Result.request;
+
+    // Step 3: Rebuild persisted with V2 data (now aiRequestV2 exists)
+    fortune.persisted = buildPersistedDailyModel(fortune);
+
     return fortune;
   }
 

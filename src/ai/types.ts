@@ -85,4 +85,11 @@ export interface AiInterpretationRequest {
 
   /** 오늘의 위치감 — AI 보조 참고 정보 (점수 계산과 무관) */
   signalLayer?: AiSignalLayer;
+
+  /** Focus Catalog v2: 오늘 특별히 드러난 흐름 (선택적 강조 포인트) */
+  focus?: Array<{
+    category:  "wealth" | "love" | "health" | "career" | "relations" | "study";
+    label:     string;
+    strength:  "medium" | "strong";
+  }>;
 }

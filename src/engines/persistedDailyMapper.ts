@@ -19,6 +19,7 @@
 import type { DailyFortune } from "./aggregator";
 import type { ScoreMap } from "./sajuEngine";
 import { STATE_TO_CAT, type StateAtomKey } from "./stateAtomLayer";
+import { buildDailyFocus, applyFocusBoost } from "./focusBuilder";
 
 // ── Public types ───────────────────────────────────────────────────────────────
 
@@ -37,12 +38,24 @@ export interface PersistedState {
 }
 
 export interface CategoryHighlight {
-  topStates: string[];  // state keys sorted by contribution to this category
-  topEvents: string[];  // event keys sorted by impact on this category
+  topStates?: string[];  // V2: driver state keys, V1: state atom keys
+  topEvents?: string[];  // event keys sorted by impact on this category
 }
 
 export interface PersistedSummary {
   flowType: string;  // canonical flow key
+}
+
+export interface DailyFocus {
+  key:                  string;   // e.g. "love.doHwa_spouse"
+  category:             keyof ScoreMap;
+  label:                string;   // e.g. "표현과 친밀감"
+  strength:             "medium" | "strong";
+  sourceKeys:           string[]; // event keys that activated this focus
+  baseFocusScore:       number;   // 8 for medium, 11 for strong
+  personalRarityBonus:  number;   // 0~3 based on monthly Top1 frequency
+  focusScore:           number;   // baseFocusScore + personalRarityBonus
+  displayBoost:         number;   // 5 or 7 based on focusScore
 }
 
 export const PERSISTED_SCHEMA_V = 2 as const;
@@ -55,6 +68,10 @@ export interface PersistedDailyModel {
   summary:            PersistedSummary;
   /** 월 활성 궁 — topEvents에서 분리된 30일 고정 배경 */
   monthlyPalace?:     { key: string; polarity: "positive" | "negative" | "neutral" };
+  /** Focus Catalog v2: 오늘 특별히 드러난 흐름 (medium/strong만) */
+  focus?:             DailyFocus[];
+  /** displayScores: categoryScores에 focus boost 적용한 결과 (UI 우선 사용) */
+  displayScores?:     ScoreMap;
 }
 
 // ── Canonical key lookup tables ────────────────────────────────────────────────
@@ -97,6 +114,22 @@ const STAR_KEY: Record<string, string> = {
   "겁살":     "geobSal",
   "천덕귀인": "cheonDeok",
   "월덕귀인": "wolDeok",
+};
+
+/** 12운성 (Korean) → English slug */
+const TWELVE_STATE_KEY: Record<string, string> = {
+  "장생": "jangSaeng",
+  "목욕": "mokYok",
+  "관대": "gwanDae",
+  "건록": "geonRok",
+  "제왕": "jeWang",
+  "쇠":   "soe",
+  "병":   "byeong",
+  "사":   "sa",
+  "묘":   "myo",
+  "절":   "jeol",
+  "태":   "tae",
+  "양":   "yang",
 };
 
 /** 자미두수 궁 Korean label (produced by reasonLayer's PALACE_KR) → English slug */
@@ -204,6 +237,10 @@ function rawToCanonical(raw: string): { key: string; source: EventSource } {
   const starKey = STAR_KEY[raw];
   if (starKey) return { key: `saju.star.${starKey}`, source: "saju" };
 
+  // Twelve States (Korean)
+  const twelveStateKey = TWELVE_STATE_KEY[raw];
+  if (twelveStateKey) return { key: `saju.twelveState.${twelveStateKey}`, source: "saju" };
+
   // Ohaeng clash (Korean literal)
   if (raw === "오행극") return { key: "saju.ohaeng.clash", source: "saju" };
 
@@ -243,6 +280,10 @@ function sourceToCanonical(src: string): string {
   if (src.startsWith("살:")) {
     const k = STAR_KEY[src.slice(2)];
     return k ? `saju.star.${k}` : `unknown.${toSafeSlug(src.slice(2))}`;
+  }
+  if (src.startsWith("12운성:")) {
+    const k = TWELVE_STATE_KEY[src.slice(5)];
+    return k ? `saju.twelveState.${k}` : `unknown.${toSafeSlug(src.slice(5))}`;
   }
   if (src.startsWith("행성:")) {
     const transitKey = parseTransitKey(src.slice(3));
@@ -293,7 +334,90 @@ function classifyFlowType(topAtoms: ReadonlyArray<{ key: string; value: number }
   return "flow.neutral";
 }
 
-// ── Main mapper ────────────────────────────────────────────────────────────────
+// ── V2 Builder ─────────────────────────────────────────────────────────────────
+
+/**
+ * V2: AiInterpretationRequestV2 기반 PersistedDailyModel 생성
+ * fortune.aiRequestV2가 존재할 때 사용
+ */
+function buildPersistedV2(fortune: DailyFortune): PersistedDailyModel {
+  const v2 = fortune.aiRequestV2!;
+
+  // topEvents: aiRequestV2.topEvents를 PersistedEventChip으로 변환
+  const topEvents: PersistedEventChip[] = v2.topEvents.map(e => ({
+    key: e.key,
+    source: e.key.startsWith("saju.") ? "saju" : e.key.startsWith("ziwei.") ? "ziwei" : "astro",
+    impact: e.impact,
+    polarity: e.polarity as "positive" | "negative" | "neutral",
+  }));
+
+  // topStates: aiRequestV2.topStates를 PersistedState으로 변환
+  const topStates: PersistedState[] = v2.topStates.map(s => ({
+    key: `state.${s.key}`,
+    polarity: s.polarity as "positive" | "negative" | "mixed",
+    strength: s.strength,
+    sourceEvents: [], // V2에서는 sourceEvents 추적 안 함 (event→state 매핑이 복잡)
+  }));
+
+  // categoryHighlights: V2 drivers 사용
+  const categoryHighlights: Partial<Record<keyof ScoreMap, CategoryHighlight>> = {};
+  const catKeys = ["wealth", "love", "health", "career", "relations", "study"] as const;
+
+  for (const cat of catKeys) {
+    const h = v2.categoryHighlights[cat];
+    if (!h) continue;
+
+    categoryHighlights[cat] = {
+      topStates: h.drivers.map(d => `state.${d}`),
+      topEvents: [], // V2에서는 category별 topEvents 제공 안 함 (전체 topEvents 사용)
+    };
+  }
+
+  // monthlyPalace: V2에서는 직접 제공하지 않으므로 undefined
+  let monthlyPalace: PersistedDailyModel["monthlyPalace"];
+
+  // summary: V2에서는 flow 분류 없음 (neutral로 처리)
+  const summary: PersistedSummary = { flowType: "flow.neutral" };
+
+  // ── Focus Catalog v2 적용 (V2에서도 동일) ────────────────────────────────────
+  let focus: DailyFocus[] | undefined;
+  let displayScores: ScoreMap | undefined;
+
+  try {
+    const activeEventKeys = new Set<string>(topEvents.map(e => e.key));
+
+    // 월간 Top1 통계 (임시 균등 분배)
+    const monthlyTop1Stats = {
+      wealth:    5,
+      love:      5,
+      health:    5,
+      career:    5,
+      relations: 5,
+      study:     5,
+    };
+
+    focus = buildDailyFocus(activeEventKeys, fortune.scores, monthlyTop1Stats);
+
+    if (focus.length > 0) {
+      displayScores = applyFocusBoost(fortune.scores, focus);
+    }
+  } catch (err) {
+    console.warn("[buildPersistedV2] Focus generation failed:", err);
+  }
+
+  return {
+    _v: PERSISTED_SCHEMA_V,
+    topEvents,
+    topStates,
+    categoryHighlights,
+    summary,
+    monthlyPalace,
+    focus,
+    displayScores,
+  };
+}
+
+// ── V1 Builder (기존 로직) ─────────────────────────────────────────────────────
 
 const MAX_ATOM_VALUE = 6;
 const MAX_TOP_EVENTS = 8;
@@ -302,6 +426,12 @@ const MAX_CAT_STATES = 3;
 const MAX_CAT_EVENTS = 3;
 
 export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyModel {
+  // V2 우선: aiRequestV2가 있으면 V2 로직 사용
+  if (fortune.aiRequestV2) {
+    return buildPersistedV2(fortune);
+  }
+
+  // V1 fallback
   const atomDebug = fortune.stateAtomDebug;
   const reasons   = fortune.reasonSources;
 
@@ -344,11 +474,28 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     if (seenKeys.has(key)) continue;
     seenKeys.add(key);
 
+    let impact = evImpact.get(raw) ?? 0;
     const signed = evSigned.get(raw) ?? 0;
+
+    // 12운성: activeEvents에 포함되지만 atom delta가 없어서 impact=0 → 기본값 설정
+    // topEvents 포함을 위해 impact 상향 조정 (3.0~4.0)
+    if (key.startsWith("saju.twelveState.")) {
+      const twelveStateImpacts: Record<string, number> = {
+        "saju.twelveState.jangSaeng": 3.5,
+        "saju.twelveState.geonRok": 3.5,
+        "saju.twelveState.jeWang": 4.0,
+        "saju.twelveState.yang": 3.0,
+        "saju.twelveState.gwanDae": 3.0,
+        "saju.twelveState.mokYok": 3.0,
+        "saju.twelveState.tae": 2.5,
+      };
+      impact = twelveStateImpacts[key] ?? 3.0;
+    }
+
     allEvents.push({
       key,
       source,
-      impact:   +((evImpact.get(raw) ?? 0).toFixed(2)),
+      impact:   +impact.toFixed(2),
       polarity: signed > 0 ? "positive" : signed < 0 ? "negative" : "neutral",
     });
   }
@@ -367,6 +514,60 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
       impact:   chip.value !== undefined ? +Math.abs(chip.value).toFixed(2) : +(reasons.ziwei.weight ?? 0),
       polarity: chip.polarity,
     });
+  }
+
+  // Special Stars (신살) conditional activation
+  const DOHWA_BRANCHES = ["子", "午", "卯", "酉"];
+  const targetBranch = (fortune.saju_factors?.target_branch as string) || "";
+  const monthBranch = (fortune.saju_factors?.month_branch as string) || "";
+  const targetStem = (fortune.saju_factors?.target_stem as string) || "";
+  const profileSpecialStars = fortune.profileSpecialStars || [];
+
+  for (const star of profileSpecialStars) {
+    if (seenKeys.has(star.key)) continue;
+
+    let activated = false;
+    let impact = 2.5; // 평균 impact
+
+    if (star.key === "saju.star.doHwa") {
+      // 도화: 일지/월지가 桃花地(子午卯酉)에 해당할 때
+      if (DOHWA_BRANCHES.includes(targetBranch) || DOHWA_BRANCHES.includes(monthBranch)) {
+        activated = true;
+      }
+    } else if (star.key === "saju.star.cheonDeok") {
+      // 천덕: 월지별 특정 지지 조건
+      const cheonDeokMap: Record<string, string[]> = {
+        "寅": ["亥"], "卯": ["申"], "辰": ["壬"], "巳": ["辛"],
+        "午": ["亥"], "未": ["甲"], "申": ["癸"], "酉": ["寅"],
+        "戌": ["丙"], "亥": ["巳"], "子": ["乙"], "丑": ["庚"]
+      };
+      if (cheonDeokMap[monthBranch]?.includes(targetBranch)) {
+        activated = true;
+        impact = 2.0;
+      }
+    } else if (star.key === "saju.star.wolDeok") {
+      // 월덕: 월지별 특정 천간 조건
+      const wolDeokMap: Record<string, string> = {
+        "寅": "丙", "卯": "丙", "辰": "丙",
+        "巳": "甲", "午": "甲", "未": "甲",
+        "申": "壬", "酉": "壬", "戌": "壬",
+        "亥": "庚", "子": "庚", "丑": "庚"
+      };
+      if (targetStem === wolDeokMap[monthBranch]) {
+        activated = true;
+        impact = 2.0;
+      }
+    }
+
+    if (activated) {
+      seenKeys.add(star.key);
+      allEvents.push({
+        key: star.key,
+        source: "saju",
+        impact: +impact.toFixed(2),
+        polarity: star.polarity as "positive" | "negative" | "neutral",
+      });
+    }
   }
 
   const topEvents = allEvents
@@ -535,7 +736,48 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
       })()
     : undefined;
 
-  return { _v: PERSISTED_SCHEMA_V, topEvents, topStates, categoryHighlights, summary: { flowType }, monthlyPalace };
+  // ── Step 7: Focus Catalog v2 적용 ───────────────────────────────────────────
+  // Focus는 선택적 기능이므로 오류 시 undefined로 fallback
+  let focus: DailyFocus[] | undefined;
+  let displayScores: ScoreMap | undefined;
+
+  try {
+    // 활성 이벤트 키 수집
+    const activeEventKeys = new Set<string>(allEvents.map(e => e.key));
+
+    // 월간 Top1 통계 계산 (현재 fortune만으로는 불가능하므로 임시로 균등 분배)
+    // TODO: FortuneAggregator에서 월간 통계를 전달받아야 함
+    const monthlyTop1Stats = {
+      wealth:    5,
+      love:      5,
+      health:    5,
+      career:    5,
+      relations: 5,
+      study:     5,
+    };
+
+    // Focus 생성
+    focus = buildDailyFocus(activeEventKeys, fortune.scores, monthlyTop1Stats);
+
+    // displayScores 생성 (focus가 있을 때만)
+    if (focus.length > 0) {
+      displayScores = applyFocusBoost(fortune.scores, focus);
+    }
+  } catch (err) {
+    // Focus 기능 오류 시 무시 (기존 로직에 영향 없음)
+    console.warn("[buildPersistedDailyModel] Focus generation failed:", err);
+  }
+
+  return {
+    _v: PERSISTED_SCHEMA_V,
+    topEvents,
+    topStates,
+    categoryHighlights,
+    summary: { flowType },
+    monthlyPalace,
+    focus,
+    displayScores,
+  };
 }
 
 // ── Debug utility ──────────────────────────────────────────────────────────────
