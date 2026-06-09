@@ -675,8 +675,335 @@ const normalizedBirthDisplay = useMemo(() => {
                 className={`${styles.tabBtn} ${tab === "detail" ? styles.tabBtnActive : ""}`}
                 onClick={() => setTab("detail")}
             >상세</button>
+            <button
+                className={`${styles.tabBtn} ${tab === "profile" ? styles.tabBtnActive : ""}`}
+                onClick={() => setTab("profile")}
+            >프로필</button>
           </div>
         </div>
+
+        {/* ── 프로필 탭 ── */}
+        {tab === "profile" && (
+            <div className={styles.profileView}>
+              {!profile ? (
+                  <div className={styles.detailEmpty}>
+                    <span className={styles.detailEmptyIcon}>👤</span>
+                    <p>프로필 정보를 불러오는 중입니다</p>
+                  </div>
+              ) : (
+                  <div className={styles.profileContent}>
+                    <div className={styles.profileHeader}>
+                      <div className={styles.profileTitle}>내 기본 프로필</div>
+                      <div className={styles.profileSubtitle}>흐름 계산에 쓰이는 기본 정보예요</div>
+                    </div>
+
+                    <div className={styles.profileBody}>
+
+                      {/* 출생정보 */}
+                      <div className={styles.profileCard}>
+                        <div className={styles.profileCardTitle}>출생정보</div>
+                        <div className={styles.profileInfoGrid}>
+
+                          {/* 생년월일 */}
+                          <div className={styles.profileInfoRow}>
+                            <span className={styles.profileInfoLabel}>생년월일</span>
+                            <span className={styles.profileInfoValue}>
+                              {profile.input.birthYear}.{pad2(profile.input.birthMonth)}.{pad2(profile.input.birthDay)}
+                            </span>
+                          </div>
+
+                          {/* 성별 */}
+                          <div className={styles.profileInfoRow}>
+                            <span className={styles.profileInfoLabel}>성별</span>
+                            <span className={styles.profileInfoValue}>{profile.input.gender === "M" ? "남성" : "여성"}</span>
+                          </div>
+
+                          {/* 시간 */}
+                          <div className={styles.profileInfoRow}>
+                            <span className={styles.profileInfoLabel}>시간</span>
+                            <span className={styles.profileInfoValue}>
+                              {user?.birth_hour === undefined
+                                  ? "모름"
+                                  : `${pad2(user.birth_hour)}:${user.birth_minute !== undefined ? pad2(user.birth_minute) : "모름"}`}
+                            </span>
+                          </div>
+
+                          {/* 지역 ⓘ */}
+                          <div className={styles.profileInfoRow}>
+                            <span className={styles.profileInfoLabel}>
+                              <span className={styles.infoIconWrap}>
+                                지역
+                                <button
+                                    className={styles.infoBtn}
+                                    onClick={() => setInfoTooltip(t => t === "region" ? null : "region")}
+                                >i</button>
+                              </span>
+                            </span>
+                            <span className={styles.profileInfoValue}>
+                              {user?.birth_region
+                                  ? getBirthRegionById(user.birth_region).name
+                                  : "모름"}
+                            </span>
+                          </div>
+                          {infoTooltip === "region" && (
+                              <div className={styles.inlineInfoBox}>
+                                출생 지역을 모르는 경우에는 서울 기준으로 계산됩니다.
+                              </div>
+                          )}
+
+                          {/* 사주정보 ⓘ */}
+                          <div className={styles.profileInfoRow} style={{ gridColumn: "1 / -1" }}>
+                            <span className={styles.profileInfoLabel}>
+                              <span className={styles.infoIconWrap}>
+                                사주정보
+                                <button
+                                    className={styles.infoBtn}
+                                    onClick={() => setInfoTooltip(t => t === "saju" ? null : "saju")}
+                                >i</button>
+                              </span>
+                            </span>
+                            <span className={`${styles.profileInfoValue} ${styles.sajuInfoValue}`}>
+                              {normalizedBirthDisplay}
+                            </span>
+                          </div>
+                          {infoTooltip === "saju" && (
+                              <div className={styles.inlineInfoBox}>
+                                사주정보는 입력한 출생 시간에 출생 지역의 태양시 보정을 반영한 값이에요.<br/>
+                                <br/>
+                                하루온도는 자시를 23:00~00:59로 보고, 23:00 이후는 다음 날 기준으로 계산합니다.<br/>
+                                <br/>
+                                출생 시간이 없으면 정오 기준으로 계산됩니다.<br/>
+                                분이 없으면 00분 기준으로 계산됩니다.<br/>
+                                지역이 없으면 서울 기준으로 계산됩니다.
+                              </div>
+                          )}
+
+                          {/* 일간 */}
+                          <div className={styles.profileInfoRow}>
+                            <span className={styles.profileInfoLabel}>일간</span>
+                            <span className={styles.profileInfoValue}>
+                              {profile.saju.dayMaster} ({profile.saju.dayMasterElement}{profile.saju.dayMasterYinYang})
+                            </span>
+                          </div>
+
+                          {/* 신살 */}
+                          {(profile.saju.specialStars?.length ?? 0) > 0 && (
+                              <div className={styles.profileInfoRow} style={{ gridColumn: "1 / -1", alignItems: "flex-start" }}>
+                                <span className={styles.profileInfoLabel}>신살</span>
+                                <div className={styles.sajuStarChips}>
+                                  {(profile.saju.specialStars ?? []).map((star) => (
+                                      <span key={star} className={styles.sajuStarChip}>{star}</span>
+                                  ))}
+                                </div>
+                              </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 사주명식표 */}
+                      <div className={styles.profileCard}>
+                        <div className={styles.profileCardTitle}>사주명식표</div>
+                        {(() => {
+                          const PILLAR_ORDER = ["hour", "day", "month", "year"] as const;
+                          return (
+                              <table className={styles.sajuTable}>
+                                <thead>
+                                <tr className={styles.sajuTableHead}>
+                                  <th className={styles.sajuRowLabelHead}></th>
+                                  <th>시(時)</th>
+                                  <th>일(日)</th>
+                                  <th>월(月)</th>
+                                  <th>년(年)</th>
+                                </tr>
+                                </thead>
+                                <tbody className={styles.sajuTableBody}>
+                                <tr>
+                                  <td className={styles.sajuRowLabel}>천간</td>
+                                  {PILLAR_ORDER.map(k => {
+                                    const p = profile.saju.pillars[k];
+                                    const isDay = k === "day";
+                                    return (
+                                        <td key={k}>
+                                          <div
+                                              className={`${styles.sajuGanziBox} ${isDay ? styles.sajuDayGanzi : ""}`}
+                                              style={{
+                                                color: getElementColor(p.stem),
+                                                backgroundColor: `${getElementColor(p.stem)}22`,
+                                              }}
+                                          >
+                                            {p.stem}
+                                          </div>
+                                          <div className={styles.sajuTenGod}>
+                                            {isDay ? <span className={styles.dayStemBase}>일간</span> : p.stemTenGod}
+                                          </div>
+                                        </td>
+                                    );
+                                  })}
+                                </tr>
+                                <tr>
+                                  <td className={styles.sajuRowLabel}>지지</td>
+                                  {PILLAR_ORDER.map(k => {
+                                    const p = profile.saju.pillars[k];
+                                    return (
+                                        <td key={k}>
+                                          <div
+                                              className={styles.sajuGanziBox}
+                                              style={{
+                                                color: getElementColor(p.branch),
+                                                backgroundColor: `${getElementColor(p.branch)}22`,
+                                              }}
+                                          >
+                                            {p.branch}
+                                          </div>
+                                          <div className={styles.sajuTenGod}>{p.branchTenGod}</div>
+                                        </td>
+                                    );
+                                  })}
+                                </tr>
+                                <tr className={styles.sajuJijangRow}>
+                                  <td className={styles.sajuRowLabel}>지장간</td>
+                                  {PILLAR_ORDER.map(k => {
+                                    const p = profile.saju.pillars[k];
+                                    return (
+                                        <td key={k} className={styles.sajuJijangCell}>
+                                          <div className={styles.sajuJijangInner}>
+                                            {(p.hiddenStems?.length ?? 0) > 0 ? (
+                                                p.hiddenStems.map((stem, idx) => {
+                                                  const color = getElementColor(stem);
+                                                  return (
+                                                      <span
+                                                          key={idx}
+                                                          className={styles.sajuJijangStem}
+                                                          style={{
+                                                            color,
+                                                            backgroundColor: `${color}22`,
+                                                          }}
+                                                      >
+                                                {stem}
+                                              </span>
+                                                  );
+                                                })
+                                            ) : (
+                                                <span style={{ color: "var(--text-dim)" }}>–</span>
+                                            )}
+                                          </div>
+                                        </td>
+                                    );
+                                  })}
+                                </tr>
+                                </tbody>
+                              </table>
+                          );
+                        })()}
+                      </div>
+
+                      {/* 오행 분포 */}
+                      {(() => {
+                        const elementCounts = profile.elementCounts ?? {
+                          wood:  profile.elements.wood,
+                          fire:  profile.elements.fire,
+                          earth: profile.elements.earth,
+                          metal: profile.elements.metal,
+                          water: profile.elements.water,
+                        };
+                        const items = [
+                          ["목", elementCounts.wood,  "#5aad6e"],
+                          ["화", elementCounts.fire,  "#e06060"],
+                          ["토", elementCounts.earth, "#c9912a"],
+                          ["금", elementCounts.metal, "#8f9aa6"],
+                          ["수", elementCounts.water, "#5577bb"],
+                        ] as const;
+                        const maxCount = Math.max(...items.map(([, count]) => count), 1);
+
+                        return (
+                            <div className={styles.profileCard}>
+                              <div className={styles.profileCardHeader}>
+                                <div className={styles.profileCardTitle}>오행 구성</div>
+                                <div className={styles.profileCardSub}>
+                                  천간 · 지지 · 지장간 기준
+                                </div>
+                              </div>
+
+                              <div className={styles.elemBars}>
+                                {items.map(([label, count, color], i) => (
+                                    <div key={label} className={styles.elemBarRow}>
+                                      <span className={styles.elemBarLabel}>{label}</span>
+                                      <div className={styles.elemBarTrack}>
+                                        <div
+                                            className={styles.elemBarFill}
+                                            style={{
+                                              width: `${(count / maxCount) * 100}%`,
+                                              background: color,
+                                              animationDelay: `${i * 50}ms`,
+                                            }}
+                                        />
+                                      </div>
+                                      <span className={styles.elemBarVal}>{count}</span>
+                                    </div>
+                                ))}
+                              </div>
+                            </div>
+                        );
+                      })()}
+
+                      {/* 자미두수 */}
+                      <div className={styles.profileCard}>
+                        <div className={styles.profileCardTitle}>자미두수</div>
+                        <div className={styles.ziweiMetaRow}>
+                          <div className={styles.ziweiMetaItem}>
+                            <span className={styles.profileInfoLabel}>명궁</span>
+                            <span className={styles.profileInfoValue}>{profile.ziwei.mingGongBranch}</span>
+                          </div>
+                          <div className={styles.ziweiMetaItem}>
+                            <span className={styles.profileInfoLabel}>오행국</span>
+                            <span className={styles.profileInfoValue}>{profile.ziwei.wuXingJu}</span>
+                          </div>
+                        </div>
+                        <div className={styles.ziweiStarList}>
+                          {profile.ziwei.mingGongStars.map(s => (
+                              <span
+                                  key={s.name}
+                                  className={`${styles.ziweiStarChip} ${styles.ziweiStarChipMain}`}
+                                  title={[s.brightness, s.siHua].filter(Boolean).join(" ")}
+                              >
+                              {s.name}{s.siHua ? ` ${s.siHua}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 별자리 */}
+                      <div className={styles.profileCard}>
+                        <div className={styles.profileCardTitle}>별자리</div>
+                        <div className={styles.astroGrid}>
+                          {[
+                            { label: "태양", sign: profile.astrology.sunSign },
+                            { label: "달",   sign: profile.astrology.moonSign },
+                            { label: "수성", sign: profile.astrology.mercurySign },
+                            { label: "금성", sign: profile.astrology.venusSign },
+                            { label: "화성", sign: profile.astrology.marsSign },
+                            { label: "목성", sign: profile.astrology.jupiterSign },
+                            { label: "토성", sign: profile.astrology.saturnSign },
+                          ].map(({ label, sign }) => (
+                              <div key={label} className={styles.astroRow}>
+                                <span className={styles.astroLabel}>{label}</span>
+                                <span className={styles.astroSign}>{sign}</span>
+                              </div>
+                          ))}
+                          <div className={`${styles.astroRow} ${styles.astroRowWide}`}>
+                            <span className={styles.astroLabel}>금성 역행</span>
+                            <span className={styles.astroSign}>
+                              {profile.astrology.venusRetrograde ? "예" : "아니오"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+              )}
+            </div>
+        )}
 
         {/* ── 달력 탭 ── */}
         {tab === "calendar" && (
@@ -889,329 +1216,6 @@ const normalizedBirthDisplay = useMemo(() => {
                         자세히 보기
                       </button>
                     </div>
-                  </div>
-              )}
-
-              {/* ── 내 기본 프로필 ── */}
-              {profile && (
-                  <div className={styles.profileSection}>
-                    <div
-                        className={styles.profileHeader}
-                        onClick={() => setProfileOpen(o => !o)}
-                    >
-                      <div className={styles.profileHeaderText}>
-                      <span className={styles.profileHeaderTitle}>
-                        내 기본 프로필 {profileOpen ? "▴" : "▾"}
-                      </span>
-                        <span className={styles.profileHeaderSub}>흐름 계산에 쓰이는 기본 정보예요</span>
-                      </div>
-                    </div>
-
-                    {profileOpen && (
-                        <div className={styles.profileBody}>
-
-                          {/* 출생정보 */}
-                          <div className={styles.profileCard}>
-                            <div className={styles.profileCardTitle}>출생정보</div>
-                            <div className={styles.profileInfoGrid}>
-
-                              {/* 생년월일 */}
-                              <div className={styles.profileInfoRow}>
-                                <span className={styles.profileInfoLabel}>생년월일</span>
-                                <span className={styles.profileInfoValue}>
-                                  {profile.input.birthYear}.{pad2(profile.input.birthMonth)}.{pad2(profile.input.birthDay)}
-                                </span>
-                              </div>
-
-                              {/* 성별 */}
-                              <div className={styles.profileInfoRow}>
-                                <span className={styles.profileInfoLabel}>성별</span>
-                                <span className={styles.profileInfoValue}>{profile.input.gender === "M" ? "남성" : "여성"}</span>
-                              </div>
-
-                              {/* 시간 */}
-                              <div className={styles.profileInfoRow}>
-                                <span className={styles.profileInfoLabel}>시간</span>
-                                <span className={styles.profileInfoValue}>
-                                  {user?.birth_hour === undefined
-                                    ? "모름"
-                                    : `${pad2(user.birth_hour)}:${user.birth_minute !== undefined ? pad2(user.birth_minute) : "모름"}`}
-                                </span>
-                              </div>
-
-                              {/* 지역 ⓘ */}
-                              <div className={styles.profileInfoRow}>
-                                <span className={styles.profileInfoLabel}>
-                                  <span className={styles.infoIconWrap}>
-                                    지역
-                                    <button
-                                      className={styles.infoBtn}
-                                      onClick={() => setInfoTooltip(t => t === "region" ? null : "region")}
-                                    >i</button>
-                                  </span>
-                                </span>
-                                <span className={styles.profileInfoValue}>
-                                  {user?.birth_region
-                                      ? getBirthRegionById(user.birth_region).name
-                                      : "모름"}
-                                </span>
-                              </div>
-                              {infoTooltip === "region" && (
-                                <div className={styles.inlineInfoBox}>
-                                  출생 지역을 모르는 경우에는 서울 기준으로 계산됩니다.
-                                </div>
-                              )}
-
-                              {/* 사주정보 ⓘ */}
-                              <div className={styles.profileInfoRow} style={{ gridColumn: "1 / -1" }}>
-                                <span className={styles.profileInfoLabel}>
-                                  <span className={styles.infoIconWrap}>
-                                    사주정보
-                                    <button
-                                      className={styles.infoBtn}
-                                      onClick={() => setInfoTooltip(t => t === "saju" ? null : "saju")}
-                                    >i</button>
-                                  </span>
-                                </span>
-                                <span className={`${styles.profileInfoValue} ${styles.sajuInfoValue}`}>
-                                  {normalizedBirthDisplay}
-                                </span>
-                              </div>
-                              {infoTooltip === "saju" && (
-                                <div className={styles.inlineInfoBox}>
-                                  사주정보는 입력한 출생 시간에 출생 지역의 태양시 보정을 반영한 값이에요.<br/>
-                                  <br/>
-                                  하루온도는 자시를 23:00~00:59로 보고, 23:00 이후는 다음 날 기준으로 계산합니다.<br/>
-                                  <br/>
-                                  출생 시간이 없으면 정오 기준으로 계산됩니다.<br/>
-                                  분이 없으면 00분 기준으로 계산됩니다.<br/>
-                                  지역이 없으면 서울 기준으로 계산됩니다.
-                                </div>
-                              )}
-
-                              {/* 일간 */}
-                              <div className={styles.profileInfoRow}>
-                                <span className={styles.profileInfoLabel}>일간</span>
-                                <span className={styles.profileInfoValue}>
-                                  {profile.saju.dayMaster} ({profile.saju.dayMasterElement}{profile.saju.dayMasterYinYang})
-                                </span>
-                              </div>
-
-                              {/* 신살 */}
-                              {(profile.saju.specialStars?.length ?? 0) > 0 && (
-                                <div className={styles.profileInfoRow} style={{ gridColumn: "1 / -1", alignItems: "flex-start" }}>
-                                  <span className={styles.profileInfoLabel}>신살</span>
-                                  <div className={styles.sajuStarChips}>
-                                    {(profile.saju.specialStars ?? []).map((star) => (
-                                      <span key={star} className={styles.sajuStarChip}>{star}</span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* 사주명식표 */}
-                          <div className={styles.profileCard}>
-                            <div className={styles.profileCardTitle}>사주명식표</div>
-                            {(() => {
-                              const PILLAR_ORDER = ["hour", "day", "month", "year"] as const;
-                              return (
-                            <table className={styles.sajuTable}>
-                              <thead>
-                              <tr className={styles.sajuTableHead}>
-                                <th className={styles.sajuRowLabelHead}></th>
-                                <th>시(時)</th>
-                                <th>일(日)</th>
-                                <th>월(月)</th>
-                                <th>년(年)</th>
-                              </tr>
-                              </thead>
-                              <tbody className={styles.sajuTableBody}>
-                              <tr>
-                                <td className={styles.sajuRowLabel}>천간</td>
-                                {PILLAR_ORDER.map(k => {
-                                  const p = profile.saju.pillars[k];
-                                  const isDay = k === "day";
-                                  return (
-                                    <td key={k}>
-                                      <div
-                                        className={`${styles.sajuGanziBox} ${isDay ? styles.sajuDayGanzi : ""}`}
-                                        style={{
-                                          color: getElementColor(p.stem),
-                                          backgroundColor: `${getElementColor(p.stem)}22`,
-                                        }}
-                                      >
-                                        {p.stem}
-                                      </div>
-                                      <div className={styles.sajuTenGod}>
-                                        {isDay ? <span className={styles.dayStemBase}>일간</span> : p.stemTenGod}
-                                      </div>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                              <tr>
-                                <td className={styles.sajuRowLabel}>지지</td>
-                                {PILLAR_ORDER.map(k => {
-                                  const p = profile.saju.pillars[k];
-                                  return (
-                                    <td key={k}>
-                                      <div
-                                        className={styles.sajuGanziBox}
-                                        style={{
-                                          color: getElementColor(p.branch),
-                                          backgroundColor: `${getElementColor(p.branch)}22`,
-                                        }}
-                                      >
-                                        {p.branch}
-                                      </div>
-                                      <div className={styles.sajuTenGod}>{p.branchTenGod}</div>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                              <tr className={styles.sajuJijangRow}>
-                                <td className={styles.sajuRowLabel}>지장간</td>
-                                {PILLAR_ORDER.map(k => {
-                                  const p = profile.saju.pillars[k];
-                                  return (
-                                    <td key={k} className={styles.sajuJijangCell}>
-                                      <div className={styles.sajuJijangInner}>
-                                        {(p.hiddenStems?.length ?? 0) > 0 ? (
-                                          p.hiddenStems.map((stem, idx) => {
-                                            const color = getElementColor(stem);
-                                            return (
-                                              <span
-                                                key={idx}
-                                                className={styles.sajuJijangStem}
-                                                style={{
-                                                  color,
-                                                  backgroundColor: `${color}22`,
-                                                }}
-                                              >
-                                                {stem}
-                                              </span>
-                                            );
-                                          })
-                                        ) : (
-                                          <span style={{ color: "var(--text-dim)" }}>–</span>
-                                        )}
-                                      </div>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                              </tbody>
-                            </table>
-                            );
-                          })()}
-                          </div>
-
-                          {/* 오행 분포 */}
-                          {(() => {
-                            const elementCounts = profile.elementCounts ?? {
-                              wood:  profile.elements.wood,
-                              fire:  profile.elements.fire,
-                              earth: profile.elements.earth,
-                              metal: profile.elements.metal,
-                              water: profile.elements.water,
-                            };
-                            const items = [
-                              ["목", elementCounts.wood,  "#5aad6e"],
-                              ["화", elementCounts.fire,  "#e06060"],
-                              ["토", elementCounts.earth, "#c9912a"],
-                              ["금", elementCounts.metal, "#8f9aa6"],
-                              ["수", elementCounts.water, "#5577bb"],
-                            ] as const;
-                            const maxCount = Math.max(...items.map(([, count]) => count), 1);
-
-                            return (
-                                <div className={styles.profileCard}>
-                                  <div className={styles.profileCardHeader}>
-                                    <div className={styles.profileCardTitle}>오행 구성</div>
-                                    <div className={styles.profileCardSub}>
-                                      천간 · 지지 · 지장간 기준
-                                    </div>
-                                  </div>
-
-                                  <div className={styles.elemBars}>
-                                    {items.map(([label, count, color], i) => (
-                                        <div key={label} className={styles.elemBarRow}>
-                                          <span className={styles.elemBarLabel}>{label}</span>
-                                          <div className={styles.elemBarTrack}>
-                                            <div
-                                                className={styles.elemBarFill}
-                                                style={{
-                                                  width: `${(count / maxCount) * 100}%`,
-                                                  background: color,
-                                                  animationDelay: `${i * 50}ms`,
-                                                }}
-                                            />
-                                          </div>
-                                          <span className={styles.elemBarVal}>{count}</span>
-                                        </div>
-                                    ))}
-                                  </div>
-                                </div>
-                            );
-                          })()}
-
-                          {/* 자미두수 */}
-                          <div className={styles.profileCard}>
-                            <div className={styles.profileCardTitle}>자미두수</div>
-                            <div className={styles.ziweiMetaRow}>
-                              <div className={styles.ziweiMetaItem}>
-                                <span className={styles.profileInfoLabel}>명궁</span>
-                                <span className={styles.profileInfoValue}>{profile.ziwei.mingGongBranch}</span>
-                              </div>
-                              <div className={styles.ziweiMetaItem}>
-                                <span className={styles.profileInfoLabel}>오행국</span>
-                                <span className={styles.profileInfoValue}>{profile.ziwei.wuXingJu}</span>
-                              </div>
-                            </div>
-                            <div className={styles.ziweiStarList}>
-                              {profile.ziwei.mingGongStars.map(s => (
-                                  <span
-                                      key={s.name}
-                                      className={`${styles.ziweiStarChip} ${styles.ziweiStarChipMain}`}
-                                      title={[s.brightness, s.siHua].filter(Boolean).join(" ")}
-                                  >
-                              {s.name}{s.siHua ? ` ${s.siHua}` : ""}
-                            </span>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* 별자리 */}
-                          <div className={styles.profileCard}>
-                            <div className={styles.profileCardTitle}>별자리</div>
-                            <div className={styles.astroGrid}>
-                              {[
-                                { label: "태양", sign: profile.astrology.sunSign },
-                                { label: "달",   sign: profile.astrology.moonSign },
-                                { label: "수성", sign: profile.astrology.mercurySign },
-                                { label: "금성", sign: profile.astrology.venusSign },
-                                { label: "화성", sign: profile.astrology.marsSign },
-                                { label: "목성", sign: profile.astrology.jupiterSign },
-                                { label: "토성", sign: profile.astrology.saturnSign },
-                              ].map(({ label, sign }) => (
-                                  <div key={label} className={styles.astroRow}>
-                                    <span className={styles.astroLabel}>{label}</span>
-                                    <span className={styles.astroSign}>{sign}</span>
-                                  </div>
-                              ))}
-                              <div className={`${styles.astroRow} ${styles.astroRowWide}`}>
-                                <span className={styles.astroLabel}>금성 역행</span>
-                                <span className={styles.astroSign}>
-                              {profile.astrology.venusRetrograde ? "예" : "아니오"}
-                            </span>
-                              </div>
-                            </div>
-                          </div>
-
-                        </div>
-                    )}
                   </div>
               )}
             </div>
