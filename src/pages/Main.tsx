@@ -65,7 +65,7 @@ function getElementColor(char: string) {
 }
 
 
-type TabId = "calendar" | "detail";
+type TabId = "calendar" | "detail" | "profile";
 type SettingsView = "main" | "noti";
 
 

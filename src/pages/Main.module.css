@@ -29,7 +29,7 @@
   flex-direction: column;
   max-width: 390px;
   margin: 0 auto;
-  font-family: inherit;
+  font-family: 'Apple SD Gothic Neo', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* ══════════════════════════════════════
@@ -162,46 +162,59 @@
    ══════════════════════════════════════ */
 .calendarView {
   flex: 1;
-  padding: 0.8rem 0.8rem 1rem;
+  padding: 0 1rem 1rem;
   overflow-y: auto;
 }
 
 .monthInfoBar {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.75rem;
   flex-wrap: wrap;
+  padding: 0 0.25rem;
 }
 
 .monthInfoBadge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  background: var(--surface-2, rgba(255,255,255,0.07));
+  gap: 0.35rem;
+  background: #f2f2f7;
   border-radius: 999px;
-  padding: 0.18rem 0.65rem;
-  font-size: 0.68rem;
-  color: var(--text-dim);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  color: #555555;
   white-space: nowrap;
+  border: 1px solid #e5e5ea;
 }
 
 .monthInfoBadge strong {
-  color: var(--text-main, #fff);
-  font-weight: 600;
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.calendarCard {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 0.75rem 0.5rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .calendarHeader {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 2px;
   margin-bottom: 0.3rem;
+  padding: 0 0.25rem;
 }
 
 .dayName {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 0.68rem;
   color: var(--text-dim);
-  padding: 0.3rem 0;
+  padding: 0.3rem 4px;
   font-weight: 500;
 }
 .dayName-sun { color: var(--col-sun); }
@@ -209,28 +222,36 @@
 
 .calendarGrid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 2px;
+  padding: 0 0.25rem;
 }
 
 .cell {
-  aspect-ratio: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
-  padding: 2px;
+  padding: 4px;
   gap: 1px;
-  border: 1.5px solid transparent;
-  transition: background 0.15s;
+  min-height: 52px;
+  border: 2px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
   overflow: hidden;
 }
 .cell:hover     { background: rgba(0,0,0,0.04); }
 .cellEmpty      { cursor: default; }
-.cellSelected   { border-color: var(--accent-mint) !important; background: var(--accent-mint-bg); }
-.cellToday      { border-color: rgba(201,145,42,0.5) !important; }
+.cellSelected   {
+  border-color: var(--accent-mint);
+  background: var(--accent-mint-bg);
+  outline: none;
+}
+.cellToday      {
+  outline: 2px solid rgba(201,145,42,0.6);
+  outline-offset: -2px;
+}
 .cellDim {
   opacity: 0.38;
 }
@@ -250,7 +271,8 @@
 }
 
 .solarDay {
-  font-size: 0.88rem;
+  font-size: 1rem;
+  font-weight: 400;
   line-height: 1;
   color: var(--text);
 }
@@ -272,14 +294,14 @@
 }
 
 .lunarDay {
-  font-size: 0.52rem;
-  color: var(--text-dim);
+  font-size: 0.625rem;
+  color: #b0b0b8;
   line-height: 1;
 }
 
 .scoreNum {
-  font-size: 0.6rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
   line-height: 1;
   position: relative;
 }
@@ -439,6 +461,34 @@
   flex: 1;
   overflow-y: auto;
   padding: 0.8rem 1rem 4rem;
+}
+
+/* ══════════════════════════════════════
+   Profile Tab
+   ══════════════════════════════════════ */
+.profileView {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.8rem 1rem 4rem;
+}
+
+.profileContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.profileTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.profileSubtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.8rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -528,10 +578,10 @@
 }
 
 .heroScoreNum {
-  font-size: 3rem;
-  font-weight: 800;
+  font-size: 3.75rem;
+  font-weight: 100;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.05em;
 }
 
 .heroScoreDivider {
@@ -545,34 +595,39 @@
 
 /* ── Day Summary Row (compact 3-col, lives inside heroCard) ── */
 .daySummaryRow {
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  background: #f9f9f9;
+  border-radius: 12px;
+  overflow: hidden;
   margin-top: 0.7rem;
 }
 .daySummaryCell {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0.42rem 0.3rem;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  border-right: 1px solid #ececec;
   gap: 0.16rem;
 }
 .daySummarySep {
-  width: 1px;
-  background: var(--border);
-  margin: 0.38rem 0;
+  display: none;
 }
 .daySummaryCellLabel {
-  font-size: 0.58rem;
-  color: var(--text-muted);
-  font-weight: 400;
+  font-size: 0.625rem;
+  color: #8e8e93;
+  font-weight: 500;
   line-height: 1;
+  margin-bottom: 0.25rem;
 }
 .daySummaryCellVal {
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 200;
   line-height: 1.2;
   color: var(--text);
+  letter-spacing: -0.02em;
 }
 .daySummaryPos { color: var(--accent-mint); }
 .daySummaryNeg { color: var(--danger); }
@@ -896,33 +951,35 @@
 }
 
 .catBarLabel {
-  font-size: 0.73rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text);
+  color: #555555;
   width: 2rem;
   flex-shrink: 0;
 }
 
 .catBarVal {
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  width: 1.8rem;
+  width: 1.75rem;
   flex-shrink: 0;
-  text-align: right;
+  text-align: left;
+  color: #1a1a1a;
 }
 
 .catBarTrack {
   flex: 1;
   height: 5px;
-  background: var(--border);
-  border-radius: 3px;
+  background: #e5e5ea;
+  border-radius: 99px;
   overflow: hidden;
 }
 
 .catBarFill {
   height: 100%;
-  border-radius: 3px;
-  transition: width 0.35s ease;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #2a9d5c, #52c98a);
+  transition: width 0.6s cubic-bezier(.4,0,.2,1);
   animation: barGrow 0.4s ease both;
 }
 
@@ -944,6 +1001,14 @@
   background: var(--surface, var(--bg));
 }
 
+.catEventsHeader {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
 
 .catBarChips {
   display: flex;
@@ -1016,6 +1081,14 @@
   color: rgba(45, 60, 55, 0.82);
   background: rgba(120, 150, 140, 0.08);
   white-space: nowrap;
+}
+
+/* Focus source 요소 - 노란색 칩 */
+.reasonChipFocus {
+  border: 1px solid rgba(201, 145, 42, 0.3);
+  color: rgba(120, 85, 20, 0.9);
+  background: rgba(201, 145, 42, 0.12);
+  font-weight: 600;
 }
 
 /* reasonChipPos and reasonChipNeg intentionally neutral */

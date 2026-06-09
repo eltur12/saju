@@ -48,15 +48,16 @@ export interface PersistedSummary {
 }
 
 export interface DailyFocus {
-  key:                  string;   // e.g. "love.doHwa_spouse"
-  category:             keyof ScoreMap;
-  label:                string;   // e.g. "표현과 친밀감"
-  strength:             "medium" | "strong";
-  sourceKeys:           string[]; // event keys that activated this focus
-  baseFocusScore:       number;   // 8 for medium, 11 for strong
-  personalRarityBonus:  number;   // 0~3 based on monthly Top1 frequency
-  focusScore:           number;   // baseFocusScore + personalRarityBonus
-  displayBoost:         number;   // 5 or 7 based on focusScore
+  key:                   string;   // e.g. "love.doHwa_spouse"
+  category:              keyof ScoreMap;
+  label:                 string;   // e.g. "표현과 친밀감"
+  strength:              "medium" | "strong";
+  sourceKeys:            string[]; // event keys that activated this focus
+  baseFocusScore:        number;   // 8 for medium, 11 for strong
+  personalRarityBonus:   number;   // 0~3 based on monthly Top1 frequency
+  focusScore:            number;   // baseFocusScore + personalRarityBonus
+  displayBoost:          number;   // 5 or 7 based on focusScore
+  representativeCategory?: keyof ScoreMap; // 대표 카테고리 (UI 노출용)
 }
 
 export const PERSISTED_SCHEMA_V = 2 as const;

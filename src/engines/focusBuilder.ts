@@ -23,6 +23,16 @@ export interface MonthlyTop1Stats {
 }
 
 /**
+ * calculateRepresentativeCategory
+ *
+ * Focus의 대표 카테고리를 계산한다.
+ * Focus의 category를 반환한다. (Focus는 이미 하나의 category로 생성됨)
+ */
+function calculateRepresentativeCategory(focus: DailyFocus): keyof ScoreMap {
+  return focus.category;
+}
+
+/**
  * buildDailyFocus
  *
  * 하루의 활성 이벤트와 raw 점수를 기반으로 Focus를 생성한다.
@@ -36,6 +46,7 @@ export interface MonthlyTop1Stats {
  *    - 동점 시 strength (strong > medium)
  *    - 동점 시 displayBoost 큰 순
  *    - 동점 시 rawScore 낮은 순 (묻힌 특별함 우선)
+ * 5. 각 Focus에 representativeCategory 설정
  */
 export function buildDailyFocus(
   activeEventKeys: Set<string>,
@@ -72,7 +83,7 @@ export function buildDailyFocus(
       displayBoost = 5;
     }
 
-    candidateFocuses.push({
+    const focus: DailyFocus = {
       key:                 entry.key,
       category:            entry.category,
       label:               entry.label,
@@ -82,7 +93,9 @@ export function buildDailyFocus(
       personalRarityBonus,
       focusScore,
       displayBoost,
-    });
+    };
+
+    candidateFocuses.push(focus);
   }
 
   // Step 2: 같은 category에서 focusScore 최고인 것만 유지
@@ -115,9 +128,14 @@ export function buildDailyFocus(
 
     // rawScore 낮은 순 (묻힌 특별함 우선)
     return rawScores[a.category] - rawScores[b.category];
-  });
+  }).slice(0, 2);
 
-  return selectedFocuses.slice(0, 2);
+  // Step 4: 각 Focus에 representativeCategory 설정
+  for (const focus of selectedFocuses) {
+    focus.representativeCategory = calculateRepresentativeCategory(focus);
+  }
+
+  return selectedFocuses;
 }
 
 /**
