@@ -91,6 +91,8 @@ export interface AiInterpretationRequest {
     category:    "wealth" | "love" | "health" | "career" | "relations" | "study";
     label:       string;
     strength:    "medium" | "strong";
+    /** V3: positive | mixed | negative — 미제공 시 positive로 간주 */
+    polarity?:   "positive" | "mixed" | "negative";
     sourceKeys:  string[];
     sourceLabels: string[];
   }>;

@@ -77,6 +77,13 @@ sourceKeys는 내부 추적용이므로 절대 출력하지 마십시오.
 
 focus가 여러 개 제공되면 첫 번째를 중심으로 하고 나머지는 보조로 활용할 수 있습니다.
 
+focus.polarity가 제공되면 톤 조절에만 참고하십시오.
+- positive: 편안하게 활용할 수 있는 흐름
+- mixed: 장점과 부담이 함께 있는 흐름 — 양면을 균형 있게 표현하십시오.
+- negative: 주의 깊게 볼 흐름 — 경고나 공포가 아니라 차분한 주의 환기로 표현하십시오.
+polarity가 없으면 positive로 간주하십시오.
+polarity 값 자체를 출력하지 마십시오.
+
 ---
 
 dailyHighlight

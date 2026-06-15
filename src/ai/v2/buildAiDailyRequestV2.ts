@@ -316,6 +316,7 @@ export function buildAiDailyRequestV2(
         category:     f.category as CategoryKey,
         label:        f.label,
         strength:     f.strength,
+        polarity:     f.polarity ?? "positive",
         sourceKeys:   f.sourceKeys || [],
         sourceLabels,
       };

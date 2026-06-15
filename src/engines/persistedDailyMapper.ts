@@ -18,6 +18,7 @@
 
 import type { DailyFortune } from "./aggregator";
 import type { ScoreMap } from "./sajuEngine";
+import { isKeyRegistered } from "../constants/fortuneDictionary";
 import { STATE_TO_CAT, type StateAtomKey } from "./stateAtomLayer";
 import { buildDailyFocus, applyFocusBoost } from "./focusBuilder";
 import type { DailyHighlight } from "./dailyHighlight";
@@ -52,6 +53,8 @@ export interface DailyFocus {
   category:              keyof ScoreMap;
   label:                 string;   // e.g. "표현과 친밀감"
   strength:              "medium" | "strong";
+  /** V3: positive | mixed | negative — 구버전 캐시 데이터에는 없음 (없으면 positive로 간주) */
+  polarity?:             "positive" | "mixed" | "negative";
   sourceKeys:            string[]; // event keys that activated this focus
   baseFocusScore:        number;   // 8 for medium, 11 for strong
   personalRarityBonus:   number;   // 0~3 based on monthly Top1 frequency
@@ -76,6 +79,11 @@ export interface PersistedDailyModel {
   displayScores?:     ScoreMap;
   /** Daily Highlight: 이번 달 흐름 대비 오늘 가장 눈에 띄는 변화 */
   dailyHighlight?:    DailyHighlight | null;
+  /**
+   * 당일 활성 이벤트 키 경량 저장 (등록된 canonical key만, 중복 없음)
+   * Flow Elements 카드의 후보 풀 확장 전용 — UI에 전체 노출 금지
+   */
+  activeEventKeys?:   string[];
 }
 
 // ── Canonical key lookup tables ────────────────────────────────────────────────
@@ -412,6 +420,8 @@ function buildPersistedV2(fortune: DailyFortune): PersistedDailyModel {
     focus,
     displayScores,
     dailyHighlight,
+    // V1 persisted에서 계산된 활성 이벤트 키 보존 (focus와 동일 패턴)
+    activeEventKeys: fortune.persisted?.activeEventKeys,
   };
 }
 
@@ -422,6 +432,60 @@ const MAX_TOP_EVENTS = 8;
 const MAX_TOP_STATES = 5;
 const MAX_CAT_STATES = 3;
 const MAX_CAT_EVENTS = 3;
+
+/**
+ * 감사/디버그 전용: 당일 활성 이벤트 키 집합 추출
+ *
+ * buildPersistedDailyModel 내부의 allEvents 키 추출과 동일한 규칙으로
+ * Focus 후보(sourceKeys 매칭)가 평가받는 키 집합을 재현한다.
+ * 점수/impact 계산 없음 — 기존 동작에 영향을 주지 않는 read-only 헬퍼.
+ * (Focus V4 후보 발굴 감사 스크립트에서 사용)
+ */
+export function extractActiveEventKeysForAudit(fortune: DailyFortune): Set<string> {
+  const keys = new Set<string>();
+  const atomDebug = fortune.stateAtomDebug;
+  const reasons   = fortune.reasonSources;
+  if (!atomDebug || !reasons) return keys;
+
+  // saju + astro (stateAtomLayer activeEvents)
+  for (const raw of atomDebug.activeEvents) {
+    keys.add(rawToCanonical(raw).key);
+  }
+
+  // ziwei chips (궁 활성 + 사화 칩 — canonKey 최우선, 본 구현과 동일 규칙)
+  for (const chip of reasons.ziwei.chips ?? []) {
+    if (FALLBACK_CHIP_KEYS.has(chip.key)) continue;
+    const palaceSlug = PALACE_KR_EN[chip.key];
+    keys.add(chip.canonKey ?? (palaceSlug ? `ziwei.palace.${palaceSlug}` : `unknown.${toSafeSlug(chip.key)}`));
+  }
+
+  // 신살 조건부 활성 (buildPersistedDailyModel과 동일 조건)
+  const DOHWA_BRANCHES = ["子", "午", "卯", "酉"];
+  const targetBranch = (fortune.saju_factors?.target_branch as string) || "";
+  const monthBranch  = (fortune.saju_factors?.month_branch as string) || "";
+  const targetStem   = (fortune.saju_factors?.target_stem as string) || "";
+  for (const star of fortune.profileSpecialStars || []) {
+    if (star.key === "saju.star.doHwa") {
+      if (DOHWA_BRANCHES.includes(targetBranch) || DOHWA_BRANCHES.includes(monthBranch)) keys.add(star.key);
+    } else if (star.key === "saju.star.cheonDeok") {
+      const map: Record<string, string[]> = {
+        "寅": ["亥"], "卯": ["申"], "辰": ["壬"], "巳": ["辛"],
+        "午": ["亥"], "未": ["甲"], "申": ["癸"], "酉": ["寅"],
+        "戌": ["丙"], "亥": ["巳"], "子": ["乙"], "丑": ["庚"],
+      };
+      const STEMS = "甲乙丙丁戊己庚辛壬癸";
+      const targets = map[monthBranch] ?? [];
+      if (targets.some(t => STEMS.includes(t) ? t === targetStem : t === targetBranch)) keys.add(star.key);
+    } else if (star.key === "saju.star.wolDeok") {
+      const map: Record<string, string> = {
+        "寅": "丙", "卯": "丙", "辰": "丙", "巳": "甲", "午": "甲", "未": "甲",
+        "申": "壬", "酉": "壬", "戌": "壬", "亥": "庚", "子": "庚", "丑": "庚",
+      };
+      if (targetStem === map[monthBranch]) keys.add(star.key);
+    }
+  }
+  return keys;
+}
 
 export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyModel {
   // V2 우선: aiRequestV2가 있으면 V2 로직 사용
@@ -503,7 +567,10 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
   for (const chip of reasons.ziwei.chips ?? []) {
     if (FALLBACK_CHIP_KEYS.has(chip.key)) continue;
     const palaceSlug = PALACE_KR_EN[chip.key];
-    const key = palaceSlug ? `ziwei.palace.${palaceSlug}` : `unknown.${toSafeSlug(chip.key)}`;
+    // canonKey 최우선 사용 (사화 칩 등 — reasonLayer가 부여한 canonical key 유지)
+    // canonKey가 없을 때만 기존 궁 매핑 → unknown.* 폴백
+    const key = chip.canonKey
+      ?? (palaceSlug ? `ziwei.palace.${palaceSlug}` : `unknown.${toSafeSlug(chip.key)}`);
     if (seenKeys.has(key)) continue;
     seenKeys.add(key);
     allEvents.push({
@@ -533,13 +600,15 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
         activated = true;
       }
     } else if (star.key === "saju.star.cheonDeok") {
-      // 천덕: 월지별 특정 지지 조건
+      // 천덕: 월지별 조건 — 값이 천간이면 일간(targetStem), 지지면 일지(targetBranch)와 비교
       const cheonDeokMap: Record<string, string[]> = {
         "寅": ["亥"], "卯": ["申"], "辰": ["壬"], "巳": ["辛"],
         "午": ["亥"], "未": ["甲"], "申": ["癸"], "酉": ["寅"],
         "戌": ["丙"], "亥": ["巳"], "子": ["乙"], "丑": ["庚"]
       };
-      if (cheonDeokMap[monthBranch]?.includes(targetBranch)) {
+      const STEMS = "甲乙丙丁戊己庚辛壬癸";
+      const targets = cheonDeokMap[monthBranch] ?? [];
+      if (targets.some(t => STEMS.includes(t) ? t === targetStem : t === targetBranch)) {
         activated = true;
         impact = 2.0;
       }
@@ -572,6 +641,12 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     .filter(e => !e.key.startsWith("unknown."))
     .sort((a, b) => b.impact - a.impact)
     .slice(0, MAX_TOP_EVENTS);
+
+  // 당일 활성 이벤트 키 경량 저장 (Flow Elements 후보 풀 확장용 — UI 전체 노출 금지)
+  // allEvents는 seenKeys로 이미 중복 제거됨; unknown.*/미등록 key 제외
+  const activeEventKeys = allEvents
+    .map(e => e.key)
+    .filter(k => !k.startsWith("unknown.") && isKeyRegistered(k));
 
   // ── Step 3: topStates ─────────────────────────────────────────────────────
   const allStates: PersistedState[] = [];
@@ -779,6 +854,7 @@ export function buildPersistedDailyModel(fortune: DailyFortune): PersistedDailyM
     focus,
     displayScores,
     dailyHighlight,
+    activeEventKeys,
   };
 }
 

@@ -189,6 +189,7 @@ export function buildAiDailyRequest(fortune: DailyFortune, monthCtx?: MonthConte
         category:     f.category as "wealth" | "love" | "health" | "career" | "relations" | "study",
         label:        f.label,
         strength:     f.strength,
+        polarity:     f.polarity ?? "positive",
         sourceKeys:   f.sourceKeys || [],
         sourceLabels,
       };

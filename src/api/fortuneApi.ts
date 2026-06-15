@@ -97,7 +97,7 @@ export async function saveWidgetMonthlyData(result: MonthlyFortuneResult): Promi
 }
 
 /** 캐시 스키마 버전 — 필드 변경 시 올리면 캐시 무효화 (PersistedDailyModel 구조 변경 시 PERSISTED_SCHEMA_V 도 함께 올릴 것) */
-const CACHE_VERSION = "v13-event-expansion"; // 도화살 + 12운성 7개 추가
+const CACHE_VERSION = "v14-active-event-keys"; // persisted.activeEventKeys 경량 저장 추가
 
 export interface SajuUser {
   birth_year: number;

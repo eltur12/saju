@@ -12,6 +12,8 @@
  *   unknown.*         (safe fallback)
  */
 
+import { STATE_LABELS as V2_STATE_LABELS } from "../ai/v2/stateDictionary";
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type Tone    = "positive" | "negative" | "neutral";
@@ -72,7 +74,10 @@ export const EVENT_LABELS: Record<string, string> = {
   "saju.twelveState.jangSaeng": "장생 기운",
   "saju.twelveState.mokYok":    "목욕 기운",
   "saju.twelveState.gwanDae":   "관대 기운",
+  // TODO: 엔진(persistedDailyMapper TWELVE_STATE_KEY)은 "건록"을 geonRok으로 emit한다.
+  //       imGwan(임관)은 같은 단계의 다른 명칭으로, 실제로는 발생하지 않음 — 명칭 통일 검토 필요.
   "saju.twelveState.imGwan":    "임관 기운",
+  "saju.twelveState.geonRok":   "건록 기운",
   "saju.twelveState.jeWang":    "제왕 기운",
   "saju.twelveState.soe":       "쇠 기운",
   "saju.twelveState.byeong":    "병 기운",
@@ -148,18 +153,20 @@ function resolveAstroLabel(key: string): string | null {
 }
 
 // ── STATE_LABELS ───────────────────────────────────────────────────────────────
+// 단일 출처: V2 상태 33종은 ai/v2/stateDictionary를 참조한다 (라벨 수정은 그쪽에서).
+// 여기서는 "state." prefix만 부여하고, V2에 없는 V1 전용 레거시 5종만 직접 유지한다.
 
 export const STATE_LABELS: Record<string, string> = {
-  "state.stability":          "안정 흐름 강화",
-  "state.tension":            "긴장 흐름 증가",
-  "state.recovery":           "회복 흐름 강화",
-  "state.focus":              "집중 흐름 강화",
-  "state.emotionalAmplitude": "감정 진폭 확대",
-  "state.socialFatigue":      "사회 피로 증가",
-  "state.executionFlow":      "실행 흐름 강화",
-  "state.energySustain":      "에너지 지속 강화",
-  "state.organization":       "정리 흐름 강화",
-  "state.impulsiveness":      "충동 흐름 활성",
+  // V2 상태 33종 — ai/v2/stateDictionary 단일 출처 (수정 금지, 원본에서 수정)
+  ...Object.fromEntries(
+    Object.entries(V2_STATE_LABELS).map(([k, v]) => [`state.${k}`, v])
+  ),
+  // V1 전용 레거시 상태 (V2 체계에 없음 — 구버전 persisted/EVENT_INFO 호환용)
+  "state.tension":       "긴장 흐름 증가",
+  "state.recovery":      "회복 흐름 강화",
+  "state.socialFatigue": "사회 피로 증가",
+  "state.organization":  "정리 흐름 강화",
+  "state.impulsiveness": "충동 흐름 활성",
 };
 
 // ── FLOW_LABELS ────────────────────────────────────────────────────────────────
@@ -176,6 +183,9 @@ export const FLOW_LABELS: Record<string, string> = {
   "flow.impulsive":      "충동 흐름 우세",
   "flow.blocked":        "흐름 억제",
   "flow.neutral":        "중립 흐름",
+  // 표시 전용 flow (EVENT_INFO relatedFlows에서 참조 — classifyFlowType은 산출하지 않음)
+  "flow.newBeginning":   "새 시작 흐름",
+  "flow.introspection":  "내면 정리 흐름",
 };
 
 // ── EVENT_META ─────────────────────────────────────────────────────────────────
@@ -222,6 +232,7 @@ export const EVENT_META: Record<string, EventMeta> = {
   "saju.twelveState.mokYok":    { icon: "droplet",  tone: "neutral",  priority: 3 },
   "saju.twelveState.gwanDae":   { icon: "crown",    tone: "positive", priority: 2 },
   "saju.twelveState.imGwan":    { icon: "shield",   tone: "positive", priority: 2 },
+  "saju.twelveState.geonRok":   { icon: "shield",   tone: "positive", priority: 2 },
   "saju.twelveState.jeWang":    { icon: "star",     tone: "positive", priority: 1 },
   "saju.twelveState.soe":       { icon: "minus",    tone: "neutral",  priority: 3 },
   "saju.twelveState.byeong":    { icon: "warning",  tone: "negative", priority: 2 },
@@ -633,6 +644,39 @@ export const EVENT_INFO: Record<string, EventInfo> = {
     ],
     relatedFlows: ["flow.highExecution", "flow.focusBoost"],
   },
+  "ziwei.transform.huaLu": {
+    title:               "화록",
+    shortDescription:    "순조로움과 풍요 흐름을 강화하는 변화성 요소예요.",
+    detailedDescription: "자미두수의 사화 중 하나로, 순조로운 진행·기회·풍요와 관련된 에너지를 끌어올리는 경향이 있어요. 일이 매끄럽게 풀리거나 관계가 부드러워지는 흐름이 활성화될 때 함께 나타나기도 해요.",
+    commonPatterns: ["진행이 매끄러워지는 시기", "기회·이득 관련 상황", "관계가 부드러워지는 흐름"],
+    relatedStates: [
+      { key: "state.stability",     polarity: "positive" },
+      { key: "state.energySustain", polarity: "positive" },
+    ],
+    relatedFlows: ["flow.stableFlow"],
+  },
+  "ziwei.transform.huaKe": {
+    title:               "화과",
+    shortDescription:    "인정과 명예 흐름을 강화하는 변화성 요소예요.",
+    detailedDescription: "자미두수의 사화 중 하나로, 인정·평판·배움과 관련된 에너지를 끌어올리는 경향이 있어요. 노력이 드러나거나 어려운 일이 부드럽게 풀리는 흐름이 활성화될 때 함께 나타나기도 해요.",
+    commonPatterns: ["노력이 인정받는 시기", "배움·평가 관련 상황", "막힌 일이 부드럽게 풀리는 흐름"],
+    relatedStates: [
+      { key: "state.focus",        polarity: "positive" },
+      { key: "state.organization", polarity: "positive" },
+    ],
+    relatedFlows: ["flow.focusBoost"],
+  },
+  "ziwei.transform.huaJi": {
+    title:               "화기",
+    shortDescription:    "얽힘과 막힘 신호를 주는 변화성 요소예요.",
+    detailedDescription: "자미두수의 사화 중 하나로, 일이 얽히거나 판단이 흐려지기 쉬운 에너지와 관련돼요. 위험 신호라기보다, 서두르지 않고 한 번 더 확인하면 좋은 시기를 알려주는 요소예요.",
+    commonPatterns: ["계획이 어긋나기 쉬운 시기", "판단을 한 번 더 확인하면 좋은 흐름", "마음이 한 곳에 매이기 쉬운 상황"],
+    relatedStates: [
+      { key: "state.tension",            polarity: "positive" },
+      { key: "state.emotionalAmplitude", polarity: "positive" },
+    ],
+    relatedFlows: ["flow.blocked"],
+  },
 
   // ── astro · aspect ───────────────────────────────────────────────────────────
   "astro.aspect.sun.trine": {
@@ -909,6 +953,50 @@ export const EVENT_INFO: Record<string, EventInfo> = {
       { key: "state.insight", polarity: "positive" },
     ],
     relatedFlows: ["flow.introspection"],
+  },
+  "saju.twelveState.mokYok": {
+    title:               "목욕",
+    shortDescription:    "감정이 들뜨고 새로움에 끌리는 흐름이에요.",
+    detailedDescription: "목욕(沐浴)은 십이운성 중 갓 태어난 생명이 씻기며 다듬어지는 단계로, 감정이 들뜨거나 새로운 것에 마음이 끌리는 시기와 겹쳐요. 매력과 표현력이 살아나지만, 마음이 자주 바뀌는 변덕스러움이 동반될 수도 있어요.",
+    commonPatterns: ["새로움에 끌리고 호기심이 커지는 시기", "매력과 표현력이 살아나는 흐름", "감정 기복이나 변덕이 생길 수 있음"],
+    relatedStates: [
+      { key: "state.emotionalAmplitude", polarity: "positive" },
+      { key: "state.impulsiveness",      polarity: "positive" },
+    ],
+    relatedFlows: ["flow.emotionalSwing"],
+  },
+  "saju.twelveState.gwanDae": {
+    title:               "관대",
+    shortDescription:    "역할을 갖추고 인정받기 시작하는 흐름이에요.",
+    detailedDescription: "관대(冠帶)는 십이운성 중 성인의 옷을 갖춰 입는 단계로, 책임과 역할이 분명해지고 의욕이 올라오는 시기와 겹쳐요. 추진력이 좋아지는 반면 격식과 절차에 다소 얽매일 수 있어요.",
+    commonPatterns: ["역할과 책임이 분명해지는 시기", "의욕과 자신감이 올라오는 흐름", "격식·절차가 중요해지는 편"],
+    relatedStates: [
+      { key: "state.executionFlow", polarity: "positive" },
+      { key: "state.organization",  polarity: "positive" },
+    ],
+    relatedFlows: ["flow.highExecution"],
+  },
+  "saju.twelveState.geonRok": {
+    title:               "건록",
+    shortDescription:    "안정된 실행력으로 본격적으로 움직이는 흐름이에요.",
+    detailedDescription: "건록(建祿)은 십이운성 중 자리를 잡고 녹(祿)을 받는 단계로, 실행력이 안정되고 노력의 결과가 차곡차곡 쌓이는 시기와 겹쳐요. 무리한 확장보다 꾸준한 진행에 유리한 편이에요.",
+    commonPatterns: ["하던 일이 안정적으로 진행되는 시기", "노력의 결과가 쌓이는 흐름", "꾸준함이 힘을 발휘하는 편"],
+    relatedStates: [
+      { key: "state.executionFlow", polarity: "positive" },
+      { key: "state.stability",     polarity: "positive" },
+    ],
+    relatedFlows: ["flow.highExecution", "flow.stableFlow"],
+  },
+  "saju.twelveState.yang": {
+    title:               "양",
+    shortDescription:    "차분히 길러지고 회복되는 흐름이에요.",
+    detailedDescription: "양(養)은 십이운성 중 생명이 보살핌 속에 자라나는 단계로, 무리하지 않고 회복하며 다음을 준비하는 시기와 겹쳐요. 완만하고 안정적인 기운이라 재충전에 유리한 편이에요.",
+    commonPatterns: ["회복과 재충전에 좋은 시기", "완만하고 안정적인 흐름", "다음 단계를 준비하는 편"],
+    relatedStates: [
+      { key: "state.recovery",  polarity: "positive" },
+      { key: "state.stability", polarity: "positive" },
+    ],
+    relatedFlows: ["flow.recoveryDay", "flow.stableFlow"],
   },
 
   // ── astro · aspect — sun ─────────────────────────────────────────────────────

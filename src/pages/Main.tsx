@@ -39,6 +39,8 @@ import { getBirthRegionById } from "../constants/cities";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
 import { Preferences } from "@capacitor/preferences";
 import {BRANCH_ELEMENT, STEM_ELEMENT} from "../engines/sajuEngine.ts";
+import { getFocusDisplayBoost, getFocusCategoryArrow } from "../engines/focusBuilder";
+import { buildFlowElementKeys } from "../utils/flowElements";
 
 const DAY_NAMES = ["일","월","화","수","목","금","토"];
 const DOW_KO    = ["일","월","화","수","목","금","토"];
@@ -62,6 +64,19 @@ const ELEMENT_COLOR: Record<string, string> = {
 function getElementColor(char: string) {
   const element = STEM_ELEMENT[char] || BRANCH_ELEMENT[char];
   return element ? ELEMENT_COLOR[element] ?? "#999" : "#999";
+}
+
+/**
+ * UI 표시용 카테고리 점수 — Focus displayBoost(polarity 정책) 적용
+ * raw scores는 변경하지 않고 표시 시점에만 보정한다.
+ * (dailyHighlight / baseline / AI Request는 raw 유지)
+ */
+function displayCatScore(f: DailyFortune, cat: keyof DailyFortune["scores"]): number {
+  let v = f.scores[cat] as number;
+  for (const fc of f.persisted?.focus ?? []) {
+    if (fc.category === cat) v += getFocusDisplayBoost(fc);
+  }
+  return Math.min(Math.max(v, 0), 100);
 }
 
 
@@ -140,7 +155,7 @@ export default function Main({ onBack }: Props) {
   const [notiModalOpen, setNotiModalOpen] = useState(false);
   const [draftNotiStart, setDraftNotiStart] = useState(notiStart);
   const [profile, setProfile] = useState<ProfileInsight | null>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
+  // const [profileOpen, setProfileOpen] = useState(false);
   const [infoTooltip, setInfoTooltip] = useState<"region" | "saju" | null>(null);
 const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<keyof DailyFortune["scores"] | null>(null);
@@ -273,9 +288,14 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
     }
   }, [selected, data, user, month, year, adjPrevScore, adjNextScore]);
 
-  // 날짜 변경 시 최고점 카테고리 자동 expand
+  // 날짜 변경 시 기본 펼침: Focus 대표 카테고리 우선, 없으면 최고점 카테고리
   useEffect(() => {
     if (!selected) { setExpandedCat(null); return; }
+    const focus = selected.persisted?.focus?.[0];
+    if (focus) {
+      setExpandedCat(focus.representativeCategory || focus.category);
+      return;
+    }
     const best = RADAR_CATS.reduce((b, c) =>
       (selected.scores[c.key] as number) > (selected.scores[b.key] as number) ? c : b
     );
@@ -1116,6 +1136,7 @@ const normalizedBirthDisplay = useMemo(() => {
                                             className={[
                                               styles.reasonChip,
                                               styles.reasonChipSmall,
+                                              styles.reasonChipFocus,
                                               hasInfo ? styles.reasonChipClickable : "",
                                             ].filter(Boolean).join(" ")}
                                             onClick={hasInfo ? () => setEventInfoKey(key) : undefined}
@@ -1127,7 +1148,17 @@ const normalizedBirthDisplay = useMemo(() => {
                                     })}
                                   </div>
                                 )}
-                                <span className={styles.previewFlowCategory}>{catLabel} ↑</span>
+                                {(() => {
+                                  const arrow = getFocusCategoryArrow(focus.polarity);
+                                  const polClass = focus.polarity === "mixed" ? styles.focusMixed
+                                    : focus.polarity === "negative" ? styles.focusNegative
+                                    : styles.focusPositive;
+                                  return (
+                                    <span className={`${styles.previewFlowCategory} ${polClass}`}>
+                                      {catLabel}{arrow ? ` ${arrow}` : ""}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             );
                           }
@@ -1148,13 +1179,13 @@ const normalizedBirthDisplay = useMemo(() => {
 
                           // CASE 3: Fallback (기존 로직)
                           const peak = RADAR_CATS.reduce((b, c) =>
-                            (selected.scores[c.key] as number) > (selected.scores[b.key] as number) ? c : b
+                            displayCatScore(selected, c.key) > displayCatScore(selected, b.key) ? c : b
                           );
                           const low = RADAR_CATS.reduce((w, c) =>
-                            (selected.scores[c.key] as number) < (selected.scores[w.key] as number) ? c : w
+                            displayCatScore(selected, c.key) < displayCatScore(selected, w.key) ? c : w
                           );
-                          const peakScore = selected.scores[peak.key] as number;
-                          const lowScore  = selected.scores[low.key]  as number;
+                          const peakScore = displayCatScore(selected, peak.key);
+                          const lowScore  = displayCatScore(selected, low.key);
                           const peakChip  = selected.persisted?.categoryHighlights?.[peak.key]?.topEvents?.[0];
                           const lowChip   = selected.persisted?.categoryHighlights?.[low.key]?.topEvents?.[0];
 
@@ -1350,6 +1381,7 @@ const normalizedBirthDisplay = useMemo(() => {
                                           className={[
                                             styles.reasonChip,
                                             styles.reasonChipSmall,
+                                            styles.reasonChipFocus,
                                             hasInfo ? styles.reasonChipClickable : "",
                                           ].filter(Boolean).join(" ")}
                                           onClick={hasInfo ? () => setEventInfoKey(key) : undefined}
@@ -1362,11 +1394,25 @@ const normalizedBirthDisplay = useMemo(() => {
                                 </div>
                               );
                             })()}
+                            {(() => {
+                              const focus = selected.persisted!.focus![0];
+                              const repCat = focus.representativeCategory || focus.category;
+                              const catLabel = RADAR_CATS.find(c => c.key === repCat)?.label || repCat;
+                              const arrow = getFocusCategoryArrow(focus.polarity);
+                              const polClass = focus.polarity === "mixed" ? styles.focusMixed
+                                : focus.polarity === "negative" ? styles.focusNegative
+                                : styles.focusPositive;
+                              return (
+                                <span className={`${styles.previewFlowCategory} ${polClass}`}>
+                                  {catLabel}{arrow ? ` ${arrow}` : ""}
+                                </span>
+                              );
+                            })()}
                           </div>
                         )}
 
-                        {/* Daily Highlight */}
-                        {selected.persisted?.dailyHighlight && (
+                        {/* Daily Highlight: Focus가 있으면 표시하지 않음 (Focus 우선) */}
+                        {!selected.persisted?.focus?.length && selected.persisted?.dailyHighlight && (
                           <div className={styles.highlightCard}>
                             <span className={styles.highlightLabel}>오늘의 변화</span>
                             <span className={styles.highlightMain}>
@@ -1379,6 +1425,36 @@ const normalizedBirthDisplay = useMemo(() => {
                       </div>
                     )}
 
+                    {/* ── 오늘의 흐름 요소 ── */}
+                    {(() => {
+                      const flowKeys = buildFlowElementKeys(selected);
+                      if (flowKeys.length === 0) return null;
+                      return (
+                        <div className={styles.flowElemCard}>
+                          <span className={styles.flowElemTitle}>오늘의 흐름 요소</span>
+                          <span className={styles.flowElemSub}>오늘 흐름에 영향을 준 핵심 요소들</span>
+                          <div className={styles.flowElemChips}>
+                            {flowKeys.map((key, i) => {
+                              const dispLabel = safeResolveLabel(key);
+                              const hasInfo = safeResolveInfo(key) !== null;
+                              return (
+                                <span
+                                  key={`${key}-${i}`}
+                                  className={[
+                                    styles.reasonChip,
+                                    hasInfo ? styles.reasonChipClickable : "",
+                                  ].filter(Boolean).join(" ")}
+                                  onClick={hasInfo ? () => setEventInfoKey(key) : undefined}
+                                >
+                                  {dispLabel}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* ── 분석 영역 공통 안내 ── */}
                     <p className={styles.analysisHint}>흐름을 만든 요소들 중,{" "}눈여겨볼 만한 내용들만 정리해봤어요.</p>
 
@@ -1386,10 +1462,28 @@ const normalizedBirthDisplay = useMemo(() => {
                     {/* ── 카테고리 바 (expandable) ── */}
                     <div className={styles.catBarsSection}>
                       <p className={styles.catBarsSectionHeader}>카테고리별 점수</p>
-                      {RADAR_CATS.map(({ key, label }, i) => {
-                        const v          = selected.scores[key] as number;
+                      {(() => {
+                        // 표시된 Focus(첫 번째)의 sourceKeys — 카테고리 driver 강조/강제 포함 판정용
+                        // 노출 불가 키(unknown.*, 미등록)는 제외 (Focus 카드와 동일 기준)
+                        const displayedFocus = selected.persisted?.focus?.[0];
+                        const focusSourceKeys = (displayedFocus?.sourceKeys ?? []).filter(k =>
+                          !k.startsWith("unknown.") && isKeyRegistered(k)
+                        );
+                        const focusRepCat = displayedFocus
+                          ? (displayedFocus.representativeCategory || displayedFocus.category)
+                          : null;
+                        return RADAR_CATS.map(({ key, label }, i) => {
+                        const v          = displayCatScore(selected, key);
                         const isExpanded = expandedCat === key;
                         const catEvents  = selected.persisted?.categoryHighlights?.[key]?.topEvents ?? [];
+                        // 대표 카테고리: Focus source를 강제 포함 (우선 배치, 총 3개 유지)
+                        // 다른 카테고리: Focus source 전체가 driver에 포함될 때만 강조 (일부만 존재하면 강조 금지)
+                        const isRepCat = focusRepCat === key && focusSourceKeys.length > 0;
+                        const focusComplete = isRepCat || (focusSourceKeys.length > 0
+                          && focusSourceKeys.every(sk => catEvents.includes(sk)));
+                        const catChips = isRepCat
+                          ? [...focusSourceKeys, ...catEvents.filter(ev => !focusSourceKeys.includes(ev))].slice(0, 3)
+                          : catEvents;
                         return (
                           <div key={key} className={styles.catBarRow}>
                             <div
@@ -1408,16 +1502,18 @@ const normalizedBirthDisplay = useMemo(() => {
                             </div>
                             {isExpanded && (
                               <div className={styles.catBarExpanded}>
-                                {catEvents.length > 0 ? (
+                                {catChips.length > 0 ? (
                                   <div className={styles.catBarChips}>
-                                    {catEvents.map((evKey, j) => {
+                                    {catChips.map((evKey, j) => {
                                       const dispLabel = safeResolveLabel(evKey);
                                       const hasInfo   = safeResolveInfo(evKey) !== null;
+                                      const isFocusSource = focusComplete && focusSourceKeys.includes(evKey);
                                       return (
                                         <span
                                           key={`${evKey}-${j}`}
                                           className={[
                                             styles.reasonChip,
+                                            isFocusSource ? styles.reasonChipFocus : "",
                                             hasInfo ? styles.reasonChipClickable : "",
                                           ].filter(Boolean).join(" ")}
                                           onClick={hasInfo ? () => setEventInfoKey(evKey) : undefined}
@@ -1434,7 +1530,8 @@ const normalizedBirthDisplay = useMemo(() => {
                             )}
                           </div>
                         );
-                      })}
+                        });
+                      })()}
                     </div>
 
                     {/* ── 시간대 흐름 ── */}

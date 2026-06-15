@@ -33,6 +33,38 @@ function calculateRepresentativeCategory(focus: DailyFocus): keyof ScoreMap {
 }
 
 /**
+ * getFocusDisplayBoost — polarity별 displayScore 보정 정책 (V3.1)
+ *
+ * - positive: medium +5, strong +7 (기존 정책 유지)
+ * - mixed:    0 (점수에 영향 없음 — 특징만 노출)
+ * - negative: -3 (부드러운 하향 — 경고 아님)
+ * - polarity 누락(구버전 캐시): positive로 간주
+ *
+ * rawScore에는 절대 적용하지 않는다. displayScores 전용.
+ */
+export function getFocusDisplayBoost(focus: Pick<DailyFocus, "polarity" | "strength">): number {
+  if (focus.polarity === "mixed") return 0;
+  if (focus.polarity === "negative") return -3;
+
+  if (focus.strength === "strong") return 7;
+  return 5;
+}
+
+/**
+ * getFocusCategoryArrow — 대표 카테고리 화살표 표시 정책 (V3.1)
+ *
+ * - positive: "↑"
+ * - mixed:    "" (화살표 없음)
+ * - negative: "↓"
+ * - polarity 누락(구버전 캐시): positive로 간주
+ */
+export function getFocusCategoryArrow(polarity: DailyFocus["polarity"]): string {
+  if (polarity === "mixed") return "";
+  if (polarity === "negative") return "↓";
+  return "↑";
+}
+
+/**
  * buildDailyFocus
  *
  * 하루의 활성 이벤트와 raw 점수를 기반으로 Focus를 생성한다.
@@ -75,19 +107,15 @@ export function buildDailyFocus(
 
     const focusScore = entry.baseFocusScore + personalRarityBonus;
 
-    // displayBoost 계산
-    let displayBoost = 0;
-    if (focusScore >= 11) {
-      displayBoost = 7;
-    } else if (focusScore >= 8) {
-      displayBoost = 5;
-    }
+    // displayBoost: polarity별 정책 (V3.1) — positive +5/+7, mixed 0, negative -3
+    const displayBoost = getFocusDisplayBoost(entry);
 
     const focus: DailyFocus = {
       key:                 entry.key,
       category:            entry.category,
       label:               entry.label,
       strength:            entry.strength,
+      polarity:            entry.polarity,
       sourceKeys:          entry.sourceKeys,
       baseFocusScore:      entry.baseFocusScore,
       personalRarityBonus,
@@ -136,6 +164,64 @@ export function buildDailyFocus(
   }
 
   return selectedFocuses;
+}
+
+/**
+ * applyMonthlyFocusFrequencyCap — Focus Frequency Cap (Policy B)
+ *
+ * 동일 focus key가 같은 월 안에서 maxPerKey회까지만 노출되도록 제한한다.
+ * - 날짜순 선착순 maxPerKey회 유지, 초과분 제거
+ * - polarity/strength 예외 없음 (positive/mixed/negative 모두 적용)
+ * - 하루의 다른 focus는 유지, 모두 제거되면 빈 배열
+ * - rawScore / dailyHighlight / baseline은 일절 건드리지 않음
+ *
+ * 호출 위치: aggregator.getMonthlyFortune의 월 dailyList 생성 이후.
+ * daily builder(buildDailyFocus)는 순수 후보 생성 역할을 유지한다.
+ *
+ * cap으로 focus가 제거된 날은 persisted.displayScores를 재계산하고
+ * aiRequestV2.focus도 동기화한다 (persisted.focus와 1:1 순서 매핑).
+ *
+ * @returns 제거된 focus 인스턴스 수
+ */
+export function applyMonthlyFocusFrequencyCap(
+  dailyList: Array<{
+    scores: ScoreMap;
+    persisted?: { focus?: DailyFocus[]; displayScores?: ScoreMap };
+    aiRequestV2?: { focus?: unknown[] };
+  }>,
+  maxPerKey = 3,
+): number {
+  const countByKey = new Map<string, number>();
+  let removed = 0;
+
+  for (const day of dailyList) {
+    const focuses = day.persisted?.focus;
+    if (!focuses || focuses.length === 0) continue;
+
+    const keptIdx: number[] = [];
+    focuses.forEach((f, i) => {
+      const n = countByKey.get(f.key) ?? 0;
+      if (n < maxPerKey) {
+        countByKey.set(f.key, n + 1);
+        keptIdx.push(i);
+      } else {
+        removed++;
+      }
+    });
+
+    const kept = keptIdx.length === focuses.length ? focuses : keptIdx.map(i => focuses[i]);
+    if (keptIdx.length !== focuses.length) {
+      day.persisted!.focus = kept; // 기존 정렬 순서 유지
+      if (day.aiRequestV2?.focus) {
+        day.aiRequestV2.focus = day.aiRequestV2.focus.filter((_, i) => keptIdx.includes(i));
+      }
+    }
+    // displayScores는 항상 재계산 — daily 빌드 후 월 보정(순위 고착 방지)으로
+    // raw가 조정된 날에도 "조정된 raw + 정책 boost"로 일치하도록 보장
+    day.persisted!.displayScores = kept.length > 0 ? applyFocusBoost(day.scores, kept) : undefined;
+  }
+
+  return removed;
 }
 
 /**

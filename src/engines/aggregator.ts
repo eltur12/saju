@@ -14,6 +14,7 @@ import { buildReasonSources, type ReasonSources } from "./reasonLayer";
 import { computeStateAtoms, type StateAtomDebug } from "./stateAtomLayer";
 import { computeBaselineAdj, applyBaselineCorrection, pushBaselineOverall, BASELINE_WINDOW, DEFAULT_BASELINE_CONFIG, type BaselineConfig } from "./profileBaselineLayer";
 import { buildPersistedDailyModel, type PersistedDailyModel } from "./persistedDailyMapper";
+import { applyMonthlyFocusFrequencyCap } from "./focusBuilder";
 import { buildAiDailyRequestV2 } from "../ai/v2/buildAiDailyRequestV2";
 import { generateMonthlyCategoryStats, buildDailyHighlight } from "./dailyHighlight";
 import { SCORE_GOLD, SCORE_MINT, SCORE_GRAY } from "../constants/scoreThresholds";
@@ -435,6 +436,10 @@ export class FortuneAggregator {
     const rawPalaceKey   = dailyList[0]?.persisted?.monthlyPalace?.key ?? "";
     const palaceSlug     = rawPalaceKey.startsWith("ziwei.palace.") ? rawPalaceKey.slice("ziwei.palace.".length) : "";
     const monthly_palace = PALACE_SLUG_KR[palaceSlug] ?? "";
+
+    // Focus Frequency Cap (Policy B): 동일 focus key 월 최대 3회
+    // raw scores에는 영향 없음 — persisted.focus / displayScores / aiRequestV2.focus만 정리
+    applyMonthlyFocusFrequencyCap(dailyList);
 
     // Generate monthly category stats and add dailyHighlight to each fortune
     const rawScores = dailyList.map(f => f.scores);

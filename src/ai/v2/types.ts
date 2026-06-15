@@ -168,6 +168,8 @@ export interface AiInterpretationRequestV2 {
     category:     CategoryKey;
     label:        string;
     strength:     "medium" | "strong";
+    /** V3: positive | mixed | negative — 미제공 시 positive로 간주 */
+    polarity?:    "positive" | "mixed" | "negative";
     sourceKeys:   string[];
     sourceLabels: string[];
   }>;
