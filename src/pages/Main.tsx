@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import WheelPickerModal from "../components/WheelPickerModal";
 import { getMonthlyFortune, getProfileInsight, getUser, clearUser } from "../api/fortuneApi";
-import { generateDailyInterpretationFull } from "../api/aiApi";
+import { generateDailyInterpretationFull, generateBatchInterpretation } from "../api/aiApi";
+import type { AiBatchDayPayload } from "../api/aiApi";
 import { buildAiDailyRequestV2 } from "../ai/v2/buildAiDailyRequestV2";
 import type { ProfileInsight } from "../api/fortuneApi";
 import { App } from "@capacitor/app";
@@ -41,6 +42,42 @@ import { Preferences } from "@capacitor/preferences";
 import {BRANCH_ELEMENT, STEM_ELEMENT} from "../engines/sajuEngine.ts";
 import { getFocusDisplayBoost, getFocusCategoryArrow } from "../engines/focusBuilder";
 import { buildFlowElementKeys } from "../utils/flowElements";
+
+// ── AI 해석 캐시 유틸 ────────────────────────────────────────────────────────
+
+const AI_INTERP_PREFIX = "ai_interpretation_";
+
+function loadAiInterpretationCache(
+  date: string,
+): { focusPoint: string; bestArea: string; worstArea: string; summary: string } | null {
+  try {
+    const raw = localStorage.getItem(`${AI_INTERP_PREFIX}${date}`);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof p.summary !== "string" || p.summary === "") return null;
+    return {
+      focusPoint: typeof p.focusPoint === "string" ? p.focusPoint : "",
+      bestArea:   typeof p.bestArea   === "string" ? p.bestArea   : "",
+      worstArea:  typeof p.worstArea  === "string" ? p.worstArea  : "",
+      summary:    p.summary,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveAiInterpretationCache(day: {
+  date: string;
+  focusPoint: string;
+  bestArea: string;
+  worstArea: string;
+  summary: string;
+}): void {
+  localStorage.setItem(`${AI_INTERP_PREFIX}${day.date}`, JSON.stringify({
+    ...day,
+    generatedAt: new Date().toISOString(),
+  }));
+}
 
 const DAY_NAMES = ["일","월","화","수","목","금","토"];
 const DOW_KO    = ["일","월","화","수","목","금","토"];
@@ -159,8 +196,12 @@ export default function Main({ onBack }: Props) {
   const [infoTooltip, setInfoTooltip] = useState<"region" | "saju" | null>(null);
 const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<keyof DailyFortune["scores"] | null>(null);
-  const [aiResult,     setAiResult]     = useState<{ subtitle: string; summary: string } | null>(null);
+  const [aiResult,     setAiResult]     = useState<{ focusPoint: string; bestArea: string; worstArea: string; summary: string } | null>(null);
   const [aiLoading,    setAiLoading]    = useState(false);
+  const pregenInFlightRef              = useRef(false);
+  const pregenPromiseRef               = useRef<Promise<void> | null>(null);
+  const pregenTargetDatesRef           = useRef<Set<string>>(new Set());
+  const interpretationInFlightDatesRef = useRef<Set<string>>(new Set());
   const [batchRunning,   setBatchRunning]   = useState(false);
   const [batchProgress,  setBatchProgress]  = useState("");
   const [batchResultKey, setBatchResultKey] = useState<string | null>(null);
@@ -259,6 +300,100 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
     setNotiSaved(true);
     setTimeout(() => setNotiSaved(false), 2000);
   };
+
+  // ── AI 해석 선생성 ─────────────────────────────────────────────────────────
+  const pregenAiInterpretations = useCallback(async (
+    startDate: string,
+    currentMonthData: MonthlyFortuneResult,
+  ): Promise<void> => {
+    if (!user) return;
+    if (pregenInFlightRef.current) return;
+    pregenInFlightRef.current = true;
+    pregenTargetDatesRef.current = new Set();
+
+    try {
+      const targets: Array<{ date: string; fortune: DailyFortune; monthData: MonthlyFortuneResult }> = [];
+      const monthDataCache: Record<string, MonthlyFortuneResult> = {};
+
+      const mk0 = `${currentMonthData.year}-${String(currentMonthData.month).padStart(2, "0")}`;
+      monthDataCache[mk0] = currentMonthData;
+
+      // startDate를 정오 기준으로 파싱해서 DST 경계 문제 회피
+      const startParts = startDate.split("-").map(Number);
+      const cursor = new Date(startParts[0], startParts[1] - 1, startParts[2], 12, 0, 0);
+      let steps = 0;
+
+      while (targets.length < 3 && steps < 60) {
+        const cy = cursor.getFullYear();
+        const cm = cursor.getMonth() + 1;
+        const cd = cursor.getDate();
+        const dateStr = `${cy}-${String(cm).padStart(2, "0")}-${String(cd).padStart(2, "0")}`;
+        const mk = `${cy}-${String(cm).padStart(2, "0")}`;
+
+        // 이미 유효한 캐시가 있으면 스킵
+        if (!loadAiInterpretationCache(dateStr)) {
+          // 해당 월 데이터 확보
+          if (!monthDataCache[mk]) {
+            monthDataCache[mk] = await getMonthlyFortune(user, cy, cm);
+          }
+          const mData = monthDataCache[mk];
+          const fortune = mData.daily_fortunes.find(f => f.date === dateStr);
+          if (fortune) {
+            targets.push({ date: dateStr, fortune, monthData: mData });
+          }
+        }
+
+        cursor.setDate(cursor.getDate() + 1);
+        steps++;
+      }
+
+      if (targets.length === 0) return;
+
+      // target dates Set 등록 (버튼 클릭 대기 판단에 사용)
+      pregenTargetDatesRef.current = new Set(targets.map(t => t.date));
+
+      // batch 페이로드 구성
+      const batchDays: AiBatchDayPayload[] = targets.map(({ date, fortune, monthData }) => {
+        const monthCtx = {
+          displayScores: monthData.daily_fortunes.map(f => f.scores.overall as number),
+          flowType:      monthData.monthly_flow_type,
+          palace:        monthData.monthly_palace,
+        };
+        const v2Result = buildAiDailyRequestV2(fortune, monthCtx);
+        const catScores = v2Result.request.scores as Record<string, number>;
+        const sorted    = Object.entries(catScores).sort((a, b) => b[1] - a[1]);
+        return {
+          date,
+          overall:         v2Result.request.overall,
+          topCategory:     sorted[0][0],
+          bottomCategory:  sorted[sorted.length - 1][0],
+          focus:           v2Result.request.focus ?? [],
+          topStates:       v2Result.request.topStates,
+        };
+      });
+
+      console.log(`[AI-PREGEN] 시작 dates=${targets.map(t => t.date).join(", ")}`);
+      const result = await generateBatchInterpretation(batchDays);
+
+      // 검증된 결과를 date 기준으로 저장 (generateBatchInterpretation 내부에서 이미 검증됨)
+      for (const day of result.days) {
+        saveAiInterpretationCache({
+          date:       day.date,
+          focusPoint: day.focusPoint,
+          bestArea:   day.bestArea,
+          worstArea:  day.worstArea,
+          summary:    day.summary,
+        });
+        console.log(`[AI-PREGEN] 저장 ${day.date}`);
+      }
+    } catch (err) {
+      console.error("[AI-PREGEN] 오류:", err instanceof Error ? err.message : err);
+    } finally {
+      pregenInFlightRef.current = false;
+      pregenTargetDatesRef.current = new Set();
+      pregenPromiseRef.current = null;
+    }
+  }, [user]);
 
   useEffect(() => { setUser(getUser()); }, []);
 
@@ -1662,30 +1797,85 @@ const normalizedBirthDisplay = useMemo(() => {
                             className={styles.flowBtn}
                             disabled={batchRunning}
                             onClick={async () => {
+                              if (!data) return;
+                              const dateKey = selected.date;
                               setAiLoading(true);
                               try {
-                                const monthCtx = data ? {
+                                // 1. 캐시 먼저 확인
+                                const cached = loadAiInterpretationCache(dateKey);
+                                if (cached) {
+                                  setAiResult(cached);
+                                  // 백그라운드 선생성 (이미 없는 날짜들만 대상)
+                                  if (!pregenInFlightRef.current) {
+                                    const p = pregenAiInterpretations(dateKey, data);
+                                    pregenPromiseRef.current = p;
+                                    p.catch(console.error);
+                                  }
+                                  return;
+                                }
+
+                                // 2. 날짜별 in-flight 방어 — 동일 날짜 중복 요청 무시
+                                if (interpretationInFlightDatesRef.current.has(dateKey)) {
+                                  console.log(`[AI] ${dateKey} 이미 요청 진행 중 — 중복 무시`);
+                                  return;
+                                }
+                                interpretationInFlightDatesRef.current.add(dateKey);
+
+                                // 3. 선생성 진행 중인 경우 — batch 완료를 기다린 후 캐시 재확인
+                                if (pregenInFlightRef.current && pregenPromiseRef.current) {
+                                  const isTargeted = pregenTargetDatesRef.current.has(dateKey);
+                                  console.log(`[AI] 선생성 진행 중 — ${dateKey} 포함=${isTargeted}, 완료 대기`);
+                                  await pregenPromiseRef.current.catch(() => undefined);
+
+                                  const afterWait = loadAiInterpretationCache(dateKey);
+                                  if (afterWait) {
+                                    setAiResult(afterWait);
+                                    return;
+                                  }
+                                  console.log(`[AI] batch 미포함 — ${dateKey} 단독 호출 폴백`);
+                                } else {
+                                  // 4a. 선생성 미진행 — selectedDate부터 batch 선생성 실행
+                                  const p = pregenAiInterpretations(dateKey, data);
+                                  pregenPromiseRef.current = p;
+                                  await p;
+
+                                  const fresh = loadAiInterpretationCache(dateKey);
+                                  if (fresh) {
+                                    setAiResult(fresh);
+                                    return;
+                                  }
+                                  console.log(`[AI] 선생성 실패 — ${dateKey} 단독 호출 폴백`);
+                                }
+
+                                // 4b. 단독 호출 폴백 (batch 미포함 또는 선생성 실패)
+                                const monthCtx = {
                                   displayScores: data.daily_fortunes.map(f => f.scores.overall as number),
-                                  flowType: data.monthly_flow_type,
-                                  palace:   data.monthly_palace,
-                                } : undefined;
+                                  flowType:      data.monthly_flow_type,
+                                  palace:        data.monthly_palace,
+                                };
                                 const v2Result = buildAiDailyRequestV2(selected, monthCtx);
-                                console.log(`[AI] V2 Request: topEvents=${v2Result.request.topEvents.length}, topStates=${v2Result.request.topStates.length}, categoryHighlights=${Object.keys(v2Result.request.categoryHighlights).length}, monthlyPosition=${!!v2Result.request.monthlyPosition}, dailyCompare=${!!v2Result.request.dailyCompare}, keyMoment=${!!v2Result.request.keyMoment}`);
                                 const { content } = await generateDailyInterpretationFull(v2Result.request as any);
                                 const clean = content.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
                                 try {
                                   const parsed = JSON.parse(clean);
-                                  setAiResult({
-                                    subtitle: typeof parsed.subtitle === "string" ? parsed.subtitle : "",
-                                    summary:  typeof parsed.summary  === "string" ? parsed.summary  : clean,
-                                  });
+                                  const result = {
+                                    focusPoint: typeof parsed.focusPoint === "string" ? parsed.focusPoint : "",
+                                    bestArea:   typeof parsed.bestArea   === "string" ? parsed.bestArea   : "",
+                                    worstArea:  typeof parsed.worstArea  === "string" ? parsed.worstArea  : "",
+                                    summary:    typeof parsed.summary    === "string" ? parsed.summary    : clean,
+                                  };
+                                  setAiResult(result);
+                                  if (result.summary !== "") {
+                                    saveAiInterpretationCache({ date: dateKey, ...result });
+                                  }
                                 } catch {
-                                  setAiResult({ subtitle: "", summary: clean });
+                                  setAiResult({ focusPoint: "", bestArea: "", worstArea: "", summary: clean });
                                 }
                               } catch (err) {
                                 const msg = err instanceof Error ? err.message : String(err);
-                                setAiResult({ subtitle: "", summary: `오류가 발생했어요.\n\n${msg}` });
+                                setAiResult({ focusPoint: "", bestArea: "", worstArea: "", summary: `오류가 발생했어요.\n\n${msg}` });
                               } finally {
+                                interpretationInFlightDatesRef.current.delete(dateKey);
                                 setAiLoading(false);
                               }
                             }}
@@ -1703,13 +1893,27 @@ const normalizedBirthDisplay = useMemo(() => {
                       {/* 결과 */}
                       {aiResult && (
                         <div>
-                          {aiResult.subtitle !== "" && (
-                            <p className={styles.flowSubtitle}>{aiResult.subtitle}</p>
+                          {aiResult.focusPoint !== "" && (
+                            <p className={styles.flowSubtitle}>{aiResult.focusPoint}</p>
                           )}
                           <div className={styles.flowSummary}>
-                            {aiResult.summary.split(/\n\n+/).map((para, i) => (
-                              <p key={i}>{para.replace(/\n/g, " ").trim()}</p>
-                            ))}
+                            {aiResult.bestArea !== "" && (
+                              <div className={styles.flowBlock}>
+                                <span className={`${styles.flowLabel} ${styles.flowLabelBest}`}>잘 맞는 영역</span>
+                                <p>{aiResult.bestArea}</p>
+                              </div>
+                            )}
+                            {aiResult.worstArea !== "" && (
+                              <div className={styles.flowBlock}>
+                                <span className={`${styles.flowLabel} ${styles.flowLabelWorst}`}>걸리는 부분</span>
+                                <p>{aiResult.worstArea}</p>
+                              </div>
+                            )}
+                            {aiResult.summary !== "" && (
+                              <div className={`${styles.flowBlock} ${styles.flowBlockSummary}`}>
+                                <p>{aiResult.summary}</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

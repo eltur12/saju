@@ -781,10 +781,37 @@
   line-height: 1.75;
 }
 .flowSummary p {
-  margin: 0 0 0.75rem;
+  margin: 0;
 }
-.flowSummary p:last-child {
+
+.flowBlock {
+  margin-bottom: 1rem;
+}
+.flowBlock:last-child {
   margin-bottom: 0;
+}
+
+.flowLabel {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.4rem;
+}
+.flowLabelBest {
+  background: var(--accent-mint-bg);
+  color: var(--accent-mint);
+}
+.flowLabelWorst {
+  background: var(--accent-gold-bg);
+  color: var(--accent-gold);
+}
+
+.flowBlockSummary {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 
 /* ── Radar Chart ── */
