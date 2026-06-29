@@ -738,6 +738,16 @@
 }
 
 /* ── 오늘의 흐름 (AI 해석) ── */
+.flowFraming {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 0.875rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--accent-mint);
+  line-height: 1.55;
+}
+
 .flowEmptyHint {
   font-size: 0.85rem;
   color: var(--text-dim);

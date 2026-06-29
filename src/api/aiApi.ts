@@ -96,6 +96,7 @@ export interface AiBatchDayPayload {
 
 export interface AiBatchDayResult {
   date: string;
+  framing: string;
   focusPoint: string;
   bestArea: string;
   worstArea: string;
@@ -195,18 +196,20 @@ export async function generateBatchInterpretation(
       continue;
     }
 
+    const framing = typeof it.framing === "string" ? it.framing : "";
+
     // 중복 date 처리
     if (seenDates.has(it.date)) {
       console.warn(`[AI-BATCH] ${it.date} 중복 응답 — 마지막 유효 응답으로 교체`);
       const idx = validDays.findIndex(d => d.date === it.date);
       if (idx !== -1) {
-        validDays[idx] = { date: it.date, focusPoint: it.focusPoint, bestArea: it.bestArea, worstArea: it.worstArea, summary: it.summary };
+        validDays[idx] = { date: it.date, framing, focusPoint: it.focusPoint, bestArea: it.bestArea, worstArea: it.worstArea, summary: it.summary };
       }
       continue;
     }
 
     seenDates.add(it.date);
-    validDays.push({ date: it.date, focusPoint: it.focusPoint, bestArea: it.bestArea, worstArea: it.worstArea, summary: it.summary });
+    validDays.push({ date: it.date, framing, focusPoint: it.focusPoint, bestArea: it.bestArea, worstArea: it.worstArea, summary: it.summary });
   }
 
   console.log(`[AI-BATCH] 검증 완료 — 입력=${days.length}개, 유효=${validDays.length}개`);

@@ -49,13 +49,14 @@ const AI_INTERP_PREFIX = "ai_interpretation_";
 
 function loadAiInterpretationCache(
   date: string,
-): { focusPoint: string; bestArea: string; worstArea: string; summary: string } | null {
+): { framing: string; focusPoint: string; bestArea: string; worstArea: string; summary: string } | null {
   try {
     const raw = localStorage.getItem(`${AI_INTERP_PREFIX}${date}`);
     if (!raw) return null;
     const p = JSON.parse(raw) as Record<string, unknown>;
     if (typeof p.summary !== "string" || p.summary === "") return null;
     return {
+      framing:    typeof p.framing    === "string" ? p.framing    : "",
       focusPoint: typeof p.focusPoint === "string" ? p.focusPoint : "",
       bestArea:   typeof p.bestArea   === "string" ? p.bestArea   : "",
       worstArea:  typeof p.worstArea  === "string" ? p.worstArea  : "",
@@ -68,6 +69,7 @@ function loadAiInterpretationCache(
 
 function saveAiInterpretationCache(day: {
   date: string;
+  framing: string;
   focusPoint: string;
   bestArea: string;
   worstArea: string;
@@ -196,7 +198,7 @@ export default function Main({ onBack }: Props) {
   const [infoTooltip, setInfoTooltip] = useState<"region" | "saju" | null>(null);
 const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<keyof DailyFortune["scores"] | null>(null);
-  const [aiResult,     setAiResult]     = useState<{ focusPoint: string; bestArea: string; worstArea: string; summary: string } | null>(null);
+  const [aiResult,     setAiResult]     = useState<{ framing: string; focusPoint: string; bestArea: string; worstArea: string; summary: string } | null>(null);
   const [aiLoading,    setAiLoading]    = useState(false);
   const pregenInFlightRef              = useRef(false);
   const pregenPromiseRef               = useRef<Promise<void> | null>(null);
@@ -379,6 +381,7 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
       for (const day of result.days) {
         saveAiInterpretationCache({
           date:       day.date,
+          framing:    day.framing,
           focusPoint: day.focusPoint,
           bestArea:   day.bestArea,
           worstArea:  day.worstArea,
@@ -1859,6 +1862,7 @@ const normalizedBirthDisplay = useMemo(() => {
                                 try {
                                   const parsed = JSON.parse(clean);
                                   const result = {
+                                    framing:    typeof parsed.framing    === "string" ? parsed.framing    : "",
                                     focusPoint: typeof parsed.focusPoint === "string" ? parsed.focusPoint : "",
                                     bestArea:   typeof parsed.bestArea   === "string" ? parsed.bestArea   : "",
                                     worstArea:  typeof parsed.worstArea  === "string" ? parsed.worstArea  : "",
@@ -1869,11 +1873,11 @@ const normalizedBirthDisplay = useMemo(() => {
                                     saveAiInterpretationCache({ date: dateKey, ...result });
                                   }
                                 } catch {
-                                  setAiResult({ focusPoint: "", bestArea: "", worstArea: "", summary: clean });
+                                  setAiResult({ framing: "", focusPoint: "", bestArea: "", worstArea: "", summary: clean });
                                 }
                               } catch (err) {
                                 const msg = err instanceof Error ? err.message : String(err);
-                                setAiResult({ focusPoint: "", bestArea: "", worstArea: "", summary: `오류가 발생했어요.\n\n${msg}` });
+                                setAiResult({ framing: "", focusPoint: "", bestArea: "", worstArea: "", summary: `오류가 발생했어요.\n\n${msg}` });
                               } finally {
                                 interpretationInFlightDatesRef.current.delete(dateKey);
                                 setAiLoading(false);
@@ -1893,6 +1897,9 @@ const normalizedBirthDisplay = useMemo(() => {
                       {/* 결과 */}
                       {aiResult && (
                         <div>
+                          {aiResult.framing !== "" && (
+                            <p className={styles.flowFraming}>{aiResult.framing}</p>
+                          )}
                           {aiResult.focusPoint !== "" && (
                             <p className={styles.flowSubtitle}>{aiResult.focusPoint}</p>
                           )}
