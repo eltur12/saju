@@ -46,11 +46,11 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
         int year  = widgetPrefs.getInt("display_year",  now.get(Calendar.YEAR));
         int month = widgetPrefs.getInt("display_month", now.get(Calendar.MONTH) + 1);
 
-        // 월간 운세 점수 배열 (1-indexed)
         int[] scores = new int[32];
         SharedPreferences prefs = context.getSharedPreferences(
                 FortuneWidget.PREFS_NAME, Context.MODE_PRIVATE);
         String raw = prefs.getString("widget_monthly_" + year + "_" + month, null);
+
         if (raw != null) {
             try {
                 JSONObject json     = new JSONObject(raw);
@@ -61,10 +61,9 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
             } catch (Exception ignored) {}
         }
 
-        // 달력 셀 구성
         Calendar cal = Calendar.getInstance();
         cal.set(year, month - 1, 1);
-        int firstDow     = cal.get(Calendar.DAY_OF_WEEK) - 1; // 0=일
+        int firstDow     = cal.get(Calendar.DAY_OF_WEEK) - 1;
         int daysInMonth  = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
         int todayYear    = now.get(Calendar.YEAR);
         int todayMonth   = now.get(Calendar.MONTH) + 1;
@@ -72,13 +71,12 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
         int defaultDay   = (year == todayYear && month == todayMonth) ? todayDay : 1;
         int selectedDay  = widgetPrefs.getInt("selected_day", defaultDay);
 
-        // 첫날 이전 빈 셀
         for (int i = 0; i < firstDow; i++) {
             CellData c = new CellData();
             c.day = 0;
             cells.add(c);
         }
-        // 날짜 셀
+
         for (int day = 1; day <= daysInMonth; day++) {
             CellData c  = new CellData();
             c.day        = day;
@@ -88,7 +86,7 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
             c.dow        = (firstDow + day - 1) % 7;
             cells.add(c);
         }
-        // 7의 배수로 패딩
+
         while (cells.size() % 7 != 0) {
             CellData c = new CellData();
             c.day = 0;
@@ -111,33 +109,55 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
             rv.setTextViewText(R.id.cell_day,   String.valueOf(cell.day));
             rv.setTextViewText(R.id.cell_score, cell.score > 0 ? String.valueOf(cell.score) : "");
 
-            // 날짜 색상 + 오늘 배경
             int dayColor;
-            if (cell.isToday) {
-                rv.setInt(R.id.cell_root, "setBackgroundResource", R.drawable.cell_today_bg);
+
+            if (cell.isSelected) {
+                rv.setInt(R.id.cell_root, "setBackgroundResource", R.drawable.cell_selected_bg);
+
+                if (cell.isToday) {
+                    dayColor = Color.parseColor("#1BC4A8");
+                } else if (cell.dow == 0) {
+                    dayColor = Color.parseColor("#FF8A8A");
+                } else if (cell.dow == 6) {
+                    dayColor = Color.parseColor("#8AB4FF");
+                } else {
+                    dayColor = Color.parseColor("#FFFFFF");
+                }
+            } else if (cell.isToday) {
+                rv.setInt(R.id.cell_root, "setBackgroundColor", Color.TRANSPARENT);
                 dayColor = Color.parseColor("#1BC4A8");
-            } else if (cell.isSelected) {
-                rv.setInt(R.id.cell_root, "setBackgroundColor", Color.parseColor("#25FFFFFF"));
-                if      (cell.dow == 0) dayColor = Color.parseColor("#CC884444");
-                else if (cell.dow == 6) dayColor = Color.parseColor("#CC7777CC");
-                else                    dayColor = Color.parseColor("#CCF0F0F0");
             } else {
                 rv.setInt(R.id.cell_root, "setBackgroundColor", Color.TRANSPARENT);
-                if      (cell.dow == 0) dayColor = Color.parseColor("#CC884444");
-                else if (cell.dow == 6) dayColor = Color.parseColor("#CC7777CC");
-                else                    dayColor = Color.parseColor("#CCF0F0F0");
+                if (cell.dow == 0) {
+                    dayColor = Color.parseColor("#CC884444");
+                } else if (cell.dow == 6) {
+                    dayColor = Color.parseColor("#CC7777CC");
+                } else {
+                    dayColor = Color.parseColor("#CCF0F0F0");
+                }
             }
+
             rv.setTextColor(R.id.cell_day, dayColor);
 
-            // 점수 색상
+            if (cell.isSelected) {
+                rv.setFloat(R.id.cell_day, "setTextSize", 15f);
+                rv.setFloat(R.id.cell_day, "setAlpha", 1.0f);
+                rv.setFloat(R.id.cell_score, "setAlpha", 1.0f);
+                rv.setFloat(R.id.cell_score, "setTextSize", 11f);
+            } else {
+                rv.setFloat(R.id.cell_day, "setTextSize", 14f);
+                rv.setFloat(R.id.cell_day, "setAlpha", 0.9f);
+                rv.setFloat(R.id.cell_score, "setAlpha", 0.88f);
+                rv.setFloat(R.id.cell_score, "setTextSize", 10f);
+            }
+
             int scoreColor;
             if      (cell.score >= 75) scoreColor = Color.parseColor("#FFD700");
-            else if (cell.score >= 65) scoreColor = Color.parseColor("#88DD88");
+            else if (cell.score >= 65) scoreColor = Color.parseColor("#1BC4A8");
             else if (cell.score >= 55) scoreColor = Color.parseColor("#AAAAAA");
             else                       scoreColor = Color.parseColor("#FF6666");
             rv.setTextColor(R.id.cell_score, scoreColor);
 
-            // 날짜 클릭 인텐트 — 모든 자식 뷰에도 적용해야 클릭이 확실히 잡힘
             Bundle extras = new Bundle();
             extras.putInt(FortuneWidget.EXTRA_DAY, cell.day);
             Intent fillIn = new Intent();
@@ -155,7 +175,8 @@ public class FortuneWidgetFactory implements RemoteViewsService.RemoteViewsFacto
         rv.setTextViewText(R.id.cell_score, "");
         return rv;
     }
-    @Override public int         getViewTypeCount() { return 1; }
-    @Override public long        getItemId(int pos) { return pos; }
-    @Override public boolean     hasStableIds()     { return false; }
+
+    @Override public int     getViewTypeCount() { return 1; }
+    @Override public long    getItemId(int pos) { return pos; }
+    @Override public boolean hasStableIds()     { return false; }
 }

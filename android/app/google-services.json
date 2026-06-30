@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "482368141062",
+    "project_id": "haru-ondo",
+    "storage_bucket": "haru-ondo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:482368141062:android:50e816415f6e0c327e9087",
+        "android_client_info": {
+          "package_name": "com.saju.fortune"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAqEqPCjM0cDyNLWiD1cstRYPH-x_ecCw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

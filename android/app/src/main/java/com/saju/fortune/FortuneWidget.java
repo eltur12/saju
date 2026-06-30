@@ -62,6 +62,15 @@ public class FortuneWidget extends AppWidgetProvider {
         if (action == null) return;
 
         AppWidgetManager mgr = AppWidgetManager.getInstance(context);
+
+        if (Intent.ACTION_DATE_CHANGED.equals(action)) {
+            resetToCurrentMonth(context);
+            NativeNotificationScheduler.scheduleToday(context);
+            int[] ids = mgr.getAppWidgetIds(new ComponentName(context, FortuneWidget.class));
+            for (int id : ids) updateWidget(context, mgr, id);
+            return;
+        }
+
         int widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
 
         if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
@@ -77,10 +86,10 @@ public class FortuneWidget extends AppWidgetProvider {
         switch (action) {
             case Intent.ACTION_DATE_CHANGED: {
                 resetToCurrentMonth(context);
+                NativeNotificationScheduler.scheduleToday(context);
                 break;
             }
             case ACTION_DAY_CLICK: {
-                // 탭 전환 없이 하단 상세만 업데이트
                 int day = intent.getIntExtra(EXTRA_DAY, 0);
                 if (day > 0) {
                     editor.putInt("selected_day", day).apply();
@@ -91,38 +100,54 @@ public class FortuneWidget extends AppWidgetProvider {
                 SharedPreferences p2 = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
                 int cy = p2.getInt("display_year",  now.get(Calendar.YEAR));
                 int cm = p2.getInt("display_month", now.get(Calendar.MONTH) + 1);
+                int selected = p2.getInt("selected_day", 1);
+
                 int py = (cm == 1) ? cy - 1 : cy;
                 int pm = (cm == 1) ? 12 : cm - 1;
-                // 월 이동 시 selected_day 초기화 (새 달의 1일)
-                editor.putInt("display_year", py).putInt("display_month", pm)
-                      .putInt("selected_day", 1).commit();
+
+                Calendar targetCal = Calendar.getInstance();
+                targetCal.set(py, pm - 1, 1);
+                int maxDay = targetCal.getActualMaximum(Calendar.DAY_OF_MONTH);
+                int nextSelected = Math.min(selected, maxDay);
+
+                editor.putInt("display_year", py)
+                        .putInt("display_month", pm)
+                        .putInt("selected_day", nextSelected)
+                        .commit();
                 break;
             }
             case ACTION_NEXT_MONTH: {
                 SharedPreferences p2 = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
                 int cy = p2.getInt("display_year",  now.get(Calendar.YEAR));
                 int cm = p2.getInt("display_month", now.get(Calendar.MONTH) + 1);
+                int selected = p2.getInt("selected_day", 1);
+
                 int ny = (cm == 12) ? cy + 1 : cy;
                 int nm = (cm == 12) ? 1 : cm + 1;
-                editor.putInt("display_year", ny).putInt("display_month", nm)
-                      .putInt("selected_day", 1).commit();
+
+                Calendar targetCal = Calendar.getInstance();
+                targetCal.set(ny, nm - 1, 1);
+                int maxDay = targetCal.getActualMaximum(Calendar.DAY_OF_MONTH);
+                int nextSelected = Math.min(selected, maxDay);
+
+                editor.putInt("display_year", ny)
+                        .putInt("display_month", nm)
+                        .putInt("selected_day", nextSelected)
+                        .commit();
                 break;
             }
             case ACTION_TODAY: {
                 editor.putInt("display_year",  now.get(Calendar.YEAR))
-                      .putInt("display_month", now.get(Calendar.MONTH) + 1)
-                      .putInt("selected_day",  now.get(Calendar.DAY_OF_MONTH))
-                      .apply();
+                        .putInt("display_month", now.get(Calendar.MONTH) + 1)
+                        .putInt("selected_day",  now.get(Calendar.DAY_OF_MONTH))
+                        .apply();
                 break;
             }
         }
 
         int[] currentIds = mgr.getAppWidgetIds(new ComponentName(context, FortuneWidget.class));
-        if (ACTION_DAY_CLICK.equals(action)) {
-            SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
-            for (int id : currentIds) updateDetailOnly(context, mgr, id, prefs);
-        } else {
-            for (int id : currentIds) updateWidget(context, mgr, id);
+        for (int id : currentIds) {
+            updateWidget(context, mgr, id);
         }
     }
 
@@ -134,8 +159,6 @@ public class FortuneWidget extends AppWidgetProvider {
         SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
         showCalendar(context, mgr, widgetId, prefs, refreshGrid);
     }
-
-    // ── 달력 뷰 ──────────────────────────────────────────────────────────────
 
     private static void updateDetailOnly(Context context, AppWidgetManager mgr,
                                          int widgetId, SharedPreferences widgetPrefs) {
@@ -153,7 +176,13 @@ public class FortuneWidget extends AppWidgetProvider {
         int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
         if (selectedDay < 1 || selectedDay > daysInMonth) selectedDay = 1;
 
-        views.setTextViewText(R.id.tv_detail_date, month + "월 " + selectedDay + "일");
+        boolean isTodayDetail =
+                year == now.get(Calendar.YEAR) &&
+                        month == now.get(Calendar.MONTH) + 1 &&
+                        selectedDay == now.get(Calendar.DAY_OF_MONTH);
+
+        String detailDateText = month + "월 " + selectedDay + "일" + (isTodayDetail ? " · 오늘" : "");
+        views.setTextViewText(R.id.tv_detail_date, detailDateText);
 
         SharedPreferences mainPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String raw = mainPrefs.getString("widget_monthly_" + year + "_" + month, null);
@@ -191,7 +220,6 @@ public class FortuneWidget extends AppWidgetProvider {
         int month = widgetPrefs.getInt("display_month", now.get(Calendar.MONTH) + 1);
         views.setTextViewText(R.id.tv_month_title, year + "년 " + month + "월");
 
-        // GridView 어댑터
         Intent serviceIntent = new Intent(context, FortuneWidgetService.class);
         serviceIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
         serviceIntent.setData(Uri.parse(serviceIntent.toUri(Intent.URI_INTENT_SCHEME)));
@@ -225,7 +253,13 @@ public class FortuneWidget extends AppWidgetProvider {
         int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
         if (selectedDay < 1 || selectedDay > daysInMonth) selectedDay = 1;
 
-        views.setTextViewText(R.id.tv_detail_date, month + "월 " + selectedDay + "일");
+        boolean isTodayDetail =
+                year == now.get(Calendar.YEAR) &&
+                        month == now.get(Calendar.MONTH) + 1 &&
+                        selectedDay == now.get(Calendar.DAY_OF_MONTH);
+
+        String detailDateText = month + "월 " + selectedDay + "일" + (isTodayDetail ? " · 오늘" : "");
+        views.setTextViewText(R.id.tv_detail_date, detailDateText);
 
         SharedPreferences mainPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String raw = mainPrefs.getString("widget_monthly_" + year + "_" + month, null);
@@ -290,13 +324,11 @@ public class FortuneWidget extends AppWidgetProvider {
     }
 
     private static int scoreColor(int score) {
-        if (score >= 75) return Color.parseColor("#FFD700");
-        if (score >= 65) return Color.parseColor("#88DD88");
-        if (score >= 55) return Color.parseColor("#AAAAAA");
+        if (score >= 85) return Color.parseColor("#FFD700");
+        if (score >= 75) return Color.parseColor("#1BC4A8");
+        if (score >= 61) return Color.parseColor("#AAAAAA");
         return Color.parseColor("#FF6666");
     }
-
-    // ── 헬퍼 ──────────────────────────────────────────────────────────────────
 
     private static int actionOffset(String action) {
         switch (action) {
@@ -319,7 +351,7 @@ public class FortuneWidget extends AppWidgetProvider {
     }
 
     private static PendingIntent makeDetailIntent(Context context, int widgetId,
-                                                   int year, int month, int day) {
+                                                  int year, int month, int day) {
         Uri uri = Uri.parse("saju://fortune/detail?year=" + year + "&month=" + month + "&day=" + day);
         Intent intent = new Intent(Intent.ACTION_VIEW, uri);
         intent.setPackage(context.getPackageName());

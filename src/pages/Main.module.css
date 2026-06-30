@@ -1,29 +1,26 @@
 /* ══════════════════════════════════════
-   Base
+   Design tokens
    ══════════════════════════════════════ */
 .container {
-  --bg:             #0f1729;
-  --bg-card:        #1a2540;
-  --bg-tab:         #162035;
-  --accent:         #c9a84c;
-  --accent-rgb:     201,168,76;
-  --accent2:        #4caf7d;
-  --accent2-rgb:    76,175,125;
-  --text:           #e8e8e8;
-  --text-sub:       #aabbcc;
-  --text-muted:     #8899aa;
-  --text-muted-rgb: 136,153,170;
-  --text-dim:       #5a6a7a;
-  --col-sun:        #e05c5c;
-  --col-sat:        #4c8faf;
-  --danger:         #e05c5c;
-  --danger-rgb:     224,92,92;
-  --today-bg:       #c9a84c;
-  --today-fg:       #0f1729;
-  --cell-hover:     rgba(255,255,255,0.05);
-  --item-bg:        rgba(255,255,255,0.04);
-  --divider:        rgba(201,168,76,0.15);
-  --divider-plain:  rgba(255,255,255,0.07);
+  --bg:           #f7f8fa;
+  --card:         #ffffff;
+  --text:         #111111;
+  --text-sub:     #444444;
+  --text-muted:   #888888;
+  --text-dim:     #bbbbbb;
+  --border:       #e5e7eb;
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.06);
+  --shadow-md:    0 2px 12px rgba(0,0,0,0.08);
+  --accent-mint:       #3aab8c;
+  --accent-mint-bg:    rgba(58,171,140,0.08);
+  --accent-mint-light: rgba(58,171,140,0.12);
+  --accent-gold:       #c9912a;
+  --accent-gold-bg:    rgba(201,145,42,0.08);
+  --accent-gold-light: rgba(201,145,42,0.14);
+  --danger:       #e05c5c;
+  --danger-bg:    rgba(224,92,92,0.08);
+  --col-sun:      #e05c5c;
+  --col-sat:      #3aab8c;
 
   min-height: 100dvh;
   background: var(--bg);
@@ -32,76 +29,102 @@
   flex-direction: column;
   max-width: 390px;
   margin: 0 auto;
+  font-family: 'Apple SD Gothic Neo', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* ── Header ── */
+/* ══════════════════════════════════════
+   Header
+   ══════════════════════════════════════ */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.2rem 0.6rem;
+  padding: 1rem 1.2rem 0.7rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
 }
 
 .headerNav {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 
 .navBtn {
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--text-muted);
   font-size: 1.3rem;
   cursor: pointer;
-  padding: 0.3rem;
+  padding: 0.25rem 0.4rem;
   line-height: 1;
+  border-radius: 8px;
+  transition: background 0.15s;
 }
+.navBtn:hover { background: var(--bg); }
 
 .headerTitle {
-  font-size: 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
   color: var(--text);
-  letter-spacing: 0.05em;
-  min-width: 80px;
+  min-width: 120px;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .settingsBtn {
-  background: none;
+  background: transparent;
   border: none;
-  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 8px;
   font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.3rem;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.55);
+}
+.settingsBtn:hover { background: var(--bg); }
+
+.settingsBtn:active {
+  background: rgba(0,0,0,0.05);
 }
 
-/* ── Tab Bar ── */
+/* ══════════════════════════════════════
+   Tab Bar
+   ══════════════════════════════════════ */
 .tabBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.2rem 0.7rem;
-  border-bottom: 1px solid var(--divider-plain);
+  padding: 0.6rem 1.2rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
 }
 
 .todayBtn {
-  background: rgba(var(--accent-rgb),0.12);
-  border: 1px solid rgba(var(--accent-rgb),0.4);
-  color: var(--accent);
+  background: var(--accent-mint-bg);
+  border: 1.5px solid var(--accent-mint);
+  color: var(--accent-mint);
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 0.3rem 0.75rem;
+  padding: 0.28rem 0.75rem;
   border-radius: 8px;
-  line-height: 1.5;
+  font-family: inherit;
   transition: background 0.15s;
 }
-
-.todayBtn:hover { background: rgba(var(--accent-rgb),0.22); }
+.todayBtn:hover { background: var(--accent-mint-light); }
+.todayBtn:disabled {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-muted);
+  cursor: default;
+}
 
 .tabBtns {
   display: flex;
-  background: var(--bg-tab);
+  background: var(--bg);
   border-radius: 10px;
   padding: 3px;
   gap: 2px;
@@ -112,82 +135,147 @@
   border: none;
   color: var(--text-muted);
   font-size: 0.78rem;
+  font-family: inherit;
   cursor: pointer;
-  padding: 0.3rem 1rem;
+  padding: 0.28rem 1rem;
   border-radius: 8px;
   transition: background 0.15s, color 0.15s;
   line-height: 1.5;
 }
-
 .tabBtnActive {
-  background: var(--bg-card);
-  color: var(--accent);
+  background: var(--card);
+  color: var(--accent-mint);
   font-weight: 700;
+  box-shadow: var(--shadow-sm);
 }
+
+/* ══════════════════════════════════════
+   Score colors (shared)
+   ══════════════════════════════════════ */
+.score-gold  { color: var(--accent-gold); }
+.score-green { color: var(--accent-mint); }
+.score-gray  { color: var(--text-muted); }
+.score-red   { color: var(--danger); }
 
 /* ══════════════════════════════════════
    Calendar Tab
    ══════════════════════════════════════ */
 .calendarView {
   flex: 1;
-  padding: 0.6rem 0.8rem 4rem;
+  padding: 0.8rem 1rem 4rem;
   overflow-y: auto;
+}
+
+.monthInfoBar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0 0.25rem;
+}
+
+.monthInfoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #f2f2f7;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  color: #555555;
+  white-space: nowrap;
+  border: 1px solid #e5e5ea;
+}
+
+.monthInfoBadge strong {
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.calendarCard {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 0.75rem 0.5rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .calendarHeader {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
   margin-bottom: 0.3rem;
+  padding: 0 0.25rem;
 }
 
 .dayName {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 0.68rem;
   color: var(--text-dim);
-  padding: 0.3rem 0;
+  padding: 0.3rem 4px;
+  font-weight: 500;
 }
-
 .dayName-sun { color: var(--col-sun); }
 .dayName-sat { color: var(--col-sat); }
 
 .calendarGrid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 2px;
+  padding: 0 0.25rem;
 }
 
 .cell {
-  aspect-ratio: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background 0.15s;
-  padding: 2px;
+  padding: 4px;
   gap: 1px;
-  border: 1px solid transparent;
+  min-height: 52px;
+  border: 2px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  overflow: hidden;
+}
+.cell:hover     { background: rgba(0,0,0,0.04); }
+.cellEmpty      { cursor: default; }
+.cellSelected   {
+  border-color: var(--accent-mint);
+  background: var(--accent-mint-bg);
+  outline: none;
+}
+.cellToday      {
+  outline: 2px solid rgba(201,145,42,0.6);
+  outline-offset: -2px;
+}
+.cellDim {
+  opacity: 0.38;
 }
 
-.cell:hover { background: var(--cell-hover); }
-.cellEmpty  { cursor: default; }
-
-.cellSelected {
-  border-color: var(--accent) !important;
-  background: rgba(var(--accent-rgb),0.12);
+.cellDim:hover {
+  background: transparent;
+  cursor: default;
 }
 
-.cellToday {
-  border-color: rgba(var(--accent-rgb),0.45) !important;
+.cellDim .solarDay {
+  color: var(--text-dim);
+}
+
+.cellDim .lunarDay,
+.cellDim .scoreNum {
+  display: none;
 }
 
 .solarDay {
-  font-size: 0.88rem;
+  font-size: 1rem;
+  font-weight: 400;
   line-height: 1;
   color: var(--text);
 }
-
 .solarDay-sun { color: var(--col-sun); }
 .solarDay-sat { color: var(--col-sat); }
 
@@ -198,29 +286,40 @@
   width: 1.45rem;
   height: 1.45rem;
   border-radius: 50%;
-  background: var(--today-bg);
-  color: var(--today-fg) !important;
+  background: var(--accent-gold);
+  color: #ffffff !important;
   font-size: 0.82rem;
   font-weight: 700;
   line-height: 1;
 }
 
 .lunarDay {
-  font-size: 0.55rem;
-  color: var(--text-dim);
+  font-size: 0.625rem;
+  color: #b0b0b8;
   line-height: 1;
 }
 
 .scoreNum {
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1;
+  position: relative;
 }
 
-.score-gold  { color: var(--accent); }
-.score-green { color: var(--accent2); }
-.score-gray  { color: var(--text-muted); }
-.score-red   { color: var(--danger); }
+.scoreNum--best::after,
+.scoreNum--worst::after {
+  content: "";
+  position: absolute;
+  left: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.scoreNum--best::after  { background: var(--accent-gold); }
+.scoreNum--worst::after { background: var(--danger); }
 
 .loading {
   display: flex;
@@ -228,9 +327,147 @@
   justify-content: center;
   padding: 3rem;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   gap: 0.5rem;
 }
+
+/* ── Calendar Preview Card ── */
+.previewCard {
+  margin-top: 0.8rem;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  cursor: pointer;
+}
+
+.previewLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.previewDate {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.previewLunar {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.previewFlowBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.28rem;
+}
+
+.previewFlowRow {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.previewFlowLabel {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.previewFlowCat {
+  font-size: 0.7rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.previewFlowChip {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Focus / Daily Highlight 단일 표시 */
+.previewFlowSingle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.previewFlowMain {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.previewFlowSub {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  line-height: 1.2;
+}
+
+.previewFlowCategory {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 0.1rem;
+}
+
+/* ── Focus polarity 표시 정책 (V3.1) ── */
+/* positive: 기존 스타일 유지 */
+.focusPositive {
+}
+
+/* mixed: 중립 톤, 화살표 없음 */
+.focusMixed {
+  color: var(--text-muted);
+}
+
+/* negative: 부드러운 주의 톤 (경고/공포 금지 — 빨강 대신 차분한 골드) */
+.focusNegative {
+  color: var(--accent-gold);
+}
+
+.previewRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.previewScore {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.previewBtn {
+  background: var(--accent-mint-bg);
+  border: 1.5px solid var(--accent-mint);
+  color: var(--accent-mint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.28rem 0.75rem;
+  border-radius: 8px;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.previewBtn:hover { background: var(--accent-mint-light); }
 
 /* ══════════════════════════════════════
    Detail Tab
@@ -238,10 +475,36 @@
 .detailView {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem 1.2rem 4rem;
+  padding: 0.8rem 1rem 4rem;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.8rem;
+}
+
+/* ══════════════════════════════════════
+   Profile Tab
+   ══════════════════════════════════════ */
+.profileView {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.8rem 1rem 4rem;
+}
+
+.profileContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.profileTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profileSubtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .detailEmpty {
@@ -251,106 +514,875 @@
   align-items: center;
   justify-content: center;
   gap: 0.8rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-size: 0.85rem;
   text-align: center;
 }
-
-.detailEmptyIcon {
-  font-size: 2.4rem;
-  opacity: 0.5;
-}
-
+.detailEmptyIcon { font-size: 2.4rem; opacity: 0.4; }
 .detailEmptyBtn {
-  margin-top: 0.4rem;
-  background: rgba(var(--accent-rgb),0.12);
-  border: 1px solid rgba(var(--accent-rgb),0.4);
-  color: var(--accent);
+  background: var(--accent-mint-bg);
+  border: 1.5px solid var(--accent-mint);
+  color: var(--accent-mint);
   font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
   padding: 0.4rem 1rem;
   border-radius: 8px;
+  font-family: inherit;
 }
 
-/* 날짜 + 점수 + 뱃지 */
-.detailTopRow {
+/* ── Hero Card ── */
+.heroCard {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 1.2rem 1.2rem 1rem;
+  box-shadow: var(--shadow-md);
+}
+
+.heroMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.heroDateNav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.9rem;
-}
-
-.detailDate {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.3;
-}
-
-.detailLunar {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin-top: 0.15rem;
-}
-
-.detailScoreInline {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
   gap: 0.3rem;
 }
 
-.detailScoreNum {
-  font-size: 2rem;
-  font-weight: 800;
+.dayNavBtn {
+  background: none;
+  border: none;
+  padding: 0.6rem 0.55rem;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  cursor: pointer;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
 }
 
-/* 뱃지 */
+.heroDate {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.heroLunar {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.heroScoreMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.heroScoreRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.heroScoreNum {
+  font-size: 3.75rem;
+  font-weight: 100;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.heroScoreDivider {
+  height: 2px;
+  width: 100%;
+  margin-top: 0.5rem;
+  border-radius: 1px;
+  opacity: 0.35;
+}
+
+
+/* ── Day Summary Row (compact 3-col, lives inside heroCard) ── */
+.daySummaryRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  background: #f9f9f9;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 0.7rem;
+}
+.daySummaryCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  border-right: 1px solid #ececec;
+  gap: 0.16rem;
+}
+.daySummarySep {
+  display: none;
+}
+.daySummaryCellLabel {
+  font-size: 0.625rem;
+  color: #8e8e93;
+  font-weight: 500;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+.daySummaryCellVal {
+  font-size: 1rem;
+  font-weight: 200;
+  line-height: 1.2;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.daySummaryPos { color: var(--accent-mint); }
+.daySummaryNeg { color: var(--danger); }
+.daySummaryNeutral { color: var(--text-muted); }
+
+.daySummaryCellNav {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s;
+}
+.daySummaryCellNav:active {
+  opacity: 0.6;
+}
+
+/* Badge */
 .badge {
   display: inline-block;
-  padding: 0.2rem 0.6rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 20px;
   font-size: 0.72rem;
   font-weight: 700;
 }
+.badge-아주좋음 { background: var(--accent-gold-bg);  color: var(--accent-gold); border: 1px solid var(--accent-gold); }
+.badge-좋음     { background: var(--accent-mint-bg);  color: var(--accent-mint); border: 1px solid var(--accent-mint); }
+.badge-보통     { background: rgba(136,136,136,0.1);   color: var(--text-muted);  border: 1px solid var(--text-muted); }
+.badge-주의     { background: var(--danger-bg);        color: var(--danger);      border: 1px solid var(--danger); }
 
-.badge-대길 { background: rgba(var(--accent-rgb),0.2);      color: var(--accent);      border: 1px solid var(--accent); }
-.badge-길   { background: rgba(var(--accent2-rgb),0.2);     color: var(--accent2);     border: 1px solid var(--accent2); }
-.badge-보통 { background: rgba(var(--text-muted-rgb),0.2);  color: var(--text-muted);  border: 1px solid var(--text-muted); }
-.badge-주의 { background: rgba(var(--danger-rgb),0.2);      color: var(--danger);      border: 1px solid var(--danger); }
-
-/* 요약 문구 */
-.detailSummaryBox {
-  font-size: 0.85rem;
-  color: var(--text-sub);
-  line-height: 1.6;
-  border-left: 3px solid var(--accent);
-  padding: 0.6rem 0.9rem;
-  border-radius: 0 8px 8px 0;
-  background: rgba(var(--accent-rgb),0.06);
-  margin-bottom: 1rem;
+/* ── Now / Best Cards ── */
+.cardsRow {
+  display: flex;
+  gap: 0.6rem;
 }
 
-/* 섹션 */
+.nowCard,
+.bestCard {
+  flex: 1;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.nowCard  { border-top: 3px solid var(--accent-mint); }
+.bestCard { border-top: 3px solid var(--accent-gold); }
+
+.cardLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.1rem;
+}
+
+.cardTime {
+  font-size: 0.78rem;
+  color: var(--text-sub);
+  font-weight: 500;
+}
+
+.cardTags {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.cardScore {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: 0.2rem;
+}
+.cardScore-mint { color: var(--accent-mint); }
+.cardScore-gold { color: var(--accent-gold); }
+
+/* ── Detail Section ── */
 .detailSection {
-  margin-bottom: 1rem;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .sectionTitle {
   font-size: 0.65rem;
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-bottom: 0.6rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.7rem;
   padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--divider-plain);
+  border-bottom: 1px solid var(--border);
 }
 
-/* 점수 그리드 */
+/* ── 오늘의 흐름 (AI 해석) ── */
+.flowFraming {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 0.875rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--accent-mint);
+  line-height: 1.55;
+}
+
+.flowEmptyHint {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.flowBtn {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-main);
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-align: center;
+}
+.flowBtn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.flowAdNotice {
+  margin-bottom: 0.75rem;
+}
+.flowAdNotice p {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+  text-align: left;
+}
+.flowAdNotice p + p {
+  margin-top: 0.25rem;
+}
+
+.flowLoading {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0.4rem 0;
+}
+
+.flowSubtitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.4;
+  margin-bottom: 0.75rem;
+}
+
+.flowSummary {
+  font-size: 0.875rem;
+  color: var(--text-sub);
+  line-height: 1.75;
+}
+.flowSummary p {
+  margin: 0;
+}
+
+.flowBlock {
+  margin-bottom: 1rem;
+}
+.flowBlock:last-child {
+  margin-bottom: 0;
+}
+
+.flowLabel {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.4rem;
+}
+.flowLabelBest {
+  background: var(--accent-mint-bg);
+  color: var(--accent-mint);
+}
+.flowLabelWorst {
+  background: var(--accent-gold-bg);
+  color: var(--accent-gold);
+}
+
+.flowBlockSummary {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ── AI 해석 카드 레이아웃 ── */
+.aiCardList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.aiCard {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 1rem 1.375rem;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07), 0 0.5px 2px rgba(0,0,0,0.04);
+}
+
+.aiCardFlow {
+  padding: 1.25rem 1.5rem;
+}
+
+.aiCardTitle {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.625rem;
+}
+
+.aiCardTitleGreen  { color: var(--accent-mint); }
+.aiCardTitleOrange { color: var(--accent-gold); }
+.aiCardTitlePurple { color: #7c5cbf; }
+
+.aiFraming {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem 0;
+}
+
+.aiFocus {
+  font-size: 0.9375rem;
+  color: var(--text-sub);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.aiBody {
+  font-size: 0.9375rem;
+  color: var(--text-main);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Radar Chart ── */
+.radarSection {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  box-shadow: var(--shadow-sm);
+  margin-top: 0.2rem;
+}
+
+.radarSvg {
+  width: 45%;
+  flex-shrink: 0;
+  display: block;
+}
+
+.radarStroke {
+  stroke-dasharray: 700;
+  stroke-dashoffset: 700;
+  animation: radarDraw 0.5s ease-out forwards;
+}
+
+.radarFill {
+  animation: radarFadeIn 0.3s ease-out 0.35s forwards;
+}
+
+@keyframes radarDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes radarFadeIn {
+  to { fill-opacity: 0.13; }
+}
+
+.radarBars {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+  justify-content: center;
+}
+
+.radarBarRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.radarBarLabel {
+  font-size: 0.74rem;
+  color: var(--text-sub);
+  width: 2.4rem;
+  flex-shrink: 0;
+}
+
+.radarBarTrack {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.radarBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-mint);
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: barFill 0.5s ease-out forwards;
+}
+
+@keyframes barFill {
+  to { transform: scaleX(1); }
+}
+
+.radarBarVal {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+  width: 1.6rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Category Bars (expandable) ── */
+.catBarsSectionHeader {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.6rem 1rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+
+/* ── Highlight Section (Focus & Daily Highlight) ── */
+.highlightSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.highlightCard {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.highlightLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.highlightMain {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.highlightChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.2rem;
+}
+
+/* ── 오늘의 흐름 요소 (Focus 카드보다 약한 단순 칩 카드) ── */
+.flowElemCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.flowElemTitle {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.flowElemSub {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.flowElemChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.analysisHint {
+  padding: 0 0.2rem;
+  font-size: 0.67rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  opacity: 0.72;
+  margin: -0.2rem 0 -0.1rem;
+  text-align: center;
+}
+
+.catBarsSection {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.catBarRow {
+  border-bottom: 1px solid var(--border);
+}
+.catBarRow:last-child {
+  border-bottom: none;
+}
+
+.catBarHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.catBarLabel {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #555555;
+  width: 2rem;
+  flex-shrink: 0;
+}
+
+.catBarVal {
+  font-size: 0.875rem;
+  font-weight: 700;
+  width: 1.75rem;
+  flex-shrink: 0;
+  text-align: left;
+  color: #1a1a1a;
+}
+
+.catBarTrack {
+  flex: 1;
+  height: 5px;
+  background: #e5e5ea;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.catBarFill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #2a9d5c, #52c98a);
+  transition: width 0.6s cubic-bezier(.4,0,.2,1);
+  animation: barGrow 0.4s ease both;
+}
+
+@keyframes barGrow {
+  from { width: 0 !important; }
+}
+
+.catBarChevron {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 0.8rem;
+  text-align: center;
+}
+
+.catBarExpanded {
+  padding: 0.5rem 1rem 0.65rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface, var(--bg));
+}
+
+.catEventsHeader {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.catBarChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.catBarNoData {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* ── Reason Card ── */
+.reasonCard {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 0 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.reasonCardTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.reasonCardSubtitle {
+  font-size: 0.58rem;
+  color: var(--text-sub, var(--text-muted));
+  opacity: 0.8;
+  letter-spacing: 0.04em;
+}
+
+.reasonCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.reasonCardTitle {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.reasonCardToggle {
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.reasonCardBody {
+  padding-bottom: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+
+.reasonChip {
+  font-size: 0.62rem;
+  padding: 0.16rem 0.52rem;
+  border-radius: 99px;
+  border: 1px solid rgba(120, 170, 150, 0.18);
+  color: rgba(45, 60, 55, 0.82);
+  background: rgba(120, 150, 140, 0.08);
+  white-space: nowrap;
+}
+
+/* Focus source 요소 - 노란색 칩 */
+.reasonChipFocus {
+  border: 1px solid rgba(201, 145, 42, 0.3);
+  color: rgba(120, 85, 20, 0.9);
+  background: rgba(201, 145, 42, 0.12);
+  font-weight: 600;
+}
+
+/* reasonChipPos and reasonChipNeg intentionally neutral */
+
+.reasonChipClickable {
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.reasonChipClickable:active {
+  opacity: 0.55;
+}
+
+.reasonChipSmall {
+  font-size: 0.58rem;
+  padding: 0.12rem 0.42rem;
+}
+
+.previewFlowChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  margin-top: 0.15rem;
+}
+
+/* ── EventInfo Bottom Sheet ── */
+.eventInfoSheet {
+  max-height: 72vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.eventInfoTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.eventInfoShort {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 0.75rem;
+}
+
+.eventInfoDetail {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.75;
+  margin: 0 0 0;
+}
+
+.eventInfoSection {
+  border-top: 1px solid var(--border);
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+}
+
+.eventInfoSectionLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.45rem;
+}
+
+.eventInfoList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.eventInfoList li {
+  font-size: 0.79rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-left: 0.8rem;
+  position: relative;
+}
+
+.eventInfoList li::before {
+  content: "·";
+  position: absolute;
+  left: 0;
+  color: var(--border);
+}
+
+.eventInfoStateList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.eventInfoStateItem {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.79rem;
+  color: var(--text-muted);
+}
+
+.polarityPos {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(60, 145, 110, 0.9);
+  min-width: 0.7rem;
+  line-height: 1;
+}
+
+.polarityNeg {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(185, 90, 70, 0.9);
+  min-width: 0.7rem;
+  line-height: 1;
+}
+
+.eventInfoFlowList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.eventInfoFlowItem {
+  font-size: 0.7rem;
+  padding: 0.14rem 0.48rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: transparent;
+}
+
+
+
+
+
+/* ── Category Score Grid ── */
 .scoreGrid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.5rem;
 }
 
@@ -358,7 +1390,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.22rem;
 }
 
 .scoreCat {
@@ -369,13 +1401,13 @@
 .scoreVal {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--text);
 }
 
 .scoreBar {
   width: 100%;
   height: 3px;
-  background: rgba(var(--text-muted-rgb),0.2);
+  background: var(--border);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -383,10 +1415,279 @@
 .scoreBarFill {
   height: 100%;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  background: linear-gradient(90deg, var(--accent-mint), var(--accent-gold));
 }
 
-/* 할 일 / 피할 일 */
+/* ── Time Segments ── */
+
+/* Card wrapper — mirrors catBarsSection */
+.segmentCard {
+  background: var(--card);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.segmentCardHeader {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 1rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+
+
+/* Segment detail card */
+.segmentDetail {
+  padding: 0.65rem 1rem 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.segmentDetailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.segmentDetailMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.segmentDetailScore {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.segmentNotifSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border);
+}
+
+.segmentNotifItem {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.segmentNotifTime {
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--accent-mint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.segmentNotifBody {
+  font-size: 0.63rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+
+/* Row item */
+.segmentItem {
+  border-bottom: 1px solid var(--border);
+}
+.segmentItem:last-child {
+  border-bottom: none;
+}
+.segmentItemNow {
+  background: rgba(58, 171, 140, 0.04);
+  border-left: 3px solid var(--accent-mint);
+}
+
+/* Row — 2층 column */
+.segmentRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.62rem 1rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 1층: 시간 범위 ↔ 상태/chevron */
+.segmentRowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.segmentTimeRange {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.segmentItemNow .segmentTimeRange {
+  color: var(--accent-mint);
+  font-weight: 600;
+}
+.segmentRowActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* 2층: 점수 + 바그래프 */
+.segmentRowBottom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.segmentScore {
+  font-size: 0.78rem;
+  font-weight: 700;
+  width: 1.8rem;
+  flex-shrink: 0;
+  text-align: right;
+}
+.segmentBarTrack {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.segmentBarFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.35s ease;
+  animation: fillBar 0.45s ease both;
+}
+
+/* Secondary group: delta + icons — dimmed, compact */
+.segmentSecondary {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+.segmentDeltaRise {
+  color: var(--accent-mint);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  opacity: 0.70;
+}
+.segmentDeltaDrop {
+  color: var(--danger);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  opacity: 0.70;
+}
+
+/* Chevron */
+.segmentChevron {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 0.8rem;
+  text-align: center;
+}
+
+/* Expanded area */
+.segmentExpanded {
+  padding: 0.5rem 1rem 0.6rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface, var(--bg));
+}
+
+/* Notification markers — inside secondary group, plain colored icons */
+.notiMarker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  line-height: 1;
+  font-weight: 700;
+}
+.notiMarkerFlow  { color: var(--accent-gold); }
+.notiMarkerLow   { color: var(--danger); }
+.notiMarkerPoint { color: var(--accent-mint); }
+
+/* Clock icon */
+.notiClockIcon {
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+/* Best/worst: outline chip — mint / neutral-gray */
+.segmentBadgeBest {
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: var(--accent-mint);
+  border: 1px solid rgba(58, 171, 140, 0.45);
+  padding: 0.05rem 0.44rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  line-height: 1.8;
+}
+.segmentBadgeWorst {
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: rgba(224, 92, 92, 0.8);
+  border: 1px solid rgba(224, 92, 92, 0.35);
+  padding: 0.05rem 0.44rem;
+  border-radius: 99px;
+  white-space: nowrap;
+  line-height: 1.8;
+}
+
+/* Chips inside expanded area */
+.segmentTopChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.segmentNoEvents {
+  font-size: 0.63rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* Scheduled notification hint */
+.notiScheduledHint {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.63rem;
+  color: var(--accent-mint);
+  background: var(--accent-mint-bg);
+  padding: 0.15rem 0.45rem;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+/* Legacy — kept for compat */
+.segmentMarker {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.segmentMarker-now    { background: var(--accent-mint-bg); color: var(--accent-mint); }
+.segmentMarker-best   { background: var(--accent-gold-bg); color: var(--accent-gold); }
+.segmentMarker-caution{ background: var(--danger-bg);      color: var(--danger); }
+
+/* ── Todo ── */
 .todoRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -396,20 +1697,16 @@
 .todoCol {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .todoTitle {
   font-size: 0.7rem;
-  color: var(--accent);
-  margin-bottom: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
+  color: var(--accent-mint);
   font-weight: 600;
+  margin-bottom: 0.2rem;
 }
-
-.todoTitleDanger { color: var(--danger); }
+.todoTitleCaution { color: var(--accent-gold); }
 
 .todoList {
   list-style: none;
@@ -417,27 +1714,706 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.25rem;
 }
 
 .todoItem {
   font-size: 0.74rem;
   color: var(--text-sub);
-  background: var(--item-bg);
+  background: var(--bg);
   border-radius: 7px;
-  padding: 0.4rem 0.6rem;
+  padding: 0.35rem 0.55rem;
   display: flex;
   align-items: flex-start;
   gap: 0.3rem;
   line-height: 1.4;
 }
-
 .todoItem::before {
-  content: "•";
-  color: var(--accent2);
+  content: "·";
+  color: var(--accent-mint);
+  font-size: 1rem;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+.dontItem::before { color: var(--accent-gold); }
+
+/* ── Notification Hints (simplified) ── */
+.hintRow {
+  display: grid;
+  grid-template-columns: 5rem 5rem 1fr 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.38rem 0.5rem;
+  border-radius: 8px;
+}
+.hintRow:hover { background: var(--bg); }
+
+.hintHour {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+.hintScheduled {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.hintType {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.hintLabel {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+}
+
+/* ══════════════════════════════════════
+   Settings Overlay + Bottom Sheet
+   ══════════════════════════════════════ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 100;
+}
+
+.bottomSheet {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 390px;
+  background: var(--card);
+  border-radius: 20px 20px 0 0;
+  padding: 0.6rem 1.2rem 2.5rem;
+  z-index: 101;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+}
+
+.sheetHandle {
+  width: 36px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 1rem;
+}
+
+.sheetTitle {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.9rem;
+}
+
+.sheetOption {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
   font-size: 0.9rem;
-  line-height: 1.2;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  transition: color 0.15s;
+}
+.sheetOption:last-of-type { border-bottom: none; }
+.sheetOption:hover { color: var(--accent-mint); }
+.sheetOptionDanger:hover { color: var(--danger); }
+
+.sheetBack {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.3rem 0 0.8rem;
+}
+
+/* Notification settings inside bottom sheet */
+.notiSheetSection {
+  margin-top: 0.5rem;
+}
+
+.notiSheetRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.notiLabel {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  min-width: 2rem;
+}
+
+.notiSelect {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  font-size: 0.82rem;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.notiSelect:focus { outline: none; border-color: var(--accent-mint); }
+
+.notiPickerBtn {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  font-size: 0.82rem;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+.notiSaveBtn {
+  background: var(--accent-mint-bg);
+  border: 1.5px solid var(--accent-mint);
+  color: var(--accent-mint);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.notiSaveBtn:hover    { background: var(--accent-mint-light); }
+.notiSaveBtn:disabled { opacity: 0.35; cursor: default; }
+
+.notiTestBtn {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.notiSavedMsg {
+  font-size: 0.72rem;
+  color: var(--accent-mint);
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.notiItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.notiItem:last-of-type { border-bottom: none; }
+
+.notiItemText { flex: 1; gap: 2px; }
+
+.notiItemLabel {
+  font-size: 0.84rem;
+  color: var(--text);
+  font-weight: 500;
+  display: block;
+}
+
+.notiItemHelper {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  display: block;
+  line-height: 1.4;
+}
+
+.notiItemControl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
-.dontItem::before { color: var(--danger); }
+.notiToggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.notiToggle input { opacity: 0; width: 0; height: 0; }
+.notiToggleTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  background: var(--border);
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.notiToggleTrack::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px;
+  left: 3px;
+  transition: left 0.2s;
+}
+.notiToggle input:checked + .notiToggleTrack { background: var(--accent-mint); }
+.notiToggle input:checked + .notiToggleTrack::after { left: 19px; }
+
+/* ══════════════════════════════════════
+   내 기본 프로필 섹션
+   ══════════════════════════════════════ */
+.profileSection {
+  margin-top: 0.75rem;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.profileHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.4rem 0.2rem 0.7rem;
+}
+
+.profileHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.profileHeaderTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.profileHeaderSub {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.profileBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* Individual cards inside profile */
+.profileCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 0.95rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.profileCardTitle {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.55rem;
+}
+
+/* 출생정보 */
+.profileInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 0.8rem;
+}
+
+.profileInfoRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.profileInfoLabel {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.profileInfoValue {
+  font-size: 0.78rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+
+.sajuStarChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.45rem;
+  min-width: 0;
+}
+
+.sajuStarChip {
+  font-size: 0.65rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(58,171,140,0.35);
+  color: var(--accent-mint);
+  background: rgba(58,171,140,0.05);
+  white-space: nowrap;
+}
+
+/* 사주명식표 */
+.sajuTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.sajuTableHead th {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: center;
+  padding: 0 0 0.3rem;
+}
+
+.sajuRowLabelHead,
+.sajuRowLabel {
+  width: 2.3rem;
+}
+
+.sajuTableHead th:not(.sajuRowLabelHead),
+.sajuTableBody td:not(.sajuRowLabel) {
+  width: calc((100% - 2.3rem) / 4);
+}
+
+.sajuRowLabel {
+  font-size: 0.58rem;
+  color: var(--text-dim);
+  text-align: left;
+  padding-right: 0.35rem;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.sajuTableBody td {
+  text-align: center;
+  padding: 0.22rem 0;
+}
+
+/* Ganzi character box — replaces inline styles */
+.sajuGanziBox {
+  width: 100%;
+  max-width: 3.1rem;
+  min-height: 2.2rem;
+
+  margin: 0 auto;
+  padding: 0.35rem 0.2rem;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+.sajuDayGanzi {
+  border: 1.2px solid currentColor;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transform: translateY(-0.5px);
+}
+
+.dayStemBase {
+  font-size: 0.52rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.sajuTenGod {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  margin-top: 0.08rem;
+}
+
+.sajuJijangRow td {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.35rem;
+}
+
+.sajuJijangCell {
+  text-align: center;
+  padding: 0.3rem 0 0.15rem;
+}
+
+.sajuJijangInner {
+  min-height: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+
+.sajuJijangStem {
+  min-width: 1.05rem;
+  padding: 1px 3px;
+  border-radius: 5px;
+  font-size: 0.68rem;
+  line-height: 1.25;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sajuJijangLabel { display: none; }
+
+/* 오행 레이더 */
+.elemRadarRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.elemRadarSvg {
+  width: 44%;
+  flex-shrink: 0;
+  display: block;
+}
+
+.elemRadarSvgFull {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
+}
+
+.elemBars {
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+
+.elemBarRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.elemBarLabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  width: 1.6rem;
+  flex-shrink: 0;
+}
+
+.elemBarTrack {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.elemBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-mint);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: barFill 0.5s ease-out forwards;
+}
+
+.elemBarVal {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text);
+  width: 2rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* 자미두수 */
+.ziweiStarList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.ziweiStarChip {
+  font-size: 0.65rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.ziweiStarChipMain {
+  border-color: rgba(58,171,140,0.45);
+  color: var(--accent-mint);
+}
+
+.ziweiMetaRow {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.ziweiMetaItem {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+/* 별자리 */
+.astroGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 1rem;
+}
+
+.astroRow {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  align-items: baseline;
+  column-gap: 0.4rem;
+}
+
+.astroRowWide {
+  grid-column: 1 / -1;
+  grid-template-columns: 3.8rem 1fr;
+}
+
+.astroLabel {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.astroSign {
+  font-size: 0.78rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.astroRetro {
+  font-size: 0.58rem;
+  color: var(--danger);
+  margin-left: 0.2rem;
+}
+
+/* Legacy aliases for backward compat (unused in new layout but safe) */
+.detailTopRow    { display: none; }
+.detailScoreInline { display: none; }
+.detailScoreNum  { display: none; }
+.detailDate      { display: none; }
+.detailLunar     { display: none; }
+.detailSummaryBox{ display: none; }
+.notiSettingsRow { display: none; }
+.hintRow.debugOnly { display: none; }
+
+.profileCardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-bottom: 0.45rem;
+}
+
+.profileCardSub {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  line-height: 1.2;
+}
+
+/* ── Info icon + inline help box ── */
+.infoIconWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.infoBtn {
+  all: unset;
+  width: 12px;
+  height: 12px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 0.52rem;
+  font-weight: 500;
+
+  color: var(--accent-mint);
+  border: 0.8px solid rgba(27, 196, 168, 0.7);
+  border-radius: 50%;
+
+  cursor: pointer;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.infoBtn:hover {
+  background: rgba(27, 196, 168, 0.05);
+}
+
+.inlineInfoBox {
+  grid-column: 1 / -1;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+
+  background: rgba(27, 196, 168, 0.06);
+  border: 1px solid rgba(27, 196, 168, 0.18);
+
+  color: var(--text, #333);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.sajuInfoValue {
+  white-space: nowrap;
+  word-break: keep-all;
+}

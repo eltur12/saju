@@ -41,6 +41,11 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
+        <!-- AdMob App ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6572674549840800~1714269434"/>
+
         <!-- 홈 화면 위젯 리시버 -->
         <receiver
             android:name=".FortuneWidget"
@@ -60,6 +65,39 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
+        <!-- 네이티브 AlarmManager 알림 수신기 -->
+        <receiver
+            android:name=".NotificationAlarmReceiver"
+            android:exported="false" />
+
+        <!-- 기기 재부팅 후 알림 재등록 -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 자정 위젯 갱신 AlarmManager 트리거 -->
+        <receiver
+            android:name=".MidnightRefreshReceiver"
+            android:exported="false" />
+
+        <!-- 점수 요약 위젯 (widget_fortune.xml) -->
+        <receiver
+            android:name=".FortuneScoreWidget"
+            android:exported="true"
+            android:label="하루온도 위젯">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_score" />
+        </receiver>
+
         <!-- 달력 위젯 GridView 어댑터 서비스 -->
         <service
             android:name=".FortuneWidgetService"
@@ -75,4 +113,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>
