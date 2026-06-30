@@ -515,4 +515,8 @@ export function clearUser(): void {
   localStorage.removeItem("saju_cache");
   localStorage.removeItem("saju_profile_v1");
   localStorage.removeItem("saju_profile_v2");
+  localStorage.removeItem("haruondo_rewarded_status");
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("ai_interpretation_"))
+    .forEach(k => localStorage.removeItem(k));
 }

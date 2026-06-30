@@ -11,6 +11,11 @@ const config: CapacitorConfig = {
     Preferences: {
       group: 'CapacitorStorage',
     },
+    AdMob: {
+      appId: {
+        android: 'ca-app-pub-6572674549840800~1714269434',
+      },
+    },
   },
 };
 

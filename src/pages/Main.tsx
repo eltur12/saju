@@ -42,6 +42,10 @@ import { Preferences } from "@capacitor/preferences";
 import {BRANCH_ELEMENT, STEM_ELEMENT} from "../engines/sajuEngine.ts";
 import { getFocusDisplayBoost, getFocusCategoryArrow } from "../engines/focusBuilder";
 import { buildFlowElementKeys } from "../utils/flowElements";
+import { showRewardedAd } from "../admob/rewardedAd";
+import { getRewardedStatus, markRewarded, markAfterBatch } from "../admob/rewardedStatus";
+import { logEvent } from "../analytics/Analytics";
+import { AnalyticsEvent } from "../analytics/events";
 
 // ── AI 해석 캐시 유틸 ────────────────────────────────────────────────────────
 
@@ -200,6 +204,7 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
   const [expandedCat, setExpandedCat] = useState<keyof DailyFortune["scores"] | null>(null);
   const [aiResult,     setAiResult]     = useState<{ framing: string; focusPoint: string; bestArea: string; worstArea: string; summary: string } | null>(null);
   const [aiLoading,    setAiLoading]    = useState(false);
+  const [adLoading,    setAdLoading]    = useState(false);
   const pregenInFlightRef              = useRef(false);
   const pregenPromiseRef               = useRef<Promise<void> | null>(null);
   const pregenTargetDatesRef           = useRef<Set<string>>(new Set());
@@ -216,8 +221,13 @@ const [eventInfoKey, setEventInfoKey] = useState<string | null>(null);
     setExpandedSegs(null);
     setAiResult(null);
     setAiLoading(false);
+    setAdLoading(false);
     setBatchProgress("");
     setBatchResultKey(null);
+    if (selected?.date && getRewardedStatus(selected.date) === true) {
+      const cached = loadAiInterpretationCache(selected.date);
+      if (cached) setAiResult(cached);
+    }
   }, [selected?.date]);
 
 
@@ -1786,45 +1796,64 @@ const normalizedBirthDisplay = useMemo(() => {
                       </div>
                     </div>
 
-                    {/* ── 오늘의 흐름 ── */}
+                    {/* ── 오늘의 흐름 (버튼 / 로딩 상태) ── */}
+                    {!aiResult && (
                     <div className={styles.detailSection}>
                       <div className={styles.sectionTitle}>오늘의 흐름</div>
 
                       {/* 빈 상태 + 버튼 */}
-                      {!aiResult && !aiLoading && (
+                      {!aiLoading && !adLoading && (
                         <>
                           <p className={styles.flowEmptyHint}>
                             오늘 흐름을 조금 더 자세히 볼 수 있어요.
                           </p>
+                          <div className={styles.flowAdNotice}>
+                            <p>광고 시청 후 오늘의 흐름을 자세히 확인할 수 있습니다.</p>
+                            <p>※ 일부 광고는 소리가 재생될 수 있습니다.</p>
+                          </div>
                           <button
                             className={styles.flowBtn}
                             disabled={batchRunning}
                             onClick={async () => {
                               if (!data) return;
                               const dateKey = selected.date;
-                              setAiLoading(true);
+                              const status = getRewardedStatus(dateKey);
+                              void logEvent(AnalyticsEvent.INTERPRETATION_BUTTON_CLICK);
+
+                              // ── 광고 시청 ──────────────────────────────────────────────────────────
+                              void logEvent(AnalyticsEvent.REWARDED_AD_START);
+                              setAdLoading(true);
+                              let rewarded = false;
                               try {
-                                // 1. 캐시 먼저 확인
+                                rewarded = await showRewardedAd();
+                              } finally {
+                                setAdLoading(false);
+                              }
+                              if (!rewarded) return;
+                              void logEvent(AnalyticsEvent.REWARDED_AD_COMPLETE);
+
+                              // ── status === false: 캐시 있음 → 광고 보상 후 바로 표시 ──────────────
+                              if (status === false) {
+                                markRewarded(dateKey);
                                 const cached = loadAiInterpretationCache(dateKey);
                                 if (cached) {
+                                  void logEvent(AnalyticsEvent.INTERPRETATION_CACHE_HIT);
                                   setAiResult(cached);
-                                  // 백그라운드 선생성 (이미 없는 날짜들만 대상)
-                                  if (!pregenInFlightRef.current) {
-                                    const p = pregenAiInterpretations(dateKey, data);
-                                    pregenPromiseRef.current = p;
-                                    p.catch(console.error);
-                                  }
                                   return;
                                 }
+                                // 캐시 없으면 하단 API 로직으로 폴백
+                              }
 
-                                // 2. 날짜별 in-flight 방어 — 동일 날짜 중복 요청 무시
-                                if (interpretationInFlightDatesRef.current.has(dateKey)) {
-                                  console.log(`[AI] ${dateKey} 이미 요청 진행 중 — 중복 무시`);
-                                  return;
-                                }
-                                interpretationInFlightDatesRef.current.add(dateKey);
+                              // ── API 호출 (status === undefined 또는 캐시 없음 폴백) ────────────────
+                              void logEvent(AnalyticsEvent.INTERPRETATION_API_CALL);
+                              setAiLoading(true);
+                              if (interpretationInFlightDatesRef.current.has(dateKey)) {
+                                setAiLoading(false);
+                                return;
+                              }
+                              interpretationInFlightDatesRef.current.add(dateKey);
 
-                                // 3. 선생성 진행 중인 경우 — batch 완료를 기다린 후 캐시 재확인
+                              try {
                                 if (pregenInFlightRef.current && pregenPromiseRef.current) {
                                   const isTargeted = pregenTargetDatesRef.current.has(dateKey);
                                   console.log(`[AI] 선생성 진행 중 — ${dateKey} 포함=${isTargeted}, 완료 대기`);
@@ -1832,25 +1861,30 @@ const normalizedBirthDisplay = useMemo(() => {
 
                                   const afterWait = loadAiInterpretationCache(dateKey);
                                   if (afterWait) {
+                                    const allCached = data.daily_fortunes.map(f => f.date).filter(d => loadAiInterpretationCache(d) !== null);
+                                    markAfterBatch(dateKey, allCached);
+                                    void logEvent(AnalyticsEvent.INTERPRETATION_OPEN);
                                     setAiResult(afterWait);
                                     return;
                                   }
                                   console.log(`[AI] batch 미포함 — ${dateKey} 단독 호출 폴백`);
                                 } else {
-                                  // 4a. 선생성 미진행 — selectedDate부터 batch 선생성 실행
                                   const p = pregenAiInterpretations(dateKey, data);
                                   pregenPromiseRef.current = p;
                                   await p;
 
                                   const fresh = loadAiInterpretationCache(dateKey);
                                   if (fresh) {
+                                    const allCached = data.daily_fortunes.map(f => f.date).filter(d => loadAiInterpretationCache(d) !== null);
+                                    markAfterBatch(dateKey, allCached);
+                                    void logEvent(AnalyticsEvent.INTERPRETATION_OPEN);
                                     setAiResult(fresh);
                                     return;
                                   }
                                   console.log(`[AI] 선생성 실패 — ${dateKey} 단독 호출 폴백`);
                                 }
 
-                                // 4b. 단독 호출 폴백 (batch 미포함 또는 선생성 실패)
+                                // 단독 호출 폴백
                                 const monthCtx = {
                                   displayScores: data.daily_fortunes.map(f => f.scores.overall as number),
                                   flowType:      data.monthly_flow_type,
@@ -1868,9 +1902,11 @@ const normalizedBirthDisplay = useMemo(() => {
                                     worstArea:  typeof parsed.worstArea  === "string" ? parsed.worstArea  : "",
                                     summary:    typeof parsed.summary    === "string" ? parsed.summary    : clean,
                                   };
+                                  void logEvent(AnalyticsEvent.INTERPRETATION_OPEN);
                                   setAiResult(result);
                                   if (result.summary !== "") {
                                     saveAiInterpretationCache({ date: dateKey, ...result });
+                                    markRewarded(dateKey);
                                   }
                                 } catch {
                                   setAiResult({ framing: "", focusPoint: "", bestArea: "", worstArea: "", summary: clean });
@@ -1884,47 +1920,65 @@ const normalizedBirthDisplay = useMemo(() => {
                               }
                             }}
                           >
-                            자세히 풀어보기
+                            {getRewardedStatus(selected.date) === false ? "광고 보고 이어보기" : "자세히 풀어보기"}
                           </button>
                         </>
                       )}
 
-                      {/* 로딩 */}
+                      {/* 광고 로딩 */}
+                      {adLoading && (
+                        <p className={styles.flowLoading}>광고를 불러오는 중이에요...</p>
+                      )}
+
+                      {/* AI 로딩 */}
                       {aiLoading && (
                         <p className={styles.flowLoading}>오늘의 흐름을 정리하고 있어요...</p>
                       )}
 
-                      {/* 결과 */}
-                      {aiResult && (
-                        <div>
+                    </div>
+                    )}
+
+                    {/* ── 오늘의 흐름 결과: 카드 4장 ── */}
+                    {aiResult && (
+                      <div className={styles.aiCardList}>
+
+                        {/* 오늘의 흐름 카드 */}
+                        <div className={`${styles.aiCard} ${styles.aiCardFlow}`}>
+                          <span className={`${styles.aiCardTitle} ${styles.aiCardTitleGreen}`}>오늘의 흐름</span>
                           {aiResult.framing !== "" && (
-                            <p className={styles.flowFraming}>{aiResult.framing}</p>
+                            <p className={styles.aiFraming}>{aiResult.framing}</p>
                           )}
                           {aiResult.focusPoint !== "" && (
-                            <p className={styles.flowSubtitle}>{aiResult.focusPoint}</p>
+                            <p className={styles.aiFocus}>{aiResult.focusPoint}</p>
                           )}
-                          <div className={styles.flowSummary}>
-                            {aiResult.bestArea !== "" && (
-                              <div className={styles.flowBlock}>
-                                <span className={`${styles.flowLabel} ${styles.flowLabelBest}`}>잘 맞는 영역</span>
-                                <p>{aiResult.bestArea}</p>
-                              </div>
-                            )}
-                            {aiResult.worstArea !== "" && (
-                              <div className={styles.flowBlock}>
-                                <span className={`${styles.flowLabel} ${styles.flowLabelWorst}`}>걸리는 부분</span>
-                                <p>{aiResult.worstArea}</p>
-                              </div>
-                            )}
-                            {aiResult.summary !== "" && (
-                              <div className={`${styles.flowBlock} ${styles.flowBlockSummary}`}>
-                                <p>{aiResult.summary}</p>
-                              </div>
-                            )}
-                          </div>
                         </div>
-                      )}
-                    </div>
+
+                        {/* 잘 맞는 영역 카드 */}
+                        {aiResult.bestArea !== "" && (
+                          <div className={styles.aiCard}>
+                            <span className={`${styles.aiCardTitle} ${styles.aiCardTitleGreen}`}>잘 맞는 영역</span>
+                            <p className={styles.aiBody}>{aiResult.bestArea}</p>
+                          </div>
+                        )}
+
+                        {/* 걸리는 부분 카드 */}
+                        {aiResult.worstArea !== "" && (
+                          <div className={styles.aiCard}>
+                            <span className={`${styles.aiCardTitle} ${styles.aiCardTitleOrange}`}>걸리는 부분</span>
+                            <p className={styles.aiBody}>{aiResult.worstArea}</p>
+                          </div>
+                        )}
+
+                        {/* 오늘의 한마디 카드 */}
+                        {aiResult.summary !== "" && (
+                          <div className={styles.aiCard}>
+                            <span className={`${styles.aiCardTitle} ${styles.aiCardTitlePurple}`}>오늘의 한마디</span>
+                            <p className={styles.aiBody}>{aiResult.summary}</p>
+                          </div>
+                        )}
+
+                      </div>
+                    )}
 
                     {/* ── 한달 AI 해석 배치 ── */}
                     <div className={styles.detailSection}>

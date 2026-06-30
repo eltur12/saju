@@ -41,6 +41,11 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
+        <!-- AdMob App ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6572674549840800~1714269434"/>
+
         <!-- 홈 화면 위젯 리시버 -->
         <receiver
             android:name=".FortuneWidget"
